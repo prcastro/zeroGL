@@ -1,0 +1,3 @@
+"c:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
+
+cl main.cpp imgui*.cpp /Zi /I C:\SDL2\include /link /LIBPATH:C:\SDL2\lib\x64 SDL2.lib SDL2main.lib /SUBSYSTEM:CONSOLE

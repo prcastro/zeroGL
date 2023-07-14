@@ -1,0 +1,35 @@
+newmtl red
+Kd 1.000 0.000 0.000
+Ks 1.000 1.000 1.000
+Ns 900.000
+map_Kd cube.png
+
+newmtl green
+Kd 0.000 1.000 0.000
+Ks 1.000 1.000 1.000
+Ns 900.000
+map_Kd cube.png
+
+newmtl blue
+Kd 0.000 0.000 1.000
+Ks 1.000 1.000 1.000
+Ns 900.000
+map_Kd cube.png
+
+newmtl yellow
+Kd 1.000 1.000 0.000
+Ks 1.000 1.000 1.000
+Ns 900.000
+map_Kd cube.png
+
+newmtl purple
+Kd 1.000 0.000 1.000
+Ks 1.000 1.000 1.000
+Ns 900.000
+map_Kd cube.png
+
+newmtl cyan
+Kd 0.000 1.000 1.000
+Ks 1.000 1.000 1.000
+Ns 900.000
+map_Kd cube.png
