@@ -33,3 +33,6 @@
 
 # Remove target
 target/*
+*.pdb
+*.dmp
+*.dmp.gz

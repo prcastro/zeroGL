@@ -17,11 +17,11 @@
 #include "object3D.h"
 #include "draw.h"
 
-#ifdef DEBUG
-#define DEBUG_PRINT(...) printf(__VA_ARGS__)
-#else
+// #ifdef DEBUG
+// #define DEBUG_PRINT(...) printf(__VA_ARGS__)
+// #else
 #define DEBUG_PRINT(...) do {} while (0)
-#endif
+// #endif
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -31,8 +31,8 @@
 typedef struct game_state_t {
     // Loop control
     bool         running;
-    uint32_t       elapsedTime;
-    uint32_t       lastTime;
+    double       elapsedTime;
+    uint64_t     lastTime;
 
     // Rendering
     SDL_Event     event;
@@ -185,7 +185,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
     if (game->shaded && !(game->shadingMode == 2)) {
         c0 = mulScalarColor(i0, c0);
         c1 = mulScalarColor(i1, c1);
-        c2 = mulScalarColor(i2, c2);
+        c2 =  (i2, c2);
     }
     
     for (int y = y_min; y <= y_max; y++) {
@@ -194,7 +194,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
         int w1 = w1_row;
         int w2 = w2_row;
         for (int x = x_min; x <= x_max; x++) {
-            bool is_inside = w0 >= 0 && w1 >= 0 && w2 >= 0;
+            bool is_inside = (w0 | w1 | w2) >= 0;
             if (is_inside) {
                 was_inside = true;
             
@@ -306,7 +306,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
     for (int p = 0; p < camera.numPlanes; p++) {
         float distance = distancePlaneV3(camera.planes[p], transformedCenter);
         if (distance < -transformedBoundsRadius) {
-            fprintf(stderr, "DEBUG: Clipped an object fully outside of the clipping volume\n");
+            DEBUG_PRINT("DEBUG: Clipped an object fully outside of the clipping volume\n");
             return;
         }
     }
@@ -353,7 +353,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
             if (distancePlaneV3(plane, camTransformed[triangle.v0]) < 0 &&
                 distancePlaneV3(plane, camTransformed[triangle.v1]) < 0 &&
                 distancePlaneV3(plane, camTransformed[triangle.v2]) < 0) {
-                    fprintf(stderr, "DEBUG: Clipped triangle fully outside of the camera clipping volume\n");
+                    DEBUG_PRINT("DEBUG: Clipped triangle fully outside of the camera clipping volume\n");
                     discarded = true;
                     break;
             }
@@ -369,7 +369,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
         if (camTransformed[triangle.v0].z < 0 ||
             camTransformed[triangle.v1].z < 0 ||
             camTransformed[triangle.v2].z < 0) {
-            fprintf(stderr, "DEBUG: Clipped triangle with a vertice behind the camera\n");
+            DEBUG_PRINT("DEBUG: Clipped triangle with a vertice behind the camera\n");
             discarded = true;
         }
 
@@ -605,7 +605,7 @@ game_state_t* init() {
     
     game->running = true;
     game->elapsedTime = 0;
-    game->lastTime = SDL_GetTicks();
+    game->lastTime = SDL_GetPerformanceCounter();
     game->window = SDL_CreateWindow("Rasterizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
     game->renderer = SDL_CreateRenderer(game->window, -1, 0);
     game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
@@ -697,7 +697,7 @@ void updateDebugUI(game_state_t *game) {
         // Create an ImGui interface
         ImGui::Begin("Settings");
 
-        ImGui::Text("FPS: %.2f (%d ms)", floor(1000.0f / game->elapsedTime), game->elapsedTime);
+        ImGui::Text("FPS: %.2f (%.3lf ms)", floor(1000.0f / game->elapsedTime), game->elapsedTime);
 
         if (ImGui::CollapsingHeader("Meshes")) {
             for (int i = 0; i < game->numMeshes; i++) {
@@ -837,18 +837,12 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
     DEBUG_PRINT("INFO: Rendering scene\n");
 
     // Init depthBuffer
-    for (int i = 0; i < WIDTH * HEIGHT; i++) {
-        game->depthBuffer[i] = 0;
-    }
+    memset(game->depthBuffer, 0, WIDTH * HEIGHT * sizeof(float));
 
     // Background
     DEBUG_PRINT("INFO: Drawing background\n");
     uint32_t backgroundColor = colorToUint32(game->backgroundColor);
-    for (int i = 0; i < WIDTH; i++) {
-        for (int j = 0; j < HEIGHT; j++) {
-            drawPixel(i, j, backgroundColor, game->frameBuffer);        
-        }
-    }
+    memset(game->frameBuffer, backgroundColor, WIDTH * HEIGHT * sizeof(uint32_t));
 
     // Draw 3D Objects
     if (game->draw3DObjects) {
@@ -959,9 +953,9 @@ int main(int argc, char* argv[])
         // Present frame and compute FPS
         DEBUG_PRINT("INFO: Present frame\n");
         SDL_RenderPresent(game->renderer);
-        uint32_t currentTime = SDL_GetTicks();
-        game->elapsedTime = (currentTime - game->lastTime);
-        printf("INFO: Frame rendered in %d ms (%.0f FPS)\n", game->elapsedTime, floor(1000.0f / game->elapsedTime));
+        uint64_t currentTime = SDL_GetPerformanceCounter();
+        game->elapsedTime = 1000.0 * (currentTime - game->lastTime) / SDL_GetPerformanceFrequency();
+        DEBUG_PRINT("INFO: Frame rendered in %.00lf ms (%.0f FPS)\n", game->elapsedTime, floor(1000.0f / game->elapsedTime));
         game->lastTime = currentTime;
     }
 
