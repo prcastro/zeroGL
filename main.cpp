@@ -185,7 +185,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
     if (game->shaded && !(game->shadingMode == 2)) {
         c0 = mulScalarColor(i0, c0);
         c1 = mulScalarColor(i1, c1);
-        c2 =  (i2, c2);
+        c2 = mulScalarColor(i2, c2);
     }
     
     for (int y = y_min; y <= y_max; y++) {
