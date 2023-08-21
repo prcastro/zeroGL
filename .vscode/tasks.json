@@ -16,11 +16,11 @@
                 "external\\imgui\\imgui*.cpp",
                 "external\\upng\\upng.cpp",
                 "/I",
-                "C:\\SDL2\\include",
+                "external\\sdl2\\include",
                 "/link",
-                "/LIBPATH:C:\\SDL2\\lib\\x64",
+                "/LIBPATH:external\\sdl2\\lib\\x64",
                 "SDL2.lib",
-                "SDL2main.lib"
+                "SDL2main.lib",
             ],
             "options": {
                 "cwd": "${fileDirname}"
