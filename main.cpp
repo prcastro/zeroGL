@@ -1,10 +1,11 @@
-#define DEBUG
+// #define DEBUG
+#define DEBUGUI
 #define SDL_MAIN_HANDLED
-#ifdef DEBUG
+#ifdef DEBUGUI
 #include "external/imgui/imgui.h"
 #include "external/imgui/imgui_impl_sdl2.h"
 #include "external/imgui/imgui_impl_sdlrenderer.h"
-#endif // DEBUG
+#endif // DEBUGUI
 
 #include <SDL.h>
 #include <math.h>
@@ -17,11 +18,11 @@
 #include "object3D.h"
 #include "draw.h"
 
-// #ifdef DEBUG
-// #define DEBUG_PRINT(...) printf(__VA_ARGS__)
-// #else
+#ifdef DEBUG
+#define DEBUG_PRINT(...) printf(__VA_ARGS__)
+#else
 #define DEBUG_PRINT(...) do {} while (0)
-// #endif
+#endif
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -78,7 +79,7 @@ typedef struct game_state_t {
     const uint8_t* keys;
 
     // GUI
-    #ifdef DEBUG
+    #ifdef DEBUGUI
     bool         showGUI;
     bool         toggleGUIKeyPressed;
     #endif // DEBUG
@@ -648,14 +649,14 @@ game_state_t* init() {
     game->rotationSpeed = 15.0f;
     game->keys = SDL_GetKeyboardState(NULL);
 
-    #ifdef DEBUG
+    #ifdef DEBUGUI
     DEBUG_PRINT("INFO:  Initializing Dear ImGui\n");
     ImGui::CreateContext();
     ImGui_ImplSDL2_InitForSDLRenderer(game->window, game->renderer);
     ImGui_ImplSDLRenderer_Init(game->renderer);
     game->showGUI = true;
     game->toggleGUIKeyPressed = false;
-    #endif // DEBUG
+    #endif // DEBUGUI
 
     return game;
 }
@@ -663,9 +664,9 @@ game_state_t* init() {
 void handleEvents(game_state_t* game) {
     DEBUG_PRINT("INFO: Handle events\n");    
     while (SDL_PollEvent(&game->event)) {
-        #ifdef DEBUG
+        #ifdef DEBUGUI
         ImGui_ImplSDL2_ProcessEvent(&game->event);
-        #endif // DEBUG
+        #endif // DEBUGUI
         switch (game->event.type) {
         case SDL_QUIT:
             // handling of close button
@@ -676,7 +677,7 @@ void handleEvents(game_state_t* game) {
     }
 }
 
-#ifdef DEBUG
+#ifdef DEBUGUI
 void updateDebugUI(game_state_t *game) {
     // Check for toggle key
     if (game->keys[SDL_SCANCODE_SPACE]) {
@@ -825,7 +826,7 @@ void updateDebugUI(game_state_t *game) {
         ImGui::End();
     }
 }
-#endif // DEBUG
+#endif // DEBUGUI
 
 void update(game_state_t* game) {
     DEBUG_PRINT("INFO: Update game state\n");
@@ -890,7 +891,7 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
     SDL_RenderCopy(game->renderer, game->texture, NULL, NULL);
 }
 
-#ifdef DEBUG
+#ifdef DEBUGUI
 void renderDebugUI(game_state_t* game) {
     if (game->showGUI) {
         DEBUG_PRINT("INFO: Rendering GUI\n");
@@ -898,7 +899,7 @@ void renderDebugUI(game_state_t* game) {
         ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
     }
 }
-#endif // DEBUG 
+#endif // DEBUGUI 
 
 void destroy(game_state_t* game) {
     free(game->camera.planes);
@@ -917,11 +918,11 @@ void destroy(game_state_t* game) {
     SDL_DestroyTexture(game->texture);
     SDL_DestroyWindow(game->window);
 
-    #ifdef DEBUG
+    #ifdef DEBUGUI
     ImGui_ImplSDLRenderer_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
-    #endif // DEBUG
+    #endif // DEBUGUI
 
     SDL_Quit();
 }
@@ -939,16 +940,16 @@ int main(int argc, char* argv[])
     while (game->running) {
         handleEvents(game);
         
-        #ifdef DEBUG
+        #ifdef DEBUGUI
         updateDebugUI(game);
-        #endif // DEBUG
+        #endif // DEBUGUI
 
         update(game);
         render(p0, p1, p2, game);
         
-        #ifdef DEBUG
+        #ifdef DEBUGUI
         renderDebugUI(game);
-        #endif // DEBUG
+        #endif // DEBUGUI
 
         // Present frame and compute FPS
         DEBUG_PRINT("INFO: Present frame\n");
