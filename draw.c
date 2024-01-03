@@ -39,15 +39,15 @@ void drawLine(int x0, int x1, int y0, int y1, color_t color, uint32_t* frameBuff
 }
 
 point_t projectVertex(vec3_t v) {
-  return {
-    static_cast<int>(v.x * VIEWPORT_DISTANCE / v.z  * WIDTH/VIEWPORT_WIDTH + WIDTH/2),
-    static_cast<int>(HEIGHT/2 - (v.y * VIEWPORT_DISTANCE / v.z * HEIGHT/VIEWPORT_HEIGHT) - 1),
+  return (point_t) {
+    (int) (v.x * VIEWPORT_DISTANCE / v.z  * WIDTH/VIEWPORT_WIDTH + WIDTH/2),
+    (int) (HEIGHT/2 - (v.y * VIEWPORT_DISTANCE / v.z * HEIGHT/VIEWPORT_HEIGHT) - 1),
     1.0f / v.z
   };
 }
 
 vec3_t unprojectPoint(point_t p) {
-  return {
+  return (vec3_t) {
     (p.x - WIDTH/2) * (VIEWPORT_WIDTH / WIDTH) / (p.invz * VIEWPORT_DISTANCE),
     (HEIGHT/2 - p.y - 1) / (VIEWPORT_DISTANCE * p.invz * HEIGHT/VIEWPORT_HEIGHT),
     1.0f / p.invz

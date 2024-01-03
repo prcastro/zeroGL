@@ -2,9 +2,18 @@
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
 #ifdef DEBUGUI
-#include "external/imgui/imgui.h"
-#include "external/imgui/imgui_impl_sdl2.h"
-#include "external/imgui/imgui_impl_sdlrenderer.h"
+#define NK_INCLUDE_FIXED_TYPES
+#define NK_INCLUDE_STANDARD_IO
+#define NK_INCLUDE_STANDARD_VARARGS
+#define NK_INCLUDE_STANDARD_BOOL 
+#define NK_INCLUDE_DEFAULT_ALLOCATOR
+#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
+#define NK_INCLUDE_FONT_BAKING
+#define NK_INCLUDE_DEFAULT_FONT
+#define NK_IMPLEMENTATION
+#define NK_SDL_RENDERER_IMPLEMENTATION
+#include "external/nuklear/nuklear.h"
+#include "external/nuklear/nuklear_sdl_renderer.h"
 #endif // DEBUGUI
 
 #include <SDL.h>
@@ -13,6 +22,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #include "color.h"
 #include "vectors.h"
 #include "object3D.h"
@@ -80,8 +90,9 @@ typedef struct game_state_t {
 
     // GUI
     #ifdef DEBUGUI
-    bool         showGUI;
-    bool         toggleGUIKeyPressed;
+    struct nk_context* nuklearContext;
+    bool               showGUI;
+    bool               toggleGUIKeyPressed;
     #endif // DEBUG
 } game_state_t;
 
@@ -260,9 +271,9 @@ void drawTriangleFilled(int x0, int x1, int x2,
                             color = colorToUint32(color_shaded);
                         } else if (game->shaded) {
                             color_t color_typed = {
-                                static_cast<uint8_t>(c0.r * alpha + c1.r * beta + c2.r * gamma),
-                                static_cast<uint8_t>(c0.g * alpha + c1.g * beta + c2.g * gamma),
-                                static_cast<uint8_t>(c0.b * alpha + c1.b * beta + c2.b * gamma)
+                                (uint8_t) (c0.r * alpha + c1.r * beta + c2.r * gamma),
+                                (uint8_t) (c0.g * alpha + c1.g * beta + c2.g * gamma),
+                                (uint8_t) (c0.b * alpha + c1.b * beta + c2.b * gamma)
                             };
                             color_t color_shaded = mulScalarColor(light, color_typed);
                             color = colorToUint32(color_shaded);
@@ -572,7 +583,7 @@ game_state_t* init() {
     meshes[2] = *loadObjFile("assets/engineer/engineer.obj", false);
     meshes[3] = *loadObjFile("assets/cube.obj", false);
 
-    objects[0] = makeObject(&meshes[2], {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -587,9 +598,9 @@ game_state_t* init() {
         exit(-1);
     }
 
-    ambientLights[0] = {0.4};
-    directionalLights[0] = {0.0, {0.0, -1.0, 1.0}};
-    pointLights[0] = {0.9, {-0.5, 1.5, -2.0}};
+    ambientLights[0] = (ambient_light_t) {0.4};
+    directionalLights[0] = (dir_light_t) {0.0, {0.0, -1.0, 1.0}};
+    pointLights[0] = (point_light_t) {0.9, {-0.5, 1.5, -2.0}};
 
 
     pointLightObjects[0] = makeObject(&meshes[0], pointLights[0].position, 0.05, IDENTITY_M4x4);
@@ -612,7 +623,7 @@ game_state_t* init() {
     game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     game->frameBuffer = frameBuffer;
     game->depthBuffer = depthBuffer;
-    game->backgroundColor = {0, 0, 0};
+    game->backgroundColor = (color_t) {0, 0, 0};
     game->drawLights    = true;
     game->draw3DObjects =  true;
     game->draw2DObjects =  false;
@@ -640,7 +651,7 @@ game_state_t* init() {
     game->pointLightObjects = pointLightObjects;
     
     game->camera = makeCamera(
-        {0, 0, -5},
+        (vec3_t) {0, 0, -5},
         rotationY(0.0f),
         VIEWPORT_DISTANCE,
         5.0f,
@@ -651,9 +662,15 @@ game_state_t* init() {
 
     #ifdef DEBUGUI
     DEBUG_PRINT("INFO:  Initializing Dear ImGui\n");
-    ImGui::CreateContext();
-    ImGui_ImplSDL2_InitForSDLRenderer(game->window, game->renderer);
-    ImGui_ImplSDLRenderer_Init(game->renderer);
+    struct nk_context *ctx = nk_sdl_init(game->window, game->renderer);
+    struct nk_font_atlas *atlas;
+    struct nk_font_config config = nk_font_config(0);
+    struct nk_font *font;
+    nk_sdl_font_stash_begin(&atlas);
+    font = nk_font_atlas_add_default(atlas, 10.0, &config);
+    nk_sdl_font_stash_end();
+    nk_style_set_font(ctx, &font->handle);
+    game->nuklearContext = ctx;
     game->showGUI = true;
     game->toggleGUIKeyPressed = false;
     #endif // DEBUGUI
@@ -662,10 +679,15 @@ game_state_t* init() {
 }
 
 void handleEvents(game_state_t* game) {
-    DEBUG_PRINT("INFO: Handle events\n");    
+    DEBUG_PRINT("INFO: Handle events\n");
+
+    #ifdef DEBUGUI
+    nk_input_begin(game->nuklearContext);
+    #endif // DEBUGUI
+    
     while (SDL_PollEvent(&game->event)) {
         #ifdef DEBUGUI
-        ImGui_ImplSDL2_ProcessEvent(&game->event);
+        nk_sdl_handle_event(&game->event);
         #endif // DEBUGUI
         switch (game->event.type) {
         case SDL_QUIT:
@@ -691,139 +713,164 @@ void updateDebugUI(game_state_t *game) {
 
     if (game->showGUI) {
         DEBUG_PRINT("INFO: Updating GUI\n");
-        ImGui_ImplSDLRenderer_NewFrame();
-        ImGui_ImplSDL2_NewFrame(game->window);
-        ImGui::NewFrame();
+        int row_size = 12;
+        struct nk_context *ctx = game->nuklearContext;
+        if (nk_begin(ctx, "Settings", nk_rect(0, 0, 220, HEIGHT),
+                     NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE|NK_WINDOW_SCALABLE)) {
+            
+            nk_layout_row_static(ctx, row_size, 150, 1);
+            nk_labelf(ctx, NK_TEXT_LEFT, "FPS: %.2f (%.3lf ms)", floor(1000.0f / game->elapsedTime), game->elapsedTime);
 
-        // Create an ImGui interface
-        ImGui::Begin("Settings");
-
-        ImGui::Text("FPS: %.2f (%.3lf ms)", floor(1000.0f / game->elapsedTime), game->elapsedTime);
-
-        if (ImGui::CollapsingHeader("Meshes")) {
-            for (int i = 0; i < game->numMeshes; i++) {
-                ImGui::Text("%s: (vertices %d, triangles: %d, uvs: %d)", game->meshes[i].name, game->meshes[i].numVertices, game->meshes[i].numTriangles, game->meshes[i].numTextureCoords);
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Meshes", NK_MINIMIZED)) {
+                for (int i = 0; i < game->numMeshes; i++) {
+                    nk_layout_row_dynamic(ctx, row_size, 1);
+                    nk_labelf(ctx, NK_TEXT_LEFT, "%s: (vertices %d, triangles: %d, uvs: %d)", game->meshes[i].name, game->meshes[i].numVertices, game->meshes[i].numTriangles, game->meshes[i].numTextureCoords);
+                }
+                nk_tree_pop(ctx);
             }
-        }
 
-        if (ImGui::CollapsingHeader("Objects")) {
-            for (int i = 0; i < game->numObjects; i++) {
-                ImGui::Text("%d: %s at (%.0f, %.0f, %.0f)", i, game->objects[i].mesh->name, game->objects[i].translation.x, game->objects[i].translation.y, game->objects[i].translation.z);
-                ImGui::SliderFloat("x", &game->objects[i].translation.x, -10.0f, 10.0f);
-                ImGui::SliderFloat("y", &game->objects[i].translation.y, -10.0f, 10.0f);
-                ImGui::SliderFloat("z", &game->objects[i].translation.z, -10.0f, 10.0f);
-                ImGui::SliderFloat("scale", &game->objects[i].scale, -0.01f, 10.0f);
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Objects", NK_MAXIMIZED)) {
+                for (int i = 0; i < game->numObjects; i++) {
+                    nk_layout_row_dynamic(ctx, row_size, 1);
+                    nk_labelf(ctx, NK_TEXT_LEFT, "%d: %s at (%.0f, %.0f, %.0f)", i, game->objects[i].mesh->name, game->objects[i].translation.x, game->objects[i].translation.y, game->objects[i].translation.z);
+                    nk_layout_row_dynamic(ctx, row_size, 1);
+                    nk_property_float(ctx, "x", -10.0f, &game->objects[i].translation.x, 10.0f, 0.1f, 0.1f);
+                    nk_layout_row_dynamic(ctx, row_size, 1);
+                    nk_property_float(ctx, "y", -10.0f, &game->objects[i].translation.y, 10.0f, 0.1f, 0.1f);
+                    nk_layout_row_dynamic(ctx, row_size, 1);
+                    nk_property_float(ctx, "z", -10.0f, &game->objects[i].translation.z, 10.0f, 0.1f, 0.1f);
+                    nk_layout_row_dynamic(ctx, row_size, 1);
+                    nk_property_float(ctx, "scale", -0.01f, &game->objects[i].scale, 10.0f, 0.01f, 0.01f);
+                }
+                nk_tree_pop(ctx);
             }
-        }
 
-        if (ImGui::CollapsingHeader("Lights")) {
-            ImGui::Indent(20.0f);
-            ImGui::Checkbox("Shaded", &game->shaded);
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Lights", NK_MINIMIZED)) {
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_checkbox_label(ctx, "Shaded", &game->shaded);
+                if (game->shaded) {
+                    nk_layout_row_dynamic(ctx, row_size, 3);
+                    nk_bool isFlat = game->shadingMode == 0;
+                    if (nk_radio_label(ctx, "Flat", &isFlat)) {
+                        game->shadingMode = 0;
+                    };
+                    nk_bool isGouraud = game->shadingMode == 1;
+                    if (nk_radio_label(ctx, "Gouraud", &isGouraud)) {
+                        game->shadingMode = 1;
+                    };
 
-            if (game->shaded) {
-                if (ImGui::RadioButton("Flat", game->shadingMode == 0)) {
-                game->shadingMode = 0;
-                }
-                ImGui::SameLine();
-                if (ImGui::RadioButton("Gouraud", game->shadingMode == 1)) {
-                    game->shadingMode = 1;
-                }
-                ImGui::SameLine();
-                if (ImGui::RadioButton("Phong", game->shadingMode == 2)) {
-                    game->shadingMode = 2;
-                }
+                    nk_bool isPhong = game->shadingMode == 2;
+                    if (nk_radio_label(ctx, "Phong", &isPhong)) {
+                        game->shadingMode = 2;
+                    };
 
-                ImGui::Checkbox("Difuse", &game->diffuseLighting);
-                ImGui::SameLine();
-                ImGui::Checkbox("Specular", &game->specularLighting);
+                    nk_layout_row_dynamic(ctx, row_size, 2);
+                    nk_checkbox_label(ctx, "Difuse", &game->diffuseLighting);
+                    nk_checkbox_label(ctx, "Specular", &game->specularLighting);
 
-
-                if (ImGui::CollapsingHeader("Ambient")) {
-                    ImGui::Indent(20.0f);
-                    for (int i = 0; i < game->numAmbientLights; i++) {
-                        ImGui::PushID(i);
-                        ImGui::Text("Ambient Light %d", i);
-                        ImGui::SliderFloat("Intensity##amb", &game->ambientLights[i].intensity, 0.0f, 3.0f);
-                        ImGui::PopID();
+                    if (nk_tree_push(ctx, NK_TREE_NODE, "Ambient", NK_MAXIMIZED)) {
+                        for (int i = 0; i < game->numAmbientLights; i++) {
+                            nk_layout_row_dynamic(ctx, row_size * 4, 1);
+                            char label[100];
+                            sprintf(label, "Ambient Light %d", i);
+                            if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "Intensity", 0.0f, &game->ambientLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                                nk_group_end(ctx);
+                            }
+                        }
+                        nk_tree_pop(ctx);
                     }
-                    ImGui::Unindent(20.0f);
-                }
 
-                if (ImGui::CollapsingHeader("Directional")) {
-                    ImGui::Indent(20.0f);
-                    for (int i = 0; i < game->numDirectionalLights; i++) {
-                        ImGui::PushID(i);
-                        ImGui::Text("Directional Light %d", i);
-                        ImGui::SliderFloat("Intensity", &game->directionalLights[i].intensity, 0.0f, 3.0f);
-                        ImGui::SliderFloat("x", &game->directionalLights[i].direction.x, -1.0f, 1.0f);
-                        ImGui::SliderFloat("y", &game->directionalLights[i].direction.y, -1.0f, 1.0f);
-                        ImGui::SliderFloat("z", &game->directionalLights[i].direction.z, -1.0f, 1.0f);
-                        ImGui::PopID();
+                    if (nk_tree_push(ctx, NK_TREE_NODE, "Directional", NK_MAXIMIZED)) {
+                        for (int i = 0; i < game->numDirectionalLights; i++) {
+                            nk_layout_row_dynamic(ctx, row_size * 8, 1);
+                            char label[100];
+                            sprintf(label, "Directional Light %d", i);
+                            if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "Intensity", 0.0f, &game->directionalLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "x", -1.0f, &game->directionalLights[i].direction.x, 1.0f, 0.1f, 0.1f);
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "y", -1.0f, &game->directionalLights[i].direction.y, 1.0f, 0.1f, 0.1f);
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "z", -1.0f, &game->directionalLights[i].direction.z, 1.0f, 0.1f, 0.1f);
+                                nk_group_end(ctx);
+                            }
+                        }
+                        nk_tree_pop(ctx);
                     }
-                    ImGui::Unindent(20.0f);
-                }
 
-                if (ImGui::CollapsingHeader("Point")) {
-                    ImGui::Indent(20.0f);
-                    for (int i = 0; i < game->numPointLights; i++) {
-                        ImGui::PushID(i);
-                        ImGui::Text("Point Light %d", i);
-                        ImGui::SliderFloat("Intensity##p", &game->pointLights[i].intensity, 0.0f, 3.0f);
-                        ImGui::SliderFloat("x##p", &game->pointLights[i].position.x, -10.0f, 10.0f);
-                        ImGui::SliderFloat("y##p", &game->pointLights[i].position.y, -10.0f, 10.0f);
-                        ImGui::SliderFloat("z##p", &game->pointLights[i].position.z, -10.0f, 10.0f);
-                        ImGui::PopID();
+                    if (nk_tree_push(ctx, NK_TREE_NODE, "Point", NK_MAXIMIZED)) {
+                        for (int i = 0; i < game->numPointLights; i++) {
+                            nk_layout_row_dynamic(ctx, row_size * 8, 1);
+                            char label[100];
+                            sprintf(label, "Point Light %d", i);
+                            if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "Intensity", 0.0f, &game->pointLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "x", -10.0f, &game->pointLights[i].position.x, 10.0f, 0.1f, 0.1f);
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "y", -10.0f, &game->pointLights[i].position.y, 10.0f, 0.1f, 0.1f);
+                                nk_layout_row_dynamic(ctx, row_size, 1);
+                                nk_property_float(ctx, "z", -10.0f, &game->pointLights[i].position.z, 10.0f, 0.1f, 0.1f);
+                                nk_group_end(ctx);
+                            }
+                        }
+                        nk_tree_pop(ctx);
                     }
-                    ImGui::Unindent(20.0f);
                 }
+                nk_tree_pop(ctx);
             }
-            ImGui::Unindent(20.0f);
-        }
-        
-        if (ImGui::CollapsingHeader("Scene", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::Text("Camera: (%.1f, %.1f, %.1f)", game->camera.translation.x, game->camera.translation.y, game->camera.translation.z);
-            ImGui::Text("What to draw");
-            ImGui::Checkbox("3D Obj", &game->draw3DObjects);
-            ImGui::SameLine();
-            ImGui::Checkbox("2D Obj", &game->draw2DObjects);
-            ImGui::SameLine();
-            ImGui::Checkbox("Light Bulbs", &game->drawLights);
-        }
 
-        if (ImGui::CollapsingHeader("Render Options", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::Checkbox("Wireframe", &game->drawWire);
-            ImGui::SameLine();
-            ImGui::Checkbox("Filled", &game->drawFilled);
-            ImGui::Checkbox("zBuffer", &game->useDepthBuffer);
-            ImGui::SameLine();
-            ImGui::Checkbox("Culling", &game->backfaceCulling);
-            ImGui::SameLine();
-            ImGui::Checkbox("Bilinear Filt.", &game->bilinearFiltering);
-        }
-        
-        
-        if (ImGui::CollapsingHeader("Background")) { 
-            ImVec4 imBackgroundColor = ImVec4(game->backgroundColor.r/255.0f,
-                                                game->backgroundColor.g/255.0f,
-                                                game->backgroundColor.b/255.0f,
-                                                1.00f);
-            ImGui::ColorPicker4(
-                "Color",
-                (float*)&imBackgroundColor,
-                ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoSidePreview
-            );
-            game->backgroundColor = {
-                static_cast<uint8_t>(imBackgroundColor.x * 255.0f),
-                static_cast<uint8_t>(imBackgroundColor.y * 255.0f),
-                static_cast<uint8_t>(imBackgroundColor.z * 255.0f)
-            };
-        }
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Scene", NK_MAXIMIZED)) {
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Camera: (%.1f, %.1f, %.1f)", game->camera.translation.x, game->camera.translation.y, game->camera.translation.z);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_label(ctx, "What to draw", NK_TEXT_LEFT);
+                nk_layout_row_dynamic(ctx, row_size, 3);
+                nk_checkbox_label(ctx, "3D Obj", &game->draw3DObjects);
+                nk_checkbox_label(ctx, "2D Obj", &game->draw2DObjects);
+                nk_checkbox_label(ctx, "Lights", &game->drawLights);
+                nk_tree_pop(ctx);
+            }
 
-        if (ImGui::CollapsingHeader("Animation")) {
-            ImGui::SliderFloat("Rotation Speed", &game->rotationSpeed, -360.0f, 360.0f, "%.2f degrees/s");
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Render Options", NK_MAXIMIZED)) {
+                nk_layout_row_dynamic(ctx, row_size, 2);
+                nk_checkbox_label(ctx, "Wireframe", &game->drawWire);
+                nk_checkbox_label(ctx, "Filled", &game->drawFilled);
+                nk_layout_row_dynamic(ctx, row_size, 3);
+                nk_checkbox_label(ctx, "z-buffer", &game->useDepthBuffer);
+                nk_checkbox_label(ctx, "Backface culling", &game->backfaceCulling);
+                nk_checkbox_label(ctx, "Bilinear filtering", &game->bilinearFiltering);
+                nk_tree_pop(ctx);
+            }
+
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Background", NK_MAXIMIZED)) {
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_label(ctx, "Color", NK_TEXT_LEFT);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                struct nk_colorf nkBackgroundColor = nk_color_cf(nk_rgb(game->backgroundColor.r, game->backgroundColor.g, game->backgroundColor.b));
+                nk_color_pick(ctx, &nkBackgroundColor, NK_RGBA);
+                game->backgroundColor = (color_t) {
+                    (uint8_t) (nkBackgroundColor.r * 255.0f),
+                    (uint8_t) (nkBackgroundColor.g * 255.0f),
+                    (uint8_t) (nkBackgroundColor.b * 255.0f)
+                };
+
+                nk_tree_pop(ctx);
+            }
+
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Animation", NK_MAXIMIZED)) {
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_property_float(ctx, "Rotation speed", -360.0f, &game->rotationSpeed, 360.0f, 0.1f, 0.1f);
+                nk_tree_pop(ctx);
+            }
+
         }
-        
-        ImGui::End();
+        nk_end(game->nuklearContext);
     }
 }
 #endif // DEBUGUI
@@ -875,8 +922,8 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
                                p0.y, p1.y, p2.y,
                                p0.invz, p1.invz, p2.invz,
                                1.0, 1.0, 1.0,
-                               {0, 0, 0}, {0, 0, 0}, {0, 0, 0},
-                               {0, 0, 0}, {0, 0, 0}, {0, 0, 0},
+                               (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0},
+                               (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0},
                                COLOR_RED, COLOR_GREEN, COLOR_BLUE,
                                0.0,
                                NULL, 0, 0,
@@ -895,8 +942,7 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
 void renderDebugUI(game_state_t* game) {
     if (game->showGUI) {
         DEBUG_PRINT("INFO: Rendering GUI\n");
-        ImGui::Render(); 
-        ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
+        nk_sdl_render(NK_ANTI_ALIASING_ON);
     }
 }
 #endif // DEBUGUI 
@@ -919,9 +965,7 @@ void destroy(game_state_t* game) {
     SDL_DestroyWindow(game->window);
 
     #ifdef DEBUGUI
-    ImGui_ImplSDLRenderer_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-    ImGui::DestroyContext();
+    nk_sdl_shutdown();
     #endif // DEBUGUI
 
     SDL_Quit();

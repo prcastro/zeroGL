@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "object3D.h"
 #include "external/upng/upng.h"
 
@@ -20,7 +21,7 @@ vec3_t triangleCenter(vec3_t v0, vec3_t v1, vec3_t v2) {
 }
 
 mat4x4_t translationToMatrix(vec3_t vector) {
-    return {{
+    return (mat4x4_t) {{
         {1, 0, 0, vector.x},
         {0, 1, 0, vector.y},
         {0, 0, 1, vector.z},
@@ -29,7 +30,7 @@ mat4x4_t translationToMatrix(vec3_t vector) {
 }
 
 mat4x4_t scaleToMatrix(float scale) {
-    return {{
+    return (mat4x4_t) {{
         {scale, 0,     0,     0},
         {0,     scale, 0,     0},
         {0,     0,     scale, 0},
@@ -42,7 +43,7 @@ mat4x4_t rotationY(float degrees) {
     float cos = cosf(radians);
     float sin = sinf(radians);
 
-    return {{
+    return (mat4x4_t) {{
         { cos, 0, -sin, 0 },
         { 0,   1, 0,    0 },
         { sin, 0, cos,  0 },
@@ -55,7 +56,7 @@ mat4x4_t rotationX(float degrees) {
     float cos = cosf(radians);
     float sin = sinf(radians);
 
-    return {{
+    return (mat4x4_t) {{
         { 1, 0,    0,   0 },
         { 0, cos,  sin, 0 },
         { 0, -sin, cos, 0 },
@@ -67,7 +68,7 @@ object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scale, mat4x4_t ro
     mat4x4_t translationMatrix = translationToMatrix(translation);
     mat4x4_t scaleMatrix = scaleToMatrix(scale);
     mat4x4_t transform = mulMM4(translationMatrix, mulMM4(rotation, scaleMatrix));
-    return {mesh, translation, scale, rotation, transform};
+    return (object3D_t) {mesh, translation, scale, rotation, transform};
 }
 
 camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
@@ -88,13 +89,13 @@ camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
     //        and with the current value it's 53 not 90 degrees. But the plane
     //        normals (l, r, t and b) are set to 90 degree FOV. We should compute
     //        the right values based on the camera parameters.
-    planes[0] = {{0,      0,      1    }, viewportDist}; // Near
-    planes[1] = {{sqrt2,  0,      sqrt2}, 0           }; // Left
-    planes[2] = {{-sqrt2, 0,      sqrt2}, 0           }; // Right
-    planes[3] = {{0,      sqrt2,  sqrt2}, 0           }; // Top
-    planes[4] = {{0,      -sqrt2, sqrt2}, 0           }; // Bottom
+    planes[0] = (plane_t) {{0,      0,      1    }, viewportDist}; // Near
+    planes[1] = (plane_t) {{sqrt2,  0,      sqrt2}, 0           }; // Left
+    planes[2] = (plane_t) {{-sqrt2, 0,      sqrt2}, 0           }; // Right
+    planes[3] = (plane_t) {{0,      sqrt2,  sqrt2}, 0           }; // Top
+    planes[4] = (plane_t) {{0,      -sqrt2, sqrt2}, 0           }; // Bottom
 
-    return {translation, rotation, transform, numPlanes,  planes,
+    return (camera_t) {translation, rotation, transform, numPlanes,  planes,
             viewportDist, movSpeed, turnSpeed};
 }
 

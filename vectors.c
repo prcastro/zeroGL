@@ -39,21 +39,21 @@ float magnitude(vec3_t v) {
 }
 
 vec3_t sub(vec3_t a, vec3_t b) {
-    return {a.x - b.x, a.y - b.y, a.z - b.z};
+    return (vec3_t) {a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
 vec3_t add(vec3_t a, vec3_t b) {
-    return {a.x + b.x, a.y + b.y, a.z + b.z};
+    return (vec3_t) {a.x + b.x, a.y + b.y, a.z + b.z};
 }
 
 vec3_t normalize(vec3_t v) {
     float mag = magnitude(v);
-    return {v.x / mag, v.y / mag, v.z / mag};
+    return (vec3_t) {v.x / mag, v.y / mag, v.z / mag};
 }
 
 // Matrix ops
 vec3_t mulScalarV3(float k, vec3_t v) {
-    return {k*v.x, k*v.y, k*v.z};
+    return (vec3_t) {k*v.x, k*v.y, k*v.z};
 }
 
 mat4x4_t transposeM4(mat4x4_t m) {
@@ -225,13 +225,13 @@ vec4_t mulMV4(mat4x4_t mat4x4, vec4_t vec4) {
     result[i] += mat4x4.data[i][3]*vec4.w;
   }
 
-  return {result[0], result[1], result[2], result[3]};
+  return (vec4_t) {result[0], result[1], result[2], result[3]};
 }
 
 vec3_t mulMV3(mat4x4_t mat4x4, vec3_t v) {
     vec4_t vec4 = {v.x, v.y, v.z, 1};
     vec4_t result = mulMV4(mat4x4, vec4);
-    return {result.x, result.y, result.z};
+    return (vec3_t) {result.x, result.y, result.z};
 }
 
 mat4x4_t mulMM4(mat4x4_t m1, mat4x4_t m2) {
