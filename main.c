@@ -1,4 +1,4 @@
-// #define DEBUG
+// #define SR_DEBUG
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
 
@@ -24,16 +24,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-#include "color.h"
-#include "vectors.h"
-#include "object3D.h"
-#include "draw.h"
-
-#ifdef DEBUG
-#define DEBUG_PRINT(...) printf(__VA_ARGS__)
-#else
-#define DEBUG_PRINT(...) do {} while (0)
-#endif
+#include "simplerenderer.h"
+#include "objloader.h"
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
