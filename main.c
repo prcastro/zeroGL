@@ -1,6 +1,7 @@
 // #define DEBUG
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
+
 #ifdef DEBUGUI
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO
@@ -851,7 +852,7 @@ void updateDebugUI(game_state_t *game) {
             if (nk_tree_push(ctx, NK_TREE_NODE, "Background", NK_MAXIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_label(ctx, "Color", NK_TEXT_LEFT);
-                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_layout_row_dynamic(ctx, row_size * 10, 1);
                 struct nk_colorf nkBackgroundColor = nk_color_cf(nk_rgb(game->backgroundColor.r, game->backgroundColor.g, game->backgroundColor.b));
                 nk_color_pick(ctx, &nkBackgroundColor, NK_RGBA);
                 game->backgroundColor = (color_t) {
@@ -885,12 +886,16 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
     DEBUG_PRINT("INFO: Rendering scene\n");
 
     // Init depthBuffer
-    memset(game->depthBuffer, 0, WIDTH * HEIGHT * sizeof(float));
+    for (int i = 0; i < WIDTH * HEIGHT; i++) {
+        game->depthBuffer[i] = 0.0;
+    }
 
     // Background
     DEBUG_PRINT("INFO: Drawing background\n");
     uint32_t backgroundColor = colorToUint32(game->backgroundColor);
-    memset(game->frameBuffer, backgroundColor, WIDTH * HEIGHT * sizeof(uint32_t));
+    for (int i = 0; i < WIDTH * HEIGHT; i++) {
+        game->frameBuffer[i] = backgroundColor;
+    }
 
     // Draw 3D Objects
     if (game->draw3DObjects) {
@@ -934,7 +939,7 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
     }
     
     DEBUG_PRINT("INFO: Update backbuffer\n");
-    SDL_UpdateTexture(game->texture, NULL, (void *) game->frameBuffer, PITCH);
+    SDL_UpdateTexture(game->texture, NULL, game->frameBuffer, PITCH);
     SDL_RenderCopy(game->renderer, game->texture, NULL, NULL);
 }
 

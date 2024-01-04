@@ -29,9 +29,9 @@ inline float clamp(float v, float max) {
 
 inline color_t mulScalarColor(double x, color_t color) {
     color_t result = {
-        (uint8_t) (x * color.r, 255.0),
-        (uint8_t) (x * color.g, 255.0),
-        (uint8_t) (x * color.b, 255.0)
+        (uint8_t) clamp(x * color.r, 255.0),
+        (uint8_t) clamp(x * color.g, 255.0),
+        (uint8_t) clamp(x * color.b, 255.0)
     };
     return result;
 }
