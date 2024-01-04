@@ -15,6 +15,10 @@ Software (CPU) 3D Rasterizer capable of drawing 3D objects with lighting
 * z-Buffering 
 * GUI with controls for lighting, movement etc
 
+### Getting started
+
+On Windows, install Visual Studio Community 2022 (plus the C/C++ compilers) and then run the `build.bat` file. If you're using Visual Studio Code, then you can also install the C/C++ extensions from Microsoft, open `main.c` on the editor and then click on `Run C/C++ File` on the top right corner. Remember to open VS Code from within a developer terminal (or run `vcvarsall.bat` on the terminal before opening it).
+
 ## Current limitations
 
 * Diffuse colors on MTL files are used for as ambient colors as well
