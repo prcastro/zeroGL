@@ -1,129 +1,16 @@
+#ifndef OBJLOADER_H
+#define OBJLOADER_H
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "object3D.h"
+#include "simplerenderer.h"
 #include "external/upng/upng.h"
 
-vec3_t triangleNormal(vec3_t v0, vec3_t v1, vec3_t v2) {
-    return crossProduct(sub(v1, v0), sub(v2, v0));
-}
-
-vec3_t triangleCenter(vec3_t v0, vec3_t v1, vec3_t v2) {
-    struct vec3_t result;
-
-    result.x = (v0.x + v1.x + v2.x) / 3.0f;
-    result.y = (v0.y + v1.y + v2.y) / 3.0f;
-    result.z = (v0.z + v1.z + v2.z) / 3.0f;
-
-    return result;
-}
-
-mat4x4_t translationToMatrix(vec3_t vector) {
-    return (mat4x4_t) {{
-        {1, 0, 0, vector.x},
-        {0, 1, 0, vector.y},
-        {0, 0, 1, vector.z},
-        {0, 0, 0,        1}
-    }};
-}
-
-mat4x4_t scaleToMatrix(float scale) {
-    return (mat4x4_t) {{
-        {scale, 0,     0,     0},
-        {0,     scale, 0,     0},
-        {0,     0,     scale, 0},
-        {0,     0,     0,     1}
-    }};
-}
-
-mat4x4_t rotationY(float degrees) {
-    float radians = degrees * M_PI / 180.0f;
-    float cos = cosf(radians);
-    float sin = sinf(radians);
-
-    return (mat4x4_t) {{
-        { cos, 0, -sin, 0 },
-        { 0,   1, 0,    0 },
-        { sin, 0, cos,  0 },
-        { 0,   0, 0,    1 }
-    }};
-}
-
-mat4x4_t rotationX(float degrees) {
-    float radians = degrees * M_PI / 180.0f;
-    float cos = cosf(radians);
-    float sin = sinf(radians);
-
-    return (mat4x4_t) {{
-        { 1, 0,    0,   0 },
-        { 0, cos,  sin, 0 },
-        { 0, -sin, cos, 0 },
-        { 0, 0,    0,   1 }
-    }};
-}
-
-object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scale, mat4x4_t rotation) {
-    mat4x4_t translationMatrix = translationToMatrix(translation);
-    mat4x4_t scaleMatrix = scaleToMatrix(scale);
-    mat4x4_t transform = mulMM4(translationMatrix, mulMM4(rotation, scaleMatrix));
-    return (object3D_t) {mesh, translation, scale, rotation, transform};
-}
-
-camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
-                    float viewportDist, float movSpeed, float turnSpeed) {
-    mat4x4_t rotationMatrix = transposeM4(rotation);
-    mat4x4_t translationMatrix = translationToMatrix(mulScalarV3(-1.0, translation));
-    mat4x4_t transform = mulMM4(rotationMatrix, translationMatrix);
-    int numPlanes = 5;
-    const float sqrt2 = 1/sqrt(2);
-
-    plane_t* planes = (plane_t*) malloc(numPlanes * sizeof(plane_t)); // allocate memory dynamically
-    if (!planes) {
-        fprintf(stderr, "ERROR: Failed to allocate memory for planes.\n");
-        exit(1);
-    }
-
-    // FIXME: This is wrong. The FOV depends on the viewport size and distance
-    //        and with the current value it's 53 not 90 degrees. But the plane
-    //        normals (l, r, t and b) are set to 90 degree FOV. We should compute
-    //        the right values based on the camera parameters.
-    planes[0] = (plane_t) {{0,      0,      1    }, viewportDist}; // Near
-    planes[1] = (plane_t) {{sqrt2,  0,      sqrt2}, 0           }; // Left
-    planes[2] = (plane_t) {{-sqrt2, 0,      sqrt2}, 0           }; // Right
-    planes[3] = (plane_t) {{0,      sqrt2,  sqrt2}, 0           }; // Top
-    planes[4] = (plane_t) {{0,      -sqrt2, sqrt2}, 0           }; // Bottom
-
-    return (camera_t) {translation, rotation, transform, numPlanes,  planes,
-            viewportDist, movSpeed, turnSpeed};
-}
-
-vec3_t meshCenter(vec3_t* vertices, int numVertices) {
-    vec3_t result = {0, 0, 0};
-
-    for (int i = 0; i < numVertices; i++) {
-        result = add(result, vertices[i]);
-    }
-
-    return mulScalarV3(1.0f / numVertices, result);
-}
-
-float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t center) {
-    float result = 0.0f;
-
-    for (int i = 0; i < numVertices; i++) {
-        float distance = magnitude(sub(vertices[i], center));
-        if (distance > result) {
-            result = distance;
-        }
-    }
-
-    return result;
-}
-
-uint32_t* loadTexture(char* filename, int* textureWidth, int* textureHeight) {
-    printf("DEBUG: Loading texture %s\n", filename);
+static inline uint32_t* loadTexture(char* filename, int* textureWidth, int* textureHeight) {
+    DEBUG_PRINT("DEBUG: Loading texture %s\n", filename);
     uint32_t* texture = NULL;
 
     upng_t* upng = upng_new_from_file(filename);
@@ -138,7 +25,7 @@ uint32_t* loadTexture(char* filename, int* textureWidth, int* textureHeight) {
         *textureWidth = upng_get_width(upng);
         *textureHeight = upng_get_height(upng);
 
-        printf("DEBUG: Texture size %d x %d\n", *textureWidth, *textureHeight);
+        DEBUG_PRINT("DEBUG: Texture size %d x %d\n", *textureWidth, *textureHeight);
         uint32_t* buffer = (uint32_t*) upng_get_buffer(upng);
         texture = (uint32_t*) malloc((*textureWidth) * (*textureHeight) * sizeof(uint32_t));
         if (texture == NULL) {
@@ -159,11 +46,11 @@ uint32_t* loadTexture(char* filename, int* textureWidth, int* textureHeight) {
     }
 
     upng_free(upng);
-    printf("DEBUG: Loaded texture %s\n", filename);
+    DEBUG_PRINT("DEBUG: Loaded texture %s\n", filename);
     return texture;
 }
 
-char* getPath(const char* filename) {
+static inline char* getPath(const char* filename) {
     char* path = (char*) malloc(128 * sizeof(char));
     if (!path) {
         fprintf(stderr, "ERROR: Failed to allocate memory for path.\n");
@@ -181,7 +68,7 @@ char* getPath(const char* filename) {
     return path;
 }
 
-material_t* loadMtlFile(const char* filename, int* numMaterials) {
+static inline material_t* loadMtlFile(const char* filename, int* numMaterials) {
     *numMaterials = 0;
     material_t* materials = NULL;
 
@@ -231,7 +118,7 @@ material_t* loadMtlFile(const char* filename, int* numMaterials) {
             sscanf(line, "map_Kd %s\n", textureFilename);
             char* path = getPath(filename);
             strcat(path, textureFilename);
-            printf("DEBUG: Loading texture %s\n", textureFilename);
+            DEBUG_PRINT("DEBUG: Loading texture %s\n", textureFilename);
             materials[*numMaterials - 1].texture = loadTexture(path, &materials[*numMaterials - 1].textureWidth, &materials[*numMaterials - 1].textureHeight);
         }
     }
@@ -241,7 +128,7 @@ material_t* loadMtlFile(const char* filename, int* numMaterials) {
     return materials;
 }
 
-mesh_t* loadObjFile(const char* filename, bool flipTexturesVertically) {
+static inline mesh_t* loadObjFile(const char* filename, bool flipTexturesVertically) {
     char name[128];
 
     vec3_t* vertices = NULL;
@@ -268,7 +155,7 @@ mesh_t* loadObjFile(const char* filename, bool flipTexturesVertically) {
     while (fgets(line, 128, fp) != NULL) {
         if (line[0] == 'o') {
             sscanf(line, "o %s\n", name);
-            printf("DEBUG: Loading object %s.\n", name);
+            DEBUG_PRINT("DEBUG: Loading object %s.\n", name);
         }
 
         if (line[0] == 'v' && line[1] == ' ') {
@@ -310,9 +197,9 @@ mesh_t* loadObjFile(const char* filename, bool flipTexturesVertically) {
             sscanf(line, "mtllib %s\n", mtl_filename);
             char* path = getPath(filename);
             strcat(path, mtl_filename);
-            printf("DEBUG: Loading MTL %s\n", path);
+            DEBUG_PRINT("DEBUG: Loading MTL %s\n", path);
             materials = loadMtlFile(path, &num_materials);
-            printf("DEBUG: Loaded %d materials\n", num_materials);
+            DEBUG_PRINT("DEBUG: Loaded %d materials\n", num_materials);
         }
 
         if (line[0] == 'u' && line[1] == 's' && line[2] == 'e') {
@@ -321,8 +208,8 @@ mesh_t* loadObjFile(const char* filename, bool flipTexturesVertically) {
 
             for (int i = 0; i < num_materials; i++) {
                 if (strcmp(material_name, materials[i].name) == 0) {
-                    printf("DEBUG: Using material %s\n", materials[i].name);
-                    printf("DEBUG: Color %d %d %d\n", materials[i].diffuseColor.r, materials[i].diffuseColor.g, materials[i].diffuseColor.b);
+                    DEBUG_PRINT("DEBUG: Using material %s\n", materials[i].name);
+                    DEBUG_PRINT("DEBUG: Color %d %d %d\n", materials[i].diffuseColor.r, materials[i].diffuseColor.g, materials[i].diffuseColor.b);
                     currentMaterial = i;
                 }
             }
@@ -400,7 +287,7 @@ mesh_t* loadObjFile(const char* filename, bool flipTexturesVertically) {
                     fprintf(stderr, "ERROR: Normal memory couldn't be allocated.\n");
                     exit(-1);
                 }
-                printf("DEBUG: Normal %d: ", num_normals - 1);
+                DEBUG_PRINT("DEBUG: Normal %d: ", num_normals - 1);
                 normals[num_normals - 1] = normal;
                 triangles[num_triangles - 1].n0 = num_normals - 1;
                 triangles[num_triangles - 1].n1 = num_normals - 1;
@@ -452,6 +339,8 @@ mesh_t* loadObjFile(const char* filename, bool flipTexturesVertically) {
     }
     strcpy(mesh->name, name);
     
-    printf("DEBUG: Loaded mesh %s\n", mesh->name);
+    DEBUG_PRINT("DEBUG: Loaded mesh %s\n", mesh->name);
     return mesh;
 }
+
+#endif // OBJLOADER_H

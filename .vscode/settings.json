@@ -2,6 +2,8 @@
     "files.associations": {
         "sdl.h": "c",
         "nuklear_sdl_renderer.h": "c",
-        "nuklear.h": "c"
+        "nuklear.h": "c",
+        "simplerenderer.h": "c",
+        "upng.h": "c"
     }
 }
