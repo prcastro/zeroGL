@@ -4,7 +4,6 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "C://SDL2/include"
             ],
             "defines": [
                 "_DEBUG",
@@ -13,7 +12,7 @@
             ],
             "windowsSdkVersion": "10.0.19041.0",
             "compilerPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.31.31103/bin/Hostx64/x64/cl.exe",
-            "cStandard": "c17",
+            "cStandard": "c99", 
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-msvc-x64"
         }

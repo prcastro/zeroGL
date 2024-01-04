@@ -18,7 +18,7 @@ typedef struct plane_t {
     float    distance;
 } plane_t;
 
-const struct mat4x4_t IDENTITY_M4x4 = {{
+static const struct mat4x4_t IDENTITY_M4x4 = {{
     {1.0, 0.0, 0.0, 0.0},
     {0.0, 1.0, 0.0, 0.0},
     {0.0, 0.0, 1.0, 0.0},
