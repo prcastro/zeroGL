@@ -3,6 +3,10 @@ Software (CPU) 3D Rasterizer capable of drawing 3D objects with lighting
 
 <img src="assets/rasterizer.gif" width="500">
 
+## Getting started
+
+To run the demo, download the latest .zip file from the releases page, uncompress it and run
+
 ## Features
 
 * Simple C code
@@ -15,9 +19,40 @@ Software (CPU) 3D Rasterizer capable of drawing 3D objects with lighting
 * z-Buffering 
 * GUI with controls for lighting, movement etc
 
-### Getting started
+## Building the project
 
-On Windows, install Visual Studio Community 2022 (plus the C/C++ compilers) and then run the `build.bat` file. If you're using Visual Studio Code, then you can also install the C/C++ extensions from Microsoft, open `main.c` on the editor and then click on `Run C/C++ File` on the top right corner. Remember to open VS Code from within a developer terminal (or run `vcvarsall.bat` on the terminal before opening it).
+### Windows
+
+#### build.bat
+Install Visual Studio Community 2022 (the C/C++ compilers may suffice) and then double-click the `build.bat` file. Alternatively, from the command-line run:
+
+```console
+> build.bat
+```
+
+#### Using CL
+Install Visual Studio Community 2022 (the C/C++ compilers may suffice), then run:
+
+```console
+> "c:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
+
+> cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c external\upng\upng.c /I external\sdl2\include /link /LIBPATH:external\sdl2\lib\x64 SDL2.lib SDL2main.lib
+```
+
+Change the `vcvarsall.bat` path according to your VS installation.
+
+#### VS Code
+If you're using Visual Studio Code, then you can install Visual Studio Community 2022 (the C/C++ compilers may suffice) and also install the C/C++ extensions from Microsoft.
+
+Open `main.c` on the editor and then click on `Run C/C++ File` on the top right corner. Remember to open VS Code from within a developer terminal (or run `vcvarsall.bat` on the terminal before opening it).
+
+#### Zig
+
+You can also bypass the all Visual Studio bullcrap and use zig instead. Just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
+
+```console
+> zig build-exe main.c external\upng\upng.c -O ReleaseFast --library c -I.\external\sdl2\include -Lexternal\sdl2\lib\x64 -lSDL2 -lSDL2main -femit-bin=target\main.exe
+```
 
 ## Current limitations
 
