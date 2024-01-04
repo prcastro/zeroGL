@@ -584,7 +584,7 @@ game_state_t* init() {
     meshes[2] = *loadObjFile("assets/engineer/engineer.obj", false);
     meshes[3] = *loadObjFile("assets/cube.obj", false);
 
-    objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
