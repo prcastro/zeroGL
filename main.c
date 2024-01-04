@@ -91,6 +91,7 @@ typedef struct game_state_t {
 
 
 // TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
+// TODO: Make it independent of game and move it to simplerenderer.h
 float shadeVertex(vec3_t v, vec3_t normal, float invMagnitudeNormal, float specularExponent, game_state_t* game) {
     float diffuseIntensity  = 0.0;
     float specularIntensity = 0.0;
@@ -137,14 +138,14 @@ float shadeVertex(vec3_t v, vec3_t normal, float invMagnitudeNormal, float specu
     return (diffuseIntensity + specularIntensity + ambientIntensity);
 }
 
-// TODO: Move to draw.cpp
+// TODO: Move to simplerenderer.h
 int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
   point_t ab = { bx - ax, by - ay };
   point_t ap = { px - ax, py - ay };
   return ab.x * ap.y - ab.y * ap.x;
 }
 
-// TODO: Move to draw.cpp
+// TODO: Move to simplerenderer.h
 void drawTriangleWireframe(int x0, int x1, int x2,
                            int y0, int y1, int y2,
                            color_t color, uint32_t* frameBuffer) {
@@ -153,7 +154,7 @@ void drawTriangleWireframe(int x0, int x1, int x2,
     drawLine(x2, x0, y2, y0, color, frameBuffer);
 }
 
-// TODO: Remove dependency with game_state_t and move to draw.cpp
+// TODO: Remove dependency with game_state_t and move to simplerenderer.h
 void drawTriangleFilled(int x0, int x1, int x2,
                         int y0, int y1, int y2,
                         float invz0, float invz1, float invz2,
@@ -294,7 +295,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
     }
 }
 
-
+// TODO: Maybe move to simplerenderer.h
 void drawObject(object3D_t* object, game_state_t* game) {
     // TODO: This function is very dumb, as it is allocating transformed
     //       vertices just to allocate the projections right after.
