@@ -279,7 +279,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         color_t color_shaded = mulScalarColor(light, color_typed);
                         color = colorToUint32(color_shaded);
                     }
-                    drawPixelDepthBuffer(x, y, invz, color, canvas);
+                    drawPixel(x, y, invz, color, canvas);
                 }
             }
 

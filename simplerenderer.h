@@ -557,13 +557,7 @@ typedef struct point_t {
   float invz;
 } point_t;
 
-static inline void drawPixel(int i, int j, uint32_t color, canvas_t canvas) {
-    if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
-        canvas.frameBuffer[j * canvas.width + i] = color;
-    }
-}
-
-static inline void drawPixelDepthBuffer(int i, int j, float z, uint32_t color, canvas_t canvas) {
+static inline void drawPixel(int i, int j, float z, uint32_t color, canvas_t canvas) {
     if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
         int position = j * canvas.width + i;
         canvas.frameBuffer[position] = color;
@@ -583,7 +577,7 @@ static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, canva
     float current_x = x0;
     float current_y = y0;
     for (int i = 0; i <= longest_side_length; i++) {
-        drawPixel(round(current_x), round(current_y), colorToUint32(color), canvas);
+        drawPixel(round(current_x), round(current_y), 0.0, colorToUint32(color), canvas);
         current_x += x_inc;
         current_y += y_inc;
     }
