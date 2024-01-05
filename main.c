@@ -29,7 +29,15 @@
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+
+#define WIDTH 1066
+#define HEIGHT 600
 #define ROTATION_SPEED 15.0f // degrees per second
+#define VIEWPORT_WIDTH (WIDTH /(float) HEIGHT)
+#define VIEWPORT_HEIGHT 1.0f
+#define VIEWPORT_DISTANCE 1.0f
+#define PIXEL_DEPTH 4
+#define PITCH (PIXEL_DEPTH * WIDTH)
 
 
 typedef struct game_state_t {
@@ -43,8 +51,7 @@ typedef struct game_state_t {
     SDL_Window*   window;
     SDL_Renderer* renderer;
     SDL_Texture*  texture;
-    uint32_t*     frameBuffer;
-    float*        depthBuffer;
+    canvas_t      canvas;
     color_t       backgroundColor;
     bool          drawLights;
     bool          draw3DObjects;
@@ -148,10 +155,10 @@ int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
 // TODO: Move to simplerenderer.h
 void drawTriangleWireframe(int x0, int x1, int x2,
                            int y0, int y1, int y2,
-                           color_t color, uint32_t* frameBuffer) {
-    drawLine(x0, x1, y0, y1, color, frameBuffer);
-    drawLine(x1, x2, y1, y2, color, frameBuffer);
-    drawLine(x2, x0, y2, y0, color, frameBuffer);
+                           color_t color, canvas_t canvas) {
+    drawLine(x0, x1, y0, y1, color, canvas);
+    drawLine(x1, x2, y1, y2, color, canvas);
+    drawLine(x2, x0, y2, y0, color, canvas);
 }
 
 // TODO: Remove dependency with game_state_t and move to simplerenderer.h
@@ -167,6 +174,9 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         mat4x4_t invCameraTransform,
                         int area,
                         game_state_t* game) {
+    canvas_t canvas = game->canvas;
+    camera_t camera = game->camera;
+
     int x_min = MAX(MIN(MIN(x0, x1), x2), 0);
     int x_max = MIN(MAX(MAX(x0, x1), x2), WIDTH - 1); 
     int y_min = MAX(MIN(MIN(y0, y1), y2), 0);
@@ -210,13 +220,13 @@ void drawTriangleFilled(int x0, int x1, int x2,
 
                 if (game->useDepthBuffer || game->shaded) { // Only interpolate z if we are going to use it
                     float invz = alpha * invz0 + beta * invz1 + gamma * invz2;
-                    if (invz > game->depthBuffer[y * WIDTH + x]) {
+                    if (invz > canvas.depthBuffer[y * WIDTH + x]) {
                         uint32_t color = colorToUint32(c0); // Fallback in case of no texture and no shading
                         float light = 1;
 
                         if (game->shadingMode == 2) { // phong shading
                             point_t p = {x, y, invz};
-                            vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p));
+                            vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p, canvas, camera));
                             vec3_t normal = add(add(mulScalarV3(alpha, n0), mulScalarV3(beta, n1)), mulScalarV3(gamma, n2));
                             light = shadeVertex(v, normal , 1/magnitude(normal), specularExponent, game);
                         } else if (game->shaded) {
@@ -273,10 +283,10 @@ void drawTriangleFilled(int x0, int x1, int x2,
                             color = colorToUint32(color_shaded);
                         }
 
-                        drawPixelDepthBuffer(x, y, invz, color, game->depthBuffer, game->frameBuffer);
+                        drawPixelDepthBuffer(x, y, invz, color, canvas);
                     }
                 } else {
-                    drawPixel(x, y, colorToUint32(c0), game->frameBuffer);
+                    drawPixel(x, y, colorToUint32(c0), canvas);
                 }
             }
 
@@ -330,7 +340,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
     for (int i = 0; i < mesh->numVertices; i++) {
         transformed[i] = mulMV3(object->transform, mesh->vertices[i]);
         camTransformed[i] = mulMV3(camera.transform, transformed[i]);
-        projected[i] = projectVertex(camTransformed[i]);
+        projected[i] = projectVertex(camTransformed[i], game->canvas, camera);
     }
 
     for (int i = 0; i < mesh->numNormals; i++) {
@@ -414,7 +424,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
                 drawTriangleWireframe(p0.x, p1.x, p2.x,
                                       p0.y, p1.y, p2.y,
                                       materials[triangle.materialIndex].diffuseColor,
-                                      game->frameBuffer);
+                                      game->canvas);
             }
             
             if (game->drawFilled) {
@@ -540,6 +550,8 @@ void updateCameraPosition(game_state_t* game) {
     *camera  = makeCamera(
         newTranslation,
         newRotation,
+        camera->viewportWidth,
+        camera->viewportHeight,
         camera->viewportDistance,
         camera->movementSpeed,
         camera->turningSpeed
@@ -596,7 +608,6 @@ game_state_t* init() {
     directionalLights[0] = (dir_light_t) {0.0, {0.0, -1.0, 1.0}};
     pointLights[0] = (point_light_t) {0.9, {-0.5, 1.5, -2.0}};
 
-
     pointLightObjects[0] = makeObject(&meshes[0], pointLights[0].position, 0.05, IDENTITY_M4x4);
 
 
@@ -608,6 +619,14 @@ game_state_t* init() {
         fprintf(stderr, "ERROR: Game state memory and buffers couldn't be allocated.\n");
         exit(-1);
     }
+
+    struct canvas_t canvas = {
+        .width = WIDTH,
+        .height = HEIGHT,
+        .hasDepthBuffer = 1,
+        .frameBuffer = frameBuffer,
+        .depthBuffer = depthBuffer
+    };
     
     game->running = true;
     game->elapsedTime = 0;
@@ -615,8 +634,7 @@ game_state_t* init() {
     game->window = SDL_CreateWindow("Rasterizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
     game->renderer = SDL_CreateRenderer(game->window, -1, 0);
     game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
-    game->frameBuffer = frameBuffer;
-    game->depthBuffer = depthBuffer;
+    game->canvas = canvas;
     game->backgroundColor = (color_t) {0, 0, 0};
     game->drawLights    = true;
     game->draw3DObjects =  true;
@@ -647,6 +665,8 @@ game_state_t* init() {
     game->camera = makeCamera(
         (vec3_t) {0, 0, -5},
         rotationY(0.0f),
+        VIEWPORT_WIDTH,
+        VIEWPORT_HEIGHT,
         VIEWPORT_DISTANCE,
         5.0f,
         90.0f
@@ -877,17 +897,17 @@ void update(game_state_t* game) {
 
 void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
     DEBUG_PRINT("INFO: Rendering scene\n");
+    canvas_t canvas = game->canvas;
 
     // Init depthBuffer
-    for (int i = 0; i < WIDTH * HEIGHT; i++) {
-        game->depthBuffer[i] = 0.0;
+    for (int i = 0; i < canvas.width * canvas.height; i++) {
+        canvas.depthBuffer[i] = 0.0;
     }
 
-    // Background
     DEBUG_PRINT("INFO: Drawing background\n");
     uint32_t backgroundColor = colorToUint32(game->backgroundColor);
-    for (int i = 0; i < WIDTH * HEIGHT; i++) {
-        game->frameBuffer[i] = backgroundColor;
+    for (int i = 0; i < canvas.width * canvas.height; i++) {
+        game->canvas.frameBuffer[i] = backgroundColor;
     }
 
     // Draw 3D Objects
@@ -909,7 +929,7 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
             DEBUG_PRINT("INFO: Drawing wireframe triangle\n");
             drawTriangleWireframe(p0.x, p1.x, p2.x,
                                   p0.y, p1.y, p2.y,
-                                  COLOR_GREEN, game->frameBuffer);
+                                  COLOR_GREEN, game->canvas);
         }
         
         if (game->drawFilled == 1) {
@@ -932,7 +952,7 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
     }
     
     DEBUG_PRINT("INFO: Update backbuffer\n");
-    SDL_UpdateTexture(game->texture, NULL, game->frameBuffer, PITCH);
+    SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH);
     SDL_RenderCopy(game->renderer, game->texture, NULL, NULL);
 }
 
@@ -947,8 +967,8 @@ void renderDebugUI(game_state_t* game) {
 
 void destroy(game_state_t* game) {
     free(game->camera.planes);
-    free(game->frameBuffer);
-    free(game->depthBuffer);
+    free(game->canvas.frameBuffer);
+    free(game->canvas.depthBuffer);
 
     // Free all triangles, vertices and materials from meshes
     for (int i = 0; i < game->numMeshes; i++) {

@@ -396,11 +396,13 @@ typedef struct object3D_t {
 } object3D_t;
 
 typedef struct camera_t {
-    vec3_t translation;
+    vec3_t   translation;
     mat4x4_t rotation;
     mat4x4_t transform;
     int      numPlanes;
     plane_t* planes;
+    float    viewportWidth;
+    float    viewportHeight;
     float    viewportDistance;
     float    movementSpeed;
     float    turningSpeed;
@@ -486,7 +488,8 @@ static inline object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scal
 }
 
 static inline camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
-                    float viewportDist, float movSpeed, float turnSpeed) {
+                    float viewportDist, float viewportWidth, float viewportHeight,
+                    float movSpeed, float turnSpeed) {
     mat4x4_t rotationMatrix = transposeM4(rotation);
     mat4x4_t translationMatrix = translationToMatrix(mulScalarV3(-1.0, translation));
     mat4x4_t transform = mulMM4(rotationMatrix, translationMatrix);
@@ -509,8 +512,11 @@ static inline camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
     planes[3] = (plane_t) {{0,      sqrt2,  sqrt2}, 0           }; // Top
     planes[4] = (plane_t) {{0,      -sqrt2, sqrt2}, 0           }; // Bottom
 
-    return (camera_t) {translation, rotation, transform, numPlanes,  planes,
-            viewportDist, movSpeed, turnSpeed};
+    return (camera_t) {
+        translation, rotation, transform, numPlanes,  planes,
+        viewportDist, viewportWidth, viewportHeight,
+        movSpeed, turnSpeed
+    };
 }
 
 static inline vec3_t meshCenter(vec3_t* vertices, int numVertices) {
@@ -538,35 +544,34 @@ static inline float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t c
 
 /* DRAWING */
 
-#define WIDTH 1066
-#define HEIGHT 600
-#define VIEWPORT_WIDTH (WIDTH / (float) HEIGHT)
-#define VIEWPORT_HEIGHT 1
-#define VIEWPORT_DISTANCE 1.0f
-#define PIXEL_DEPTH 4
-#define PITCH (PIXEL_DEPTH * WIDTH)
+typedef struct canvas_t {
+    uint32_t* frameBuffer;
+    int       width;
+    int       height;
+    int       hasDepthBuffer;
+    float*    depthBuffer;
+} canvas_t;
 
 typedef struct point_t {
   int   x, y;
   float invz;
 } point_t;
 
-
-static inline void drawPixel(int i, int j, uint32_t color, uint32_t* frameBuffer) {
-    if ((i >= 0) && (i < WIDTH) && (j >= 0) && (j < HEIGHT)) {
-        frameBuffer[j * WIDTH + i] = color;
+static inline void drawPixel(int i, int j, uint32_t color, canvas_t canvas) {
+    if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
+        canvas.frameBuffer[j * canvas.width + i] = color;
     }
 }
 
-static inline void drawPixelDepthBuffer(int i, int j, float z, uint32_t color, float* depthBuffer, uint32_t* frameBuffer) {
-    if ((i >= 0) && (i < WIDTH) && (j >= 0) && (j < HEIGHT)) {
-        int position = j * WIDTH + i;
-        frameBuffer[position] = color;
-        depthBuffer[position] = z;
+static inline void drawPixelDepthBuffer(int i, int j, float z, uint32_t color, canvas_t canvas) {
+    if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
+        int position = j * canvas.width + i;
+        canvas.frameBuffer[position] = color;
+        canvas.depthBuffer[position] = z;
     }
 }
 
-static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, uint32_t* frameBuffer) {
+static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, canvas_t canvas) {
     int delta_x = (x1 - x0);
     int delta_y = (y1 - y0);
 
@@ -578,24 +583,24 @@ static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, uint3
     float current_x = x0;
     float current_y = y0;
     for (int i = 0; i <= longest_side_length; i++) {
-        drawPixel(round(current_x), round(current_y), colorToUint32(color), frameBuffer);
+        drawPixel(round(current_x), round(current_y), colorToUint32(color), canvas);
         current_x += x_inc;
         current_y += y_inc;
     }
 }
 
-static inline point_t projectVertex(vec3_t v) {
+static inline point_t projectVertex(vec3_t v, canvas_t canvas, camera_t cam) {
   return (point_t) {
-    (int) (v.x * VIEWPORT_DISTANCE / v.z  * WIDTH/VIEWPORT_WIDTH + WIDTH/2),
-    (int) (HEIGHT/2 - (v.y * VIEWPORT_DISTANCE / v.z * HEIGHT/VIEWPORT_HEIGHT) - 1),
+    (int) (v.x * cam.viewportDistance / v.z  * canvas.width/cam.viewportWidth + canvas.width/2),
+    (int) (canvas.height/2 - (v.y * cam.viewportDistance / v.z * canvas.height/cam.viewportHeight) - 1),
     1.0f / v.z
   };
 }
 
-static inline vec3_t unprojectPoint(point_t p) {
+static inline vec3_t unprojectPoint(point_t p, canvas_t canvas, camera_t cam) {
   return (vec3_t) {
-    (p.x - WIDTH/2) * (VIEWPORT_WIDTH / WIDTH) / (p.invz * VIEWPORT_DISTANCE),
-    (HEIGHT/2 - p.y - 1) / (VIEWPORT_DISTANCE * p.invz * HEIGHT/VIEWPORT_HEIGHT),
+    (p.x - canvas.width/2) * (cam.viewportWidth / canvas.width) / (p.invz * cam.viewportDistance),
+    (canvas.height/2 - p.y - 1) / (cam.viewportDistance * p.invz * canvas.height/cam.viewportHeight),
     1.0f / p.invz
   };
 }
