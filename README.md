@@ -60,16 +60,3 @@ You can also bypass the all Visual Studio bullcrap and use zig instead. Just [in
 * Diffuse colors on MTL files are used for as ambient colors as well
 * No multi-threading/SIMD
 * Support only a subset of the OBJ specification
-
-<!-- ## TODO
-* Use binary masks for options instead of ints
-* Move shadeVertex, edgeCross, drawTriangleWireframe and drawTriangleFilled to simplerenderer.h
-* Alpha compositing
-* Support custom pixel colors
-* Study using uint32 instead of color_t
-* Study removing point_t
-* Remove mallocs from within simplerenderer.h
-* Remove usage of stdbool.h
-* Use canvas to store textures
-* Load GLTF data
--->
