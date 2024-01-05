@@ -62,7 +62,6 @@ typedef struct game_state_t {
     bool          specularLighting;
     bool          shaded;
     int           shadingMode;
-    bool          useDepthBuffer;
     bool          backfaceCulling;
     bool          bilinearFiltering;
 
@@ -217,76 +216,70 @@ void drawTriangleFilled(int x0, int x1, int x2,
                 float alpha = w0 * invArea;
                 float beta  = w1 * invArea;
                 float gamma = w2 * invArea;
+                float invz = alpha * invz0 + beta * invz1 + gamma * invz2;
+                if (invz > canvas.depthBuffer[y * WIDTH + x]) {
+                    uint32_t color = colorToUint32(c0); // Fallback in case of no texture and no shading
+                    float light = 1;
 
-                if (game->useDepthBuffer || game->shaded) { // Only interpolate z if we are going to use it
-                    float invz = alpha * invz0 + beta * invz1 + gamma * invz2;
-                    if (invz > canvas.depthBuffer[y * WIDTH + x]) {
-                        uint32_t color = colorToUint32(c0); // Fallback in case of no texture and no shading
-                        float light = 1;
+                    if (game->shadingMode == 2) { // phong shading
+                        point_t p = {x, y, invz};
+                        vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p, canvas, camera));
+                        vec3_t normal = add(add(mulScalarV3(alpha, n0), mulScalarV3(beta, n1)), mulScalarV3(gamma, n2));
+                        light = shadeVertex(v, normal , 1/magnitude(normal), specularExponent, game);
+                    } else if (game->shaded) {
+                        light = alpha * i0 + beta * i1 + gamma * i2;
+                    }
+                    
+                    if (textureWidth != 0 && textureHeight != 0) {
+                        // Interpolate u/z and v/z to get perspective correct texture coordinates
+                        float u_over_z = alpha * (t0.x * invz0) + beta * (t1.x * invz1) + gamma * (t2.x * invz2);
+                        float v_over_z = alpha * (t0.y * invz0) + beta * (t1.y * invz1) + gamma * (t2.y * invz2);
+                        color_t color_typed;
+                        // TODO: Fix crash when we have overflow here
+                        if (game->bilinearFiltering) {
+                            float tex_u = u_over_z/invz;
+                            if (tex_u < 0) {
+                                tex_u = 1 + tex_u;
+                            }
+                            tex_u = MIN(tex_u * textureWidth, textureWidth - 1);
 
-                        if (game->shadingMode == 2) { // phong shading
-                            point_t p = {x, y, invz};
-                            vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p, canvas, camera));
-                            vec3_t normal = add(add(mulScalarV3(alpha, n0), mulScalarV3(beta, n1)), mulScalarV3(gamma, n2));
-                            light = shadeVertex(v, normal , 1/magnitude(normal), specularExponent, game);
-                        } else if (game->shaded) {
-                            light = alpha * i0 + beta * i1 + gamma * i2;
+                            float tex_v = v_over_z/invz;
+                            if (tex_v < 0) {
+                                tex_v = 1 + tex_v;
+                            }
+                            tex_v = MIN(tex_v * textureHeight, textureHeight - 1);
+
+                            int floor_u = floor(tex_u);
+                            int floor_v = floor(tex_v);
+                            int next_u = MIN(floor_u + 1, textureWidth - 1);
+                            int next_v = MIN(floor_v + 1, textureHeight - 1);
+                            float frac_u = tex_u - floor_u;
+                            float frac_v = tex_v - floor_v;
+                            color_t color_tl = colorFromUint32(texture[floor_v * textureWidth + floor_u]);
+                            color_t color_tr = colorFromUint32(texture[floor_v * textureWidth + next_u]);
+                            color_t color_bl = colorFromUint32(texture[next_v * textureWidth + floor_u]);
+                            color_t color_br = colorFromUint32(texture[next_v * textureWidth + next_u]);
+                            color_t color_b = sumColors(mulScalarColor(1 - frac_u, color_bl), mulScalarColor(frac_u, color_br));
+                            color_t color_tp = sumColors(mulScalarColor(1 - frac_u, color_tl), mulScalarColor(frac_u, color_tr));
+                            color_typed = sumColors(mulScalarColor(1 - frac_v, color_b), mulScalarColor(frac_v, color_tp));
+                        } else {
+                            int tex_x = MIN(abs((int)((u_over_z/invz) * textureWidth)), textureWidth - 1);
+                            int tex_y = MIN(abs((int)((v_over_z/invz) * textureHeight)), textureHeight - 1);
+                            color_typed = colorFromUint32(texture[tex_y * textureWidth + tex_x]);
                         }
                         
-                        if (textureWidth != 0 && textureHeight != 0) {
-                            // Interpolate u/z and v/z to get perspective correct texture coordinates
-                            float u_over_z = alpha * (t0.x * invz0) + beta * (t1.x * invz1) + gamma * (t2.x * invz2);
-                            float v_over_z = alpha * (t0.y * invz0) + beta * (t1.y * invz1) + gamma * (t2.y * invz2);
-                            color_t color_typed;
-                            // TODO: Fix crash when we have overflow here
-                            if (game->bilinearFiltering) {
-                                float tex_u = u_over_z/invz;
-                                if (tex_u < 0) {
-                                    tex_u = 1 + tex_u;
-                                }
-                                tex_u = MIN(tex_u * textureWidth, textureWidth - 1);
-
-                                float tex_v = v_over_z/invz;
-                                if (tex_v < 0) {
-                                    tex_v = 1 + tex_v;
-                                }
-                                tex_v = MIN(tex_v * textureHeight, textureHeight - 1);
-
-                                int floor_u = floor(tex_u);
-                                int floor_v = floor(tex_v);
-                                int next_u = MIN(floor_u + 1, textureWidth - 1);
-                                int next_v = MIN(floor_v + 1, textureHeight - 1);
-                                float frac_u = tex_u - floor_u;
-                                float frac_v = tex_v - floor_v;
-                                color_t color_tl = colorFromUint32(texture[floor_v * textureWidth + floor_u]);
-                                color_t color_tr = colorFromUint32(texture[floor_v * textureWidth + next_u]);
-                                color_t color_bl = colorFromUint32(texture[next_v * textureWidth + floor_u]);
-                                color_t color_br = colorFromUint32(texture[next_v * textureWidth + next_u]);
-                                color_t color_b = sumColors(mulScalarColor(1 - frac_u, color_bl), mulScalarColor(frac_u, color_br));
-                                color_t color_tp = sumColors(mulScalarColor(1 - frac_u, color_tl), mulScalarColor(frac_u, color_tr));
-                                color_typed = sumColors(mulScalarColor(1 - frac_v, color_b), mulScalarColor(frac_v, color_tp));
-                            } else {
-                                int tex_x = MIN(abs((int)((u_over_z/invz) * textureWidth)), textureWidth - 1);
-                                int tex_y = MIN(abs((int)((v_over_z/invz) * textureHeight)), textureHeight - 1);
-                                color_typed = colorFromUint32(texture[tex_y * textureWidth + tex_x]);
-                            }
-                            
-                            color_t color_shaded = mulScalarColor(light, color_typed);
-                            color = colorToUint32(color_shaded);
-                        } else if (game->shaded) {
-                            color_t color_typed = {
-                                (uint8_t) (c0.r * alpha + c1.r * beta + c2.r * gamma),
-                                (uint8_t) (c0.g * alpha + c1.g * beta + c2.g * gamma),
-                                (uint8_t) (c0.b * alpha + c1.b * beta + c2.b * gamma)
-                            };
-                            color_t color_shaded = mulScalarColor(light, color_typed);
-                            color = colorToUint32(color_shaded);
-                        }
-
-                        drawPixelDepthBuffer(x, y, invz, color, canvas);
+                        color_t color_shaded = mulScalarColor(light, color_typed);
+                        color = colorToUint32(color_shaded);
+                    } else if (game->shaded) {
+                        color_t color_typed = {
+                            (uint8_t) (c0.r * alpha + c1.r * beta + c2.r * gamma),
+                            (uint8_t) (c0.g * alpha + c1.g * beta + c2.g * gamma),
+                            (uint8_t) (c0.b * alpha + c1.b * beta + c2.b * gamma)
+                        };
+                        color_t color_shaded = mulScalarColor(light, color_typed);
+                        color = colorToUint32(color_shaded);
                     }
-                } else {
-                    drawPixel(x, y, colorToUint32(c0), canvas);
+                    drawPixelDepthBuffer(x, y, invz, color, canvas);
                 }
             }
 
@@ -645,7 +638,6 @@ game_state_t* init() {
     game->drawFilled = true;
     game->shaded = true;
     game->shadingMode = 1;
-    game->useDepthBuffer = true;
     game->backfaceCulling = true;
     game->bilinearFiltering = false;
     game->numMeshes = numMeshes;
@@ -855,8 +847,7 @@ void updateDebugUI(game_state_t *game) {
                 nk_layout_row_dynamic(ctx, row_size, 2);
                 nk_checkbox_label(ctx, "Wireframe", &game->drawWire);
                 nk_checkbox_label(ctx, "Filled", &game->drawFilled);
-                nk_layout_row_dynamic(ctx, row_size, 3);
-                nk_checkbox_label(ctx, "z-buffer", &game->useDepthBuffer);
+                nk_layout_row_dynamic(ctx, row_size, 2);
                 nk_checkbox_label(ctx, "Backface culling", &game->backfaceCulling);
                 nk_checkbox_label(ctx, "Bilinear filtering", &game->bilinearFiltering);
                 nk_tree_pop(ctx);
