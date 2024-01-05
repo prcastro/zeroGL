@@ -33,6 +33,8 @@
 #define WIDTH 1066
 #define HEIGHT 600
 #define ROTATION_SPEED 15.0f // degrees per second
+#define VIEWPORT_WIDTH (WIDTH /(float) HEIGHT)
+#define VIEWPORT_HEIGHT 1.0f
 #define VIEWPORT_DISTANCE 1.0f
 #define PIXEL_DEPTH 4
 #define PITCH (PIXEL_DEPTH * WIDTH)
@@ -173,6 +175,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         int area,
                         game_state_t* game) {
     canvas_t canvas = game->canvas;
+    camera_t camera = game->camera;
 
     int x_min = MAX(MIN(MIN(x0, x1), x2), 0);
     int x_max = MIN(MAX(MAX(x0, x1), x2), WIDTH - 1); 
@@ -223,7 +226,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
 
                         if (game->shadingMode == 2) { // phong shading
                             point_t p = {x, y, invz};
-                            vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p, canvas));
+                            vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p, canvas, camera));
                             vec3_t normal = add(add(mulScalarV3(alpha, n0), mulScalarV3(beta, n1)), mulScalarV3(gamma, n2));
                             light = shadeVertex(v, normal , 1/magnitude(normal), specularExponent, game);
                         } else if (game->shaded) {
@@ -337,7 +340,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
     for (int i = 0; i < mesh->numVertices; i++) {
         transformed[i] = mulMV3(object->transform, mesh->vertices[i]);
         camTransformed[i] = mulMV3(camera.transform, transformed[i]);
-        projected[i] = projectVertex(camTransformed[i], game->canvas);
+        projected[i] = projectVertex(camTransformed[i], game->canvas, camera);
     }
 
     for (int i = 0; i < mesh->numNormals; i++) {
@@ -547,6 +550,8 @@ void updateCameraPosition(game_state_t* game) {
     *camera  = makeCamera(
         newTranslation,
         newRotation,
+        camera->viewportWidth,
+        camera->viewportHeight,
         camera->viewportDistance,
         camera->movementSpeed,
         camera->turningSpeed
@@ -660,6 +665,8 @@ game_state_t* init() {
     game->camera = makeCamera(
         (vec3_t) {0, 0, -5},
         rotationY(0.0f),
+        VIEWPORT_WIDTH,
+        VIEWPORT_HEIGHT,
         VIEWPORT_DISTANCE,
         5.0f,
         90.0f

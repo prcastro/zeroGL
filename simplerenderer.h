@@ -396,11 +396,13 @@ typedef struct object3D_t {
 } object3D_t;
 
 typedef struct camera_t {
-    vec3_t translation;
+    vec3_t   translation;
     mat4x4_t rotation;
     mat4x4_t transform;
     int      numPlanes;
     plane_t* planes;
+    float    viewportWidth;
+    float    viewportHeight;
     float    viewportDistance;
     float    movementSpeed;
     float    turningSpeed;
@@ -486,7 +488,8 @@ static inline object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scal
 }
 
 static inline camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
-                    float viewportDist, float movSpeed, float turnSpeed) {
+                    float viewportDist, float viewportWidth, float viewportHeight,
+                    float movSpeed, float turnSpeed) {
     mat4x4_t rotationMatrix = transposeM4(rotation);
     mat4x4_t translationMatrix = translationToMatrix(mulScalarV3(-1.0, translation));
     mat4x4_t transform = mulMM4(rotationMatrix, translationMatrix);
@@ -509,8 +512,11 @@ static inline camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
     planes[3] = (plane_t) {{0,      sqrt2,  sqrt2}, 0           }; // Top
     planes[4] = (plane_t) {{0,      -sqrt2, sqrt2}, 0           }; // Bottom
 
-    return (camera_t) {translation, rotation, transform, numPlanes,  planes,
-            viewportDist, movSpeed, turnSpeed};
+    return (camera_t) {
+        translation, rotation, transform, numPlanes,  planes,
+        viewportDist, viewportWidth, viewportHeight,
+        movSpeed, turnSpeed
+    };
 }
 
 static inline vec3_t meshCenter(vec3_t* vertices, int numVertices) {
@@ -583,26 +589,18 @@ static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, canva
     }
 }
 
-// TODO: Receive viewport info as parameters
-static inline point_t projectVertex(vec3_t v, canvas_t canvas) {
-  float viewportWidth = canvas.width/(float) canvas.height;
-  float viewportHeight = 1.0f;
-  float viewportDistance = 1.0f;
+static inline point_t projectVertex(vec3_t v, canvas_t canvas, camera_t cam) {
   return (point_t) {
-    (int) (v.x * viewportDistance / v.z  * canvas.width/viewportWidth + canvas.width/2),
-    (int) (canvas.height/2 - (v.y * viewportDistance / v.z * canvas.height/viewportHeight) - 1),
+    (int) (v.x * cam.viewportDistance / v.z  * canvas.width/cam.viewportWidth + canvas.width/2),
+    (int) (canvas.height/2 - (v.y * cam.viewportDistance / v.z * canvas.height/cam.viewportHeight) - 1),
     1.0f / v.z
   };
 }
 
-// TODO: Receive viewport info as parameters
-static inline vec3_t unprojectPoint(point_t p, canvas_t canvas) {
-  float viewportWidth = canvas.width/(float) canvas.height;
-  float viewportHeight = 1.0f;
-  float viewportDistance = 1.0f;
+static inline vec3_t unprojectPoint(point_t p, canvas_t canvas, camera_t cam) {
   return (vec3_t) {
-    (p.x - canvas.width/2) * (viewportWidth / canvas.width) / (p.invz * viewportDistance),
-    (canvas.height/2 - p.y - 1) / (viewportDistance * p.invz * canvas.height/viewportHeight),
+    (p.x - canvas.width/2) * (cam.viewportWidth / canvas.width) / (p.invz * cam.viewportDistance),
+    (canvas.height/2 - p.y - 1) / (cam.viewportDistance * p.invz * canvas.height/cam.viewportHeight),
     1.0f / p.invz
   };
 }
