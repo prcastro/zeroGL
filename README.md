@@ -61,9 +61,5 @@ You can also bypass the all Visual Studio bullcrap and use zig instead. Just [in
 * Support only a subset of the OBJ specification
 
 <!-- ## TODO
-* Create the concept of a canvas (pixels, depthbuffer, width, height)
-* Make game->framebuffer a canvas
-* Make all drawing functions accept a canvas instead of a framebuffer
-* Remove WIDTH and HEIGHT from simplerenderer.h. Put it on main.c and use it only when instatiating the canvas.
 * Look how olive.c uses a canvas as a texture too
 -->
