@@ -39,6 +39,16 @@
 #define PIXEL_DEPTH 4
 #define PITCH (PIXEL_DEPTH * WIDTH)
 
+// TODO: Move this to simplerenderer.h
+// Rendering options
+#define DIFFUSE_LIGHTING (1 << 0)
+#define SPECULAR_LIGHTING (1 << 1)
+#define BACKFACE_CULLING (1 << 2)
+#define BILINEAR_FILTERING (1 << 3)
+#define SHADED (1 << 4)
+#define SHADED_FLAT (1 << 5)
+#define SHADED_GOURAUD (1 << 6)
+#define SHADED_PHONG (1 << 7)
 
 typedef struct game_state_t {
     // Loop control
@@ -58,12 +68,7 @@ typedef struct game_state_t {
     bool          draw2DObjects;
     bool          drawWire;
     bool          drawFilled;
-    bool          diffuseLighting;
-    bool          specularLighting;
-    bool          shaded;
-    int           shadingMode;
-    bool          backfaceCulling;
-    bool          bilinearFiltering;
+    uint8_t       renderOptions;
 
     // Game objects
     int              numMeshes;
@@ -99,65 +104,59 @@ typedef struct game_state_t {
 // TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
 // TODO: Make it independent of game and move it to simplerenderer.h
 float shadeVertex(vec3_t v, vec3_t normal, float invMagnitudeNormal, float specularExponent, game_state_t* game) {
+    // TODO: move these to parameters
+    uint8_t renderOptions = game->renderOptions;
+    int numDirectionalLights = game->numDirectionalLights;
+    dir_light_t* directionalLights = game->directionalLights;
+    int numPointLights = game->numPointLights;
+    point_light_t* pointLights = game->pointLights;
+    int numAmbientLights = game->numAmbientLights;
+    ambient_light_t* ambientLights = game->ambientLights;
+
+
     float diffuseIntensity  = 0.0;
     float specularIntensity = 0.0;
     float ambientIntensity  = 0.0;
     
     // Directional lights
-    for (int i = 0; i < game->numDirectionalLights; i++) {
-        vec3_t lightDirection = game->directionalLights[i].direction;
+    for (int i = 0; i < numDirectionalLights; i++) {
+        vec3_t lightDirection = directionalLights[i].direction;
         float magnitudeLightDirection = magnitude(lightDirection);
         float invMagnitudeLightDirection = 1.0f / magnitudeLightDirection;
-        if (game->diffuseLighting) {
+        if (renderOptions & DIFFUSE_LIGHTING) {
             float cos_alpha = -dot(lightDirection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
-            diffuseIntensity += MAX(cos_alpha, 0.0f) * game->directionalLights[i].intensity;
+            diffuseIntensity += MAX(cos_alpha, 0.0f) * directionalLights[i].intensity;
         }
 
-        if (game->specularLighting) {
+        if (renderOptions & SPECULAR_LIGHTING) {
             vec3_t reflection = sub(mulScalarV3(2 * -dot(lightDirection, normal), normal), lightDirection);
             float cos_beta = -dot(reflection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
-            specularIntensity += pow(MAX(cos_beta, 0.0f), specularExponent) * game->directionalLights[i].intensity;
+            specularIntensity += pow(MAX(cos_beta, 0.0f), specularExponent) * directionalLights[i].intensity;
         }
     }
 
     // Point lights
-    for (int i = 0; i < game->numPointLights; i++) {
-        vec3_t lightDirection = sub(game->pointLights[i].position, v);
+    for (int i = 0; i < numPointLights; i++) {
+        vec3_t lightDirection = sub(pointLights[i].position, v);
         float invMagnitudeLightDirection = 1.0f / magnitude(lightDirection);
-        if (game->diffuseLighting) {
+        if (renderOptions & DIFFUSE_LIGHTING) {
             float cos_alpha = dot(lightDirection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
-            diffuseIntensity += MAX(cos_alpha, 0) * game->pointLights[i].intensity;
+            diffuseIntensity += MAX(cos_alpha, 0) * pointLights[i].intensity;
         }
 
-        if (game->specularLighting) {
+        if (renderOptions & SPECULAR_LIGHTING) {
             vec3_t reflection = sub(mulScalarV3(2 * dot(lightDirection, normal), normal), lightDirection);
             float cos_beta = dot(reflection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
-            specularIntensity += pow(MAX(cos_beta, 0), specularExponent) * game->pointLights[i].intensity;
+            specularIntensity += pow(MAX(cos_beta, 0), specularExponent) * pointLights[i].intensity;
         }
     }
 
     // Ambient light
-    for (int i = 0; i < game->numAmbientLights; i++) {
-        ambientIntensity += game->ambientLights[i].intensity;
+    for (int i = 0; i < numAmbientLights; i++) {
+        ambientIntensity += ambientLights[i].intensity;
     }
 
     return (diffuseIntensity + specularIntensity + ambientIntensity);
-}
-
-// TODO: Move to simplerenderer.h
-int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
-  point_t ab = { bx - ax, by - ay };
-  point_t ap = { px - ax, py - ay };
-  return ab.x * ap.y - ab.y * ap.x;
-}
-
-// TODO: Move to simplerenderer.h
-void drawTriangleWireframe(int x0, int x1, int x2,
-                           int y0, int y1, int y2,
-                           color_t color, canvas_t canvas) {
-    drawLine(x0, x1, y0, y1, color, canvas);
-    drawLine(x1, x2, y1, y2, color, canvas);
-    drawLine(x2, x0, y2, y0, color, canvas);
 }
 
 // TODO: Remove dependency with game_state_t and move to simplerenderer.h
@@ -173,8 +172,10 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         mat4x4_t invCameraTransform,
                         int area,
                         game_state_t* game) {
+    // TODO: Move these to parameters
     canvas_t canvas = game->canvas;
     camera_t camera = game->camera;
+    uint8_t renderOptions = game->renderOptions;
 
     int x_min = MAX(MIN(MIN(x0, x1), x2), 0);
     int x_max = MIN(MAX(MAX(x0, x1), x2), WIDTH - 1); 
@@ -197,7 +198,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
     int w2_row = edgeCross(x0, y0, x1, y1, x_min, y_min);
 
     // Illuminate each vertex
-    if (game->shaded && !(game->shadingMode == 2)) {
+    if ((renderOptions & SHADED) && !(renderOptions & SHADED_PHONG)) {
         c0 = mulScalarColor(i0, c0);
         c1 = mulScalarColor(i1, c1);
         c2 = mulScalarColor(i2, c2);
@@ -221,12 +222,12 @@ void drawTriangleFilled(int x0, int x1, int x2,
                     uint32_t color = colorToUint32(c0); // Fallback in case of no texture and no shading
                     float light = 1;
 
-                    if (game->shadingMode == 2) { // phong shading
+                    if (renderOptions & SHADED_PHONG) {
                         point_t p = {x, y, invz};
                         vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p, canvas, camera));
                         vec3_t normal = add(add(mulScalarV3(alpha, n0), mulScalarV3(beta, n1)), mulScalarV3(gamma, n2));
                         light = shadeVertex(v, normal , 1/magnitude(normal), specularExponent, game);
-                    } else if (game->shaded) {
+                    } else if (renderOptions & SHADED) {
                         light = alpha * i0 + beta * i1 + gamma * i2;
                     }
                     
@@ -236,7 +237,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         float v_over_z = alpha * (t0.y * invz0) + beta * (t1.y * invz1) + gamma * (t2.y * invz2);
                         color_t color_typed;
                         // TODO: Fix crash when we have overflow here
-                        if (game->bilinearFiltering) {
+                        if (renderOptions & BILINEAR_FILTERING) {
                             float tex_u = u_over_z/invz;
                             if (tex_u < 0) {
                                 tex_u = 1 + tex_u;
@@ -270,7 +271,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         
                         color_t color_shaded = mulScalarColor(light, color_typed);
                         color = colorToUint32(color_shaded);
-                    } else if (game->shaded) {
+                    } else if (renderOptions & SHADED) {
                         color_t color_typed = {
                             (uint8_t) (c0.r * alpha + c1.r * beta + c2.r * gamma),
                             (uint8_t) (c0.g * alpha + c1.g * beta + c2.g * gamma),
@@ -298,13 +299,16 @@ void drawTriangleFilled(int x0, int x1, int x2,
     }
 }
 
+// TODO: This function is very dumb, as it is allocating transformed
+//       vertices just to allocate the projections right after.
 // TODO: Maybe move to simplerenderer.h
 void drawObject(object3D_t* object, game_state_t* game) {
-    // TODO: This function is very dumb, as it is allocating transformed
-    //       vertices just to allocate the projections right after.
+    // TODO: Move these to parameters
+    camera_t camera = game->camera;
+    canvas_t canvas = game->canvas;
+    uint8_t renderOptions = game->renderOptions;
 
     mesh_t* mesh = object->mesh;
-    camera_t camera = game->camera;
     material_t* materials = mesh->materials;
     mat4x4_t invCameraTransform = inverseM4(camera.transform);
     
@@ -333,7 +337,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
     for (int i = 0; i < mesh->numVertices; i++) {
         transformed[i] = mulMV3(object->transform, mesh->vertices[i]);
         camTransformed[i] = mulMV3(camera.transform, transformed[i]);
-        projected[i] = projectVertex(camTransformed[i], game->canvas, camera);
+        projected[i] = projectVertex(camTransformed[i], canvas, camera);
     }
 
     for (int i = 0; i < mesh->numNormals; i++) {
@@ -351,7 +355,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
         point_t p1 = projected[triangle.v1];
         point_t p2 = projected[triangle.v2];
         int area = edgeCross(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
-        if (area < 0 && game->backfaceCulling) {
+        if (area < 0 && (renderOptions & BACKFACE_CULLING)) {
             discarded = true;
         }
 
@@ -388,8 +392,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
             float i2 = 1.0;
 
             // Shading
-            if (game->shaded && game->shadingMode == 0) {
-                // Flat shading
+            if ((renderOptions & SHADED) && (renderOptions & SHADED_FLAT)) {
                 vec3_t v0 = transformed[triangle.v0];
                 vec3_t v1 = transformed[triangle.v1];
                 vec3_t v2 = transformed[triangle.v2];
@@ -400,8 +403,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
                 i0 = intensity;
                 i1 = intensity;
                 i2 = intensity;
-            } else if (game->shaded && game->shadingMode == 1) {
-                // Gouraud shading
+            } else if ((renderOptions & SHADED)  && (renderOptions & SHADED_GOURAUD)) {
                 float specularExponent = 900.0f;
                 if (mesh->numMaterials != 0) {
                     specularExponent = materials[triangle.materialIndex].specularExponent;
@@ -417,7 +419,7 @@ void drawObject(object3D_t* object, game_state_t* game) {
                 drawTriangleWireframe(p0.x, p1.x, p2.x,
                                       p0.y, p1.y, p2.y,
                                       materials[triangle.materialIndex].diffuseColor,
-                                      game->canvas);
+                                      canvas);
             }
             
             if (game->drawFilled) {
@@ -475,10 +477,10 @@ void drawObjects(game_state_t* game) {
 // TODO: This is a huge hack, we should have a proper way to solve shading in this case
 void drawLights(game_state_t* game) {
     for (int i = 0; i < game->numPointLights; i++) {
-        bool shadedBackup = game->shaded;
-        game->shaded = false; 
+        uint8_t renderOptionsBackup = game->renderOptions;
+        game->renderOptions &= ~SHADED;
         drawObject(&game->pointLightObjects[i], game);
-        game->shaded = shadedBackup;
+        game->renderOptions = renderOptionsBackup;
     }
 }
 
@@ -632,14 +634,9 @@ game_state_t* init() {
     game->drawLights    = true;
     game->draw3DObjects =  true;
     game->draw2DObjects =  false;
-    game->diffuseLighting = true;
-    game->specularLighting = true;
+    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_GOURAUD;
     game->drawWire = false;
     game->drawFilled = true;
-    game->shaded = true;
-    game->shadingMode = 1;
-    game->backfaceCulling = true;
-    game->bilinearFiltering = false;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -753,26 +750,43 @@ void updateDebugUI(game_state_t *game) {
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Lights", NK_MINIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
-                nk_checkbox_label(ctx, "Shaded", &game->shaded);
-                if (game->shaded) {
+                
+                nk_bool shaded = game->renderOptions & SHADED;
+                nk_checkbox_label(ctx, "Shaded", &shaded);
+                game->renderOptions = shaded ? game->renderOptions | SHADED : game->renderOptions & ~SHADED;
+
+                if (game->renderOptions & SHADED) {
                     nk_layout_row_dynamic(ctx, row_size, 3);
-                    nk_bool isFlat = game->shadingMode == 0;
+                    nk_bool isFlat = game->renderOptions & SHADED_FLAT;
                     if (nk_radio_label(ctx, "Flat", &isFlat)) {
-                        game->shadingMode = 0;
-                    };
-                    nk_bool isGouraud = game->shadingMode == 1;
-                    if (nk_radio_label(ctx, "Gouraud", &isGouraud)) {
-                        game->shadingMode = 1;
+                        game->renderOptions = game->renderOptions | SHADED_FLAT;
+                        game->renderOptions = game->renderOptions & ~SHADED_GOURAUD;
+                        game->renderOptions = game->renderOptions & ~SHADED_PHONG;
                     };
 
-                    nk_bool isPhong = game->shadingMode == 2;
+                    nk_bool isGouraud = game->renderOptions & SHADED_GOURAUD;
+                    if (nk_radio_label(ctx, "Gouraud", &isGouraud)) {
+                        game->renderOptions = game->renderOptions & ~SHADED_FLAT;
+                        game->renderOptions = game->renderOptions | SHADED_GOURAUD;
+                        game->renderOptions = game->renderOptions & ~SHADED_PHONG;
+                    };
+
+                    nk_bool isPhong = game->renderOptions & SHADED_PHONG;
                     if (nk_radio_label(ctx, "Phong", &isPhong)) {
-                        game->shadingMode = 2;
+                        game->renderOptions = game->renderOptions & ~SHADED_FLAT;
+                        game->renderOptions = game->renderOptions & ~SHADED_GOURAUD;
+                        game->renderOptions = game->renderOptions | SHADED_PHONG;
                     };
 
                     nk_layout_row_dynamic(ctx, row_size, 2);
-                    nk_checkbox_label(ctx, "Difuse", &game->diffuseLighting);
-                    nk_checkbox_label(ctx, "Specular", &game->specularLighting);
+
+                    nk_bool isDiffuse = game->renderOptions & DIFFUSE_LIGHTING;
+                    nk_checkbox_label(ctx, "Difuse", &isDiffuse);
+                    game->renderOptions = isDiffuse ? game->renderOptions | DIFFUSE_LIGHTING : game->renderOptions & ~DIFFUSE_LIGHTING;
+
+                    nk_bool isSpecular = game->renderOptions & SPECULAR_LIGHTING;
+                    nk_checkbox_label(ctx, "Specular", &isSpecular);
+                    game->renderOptions = isSpecular ? game->renderOptions | SPECULAR_LIGHTING : game->renderOptions & ~SPECULAR_LIGHTING;
 
                     if (nk_tree_push(ctx, NK_TREE_NODE, "Ambient", NK_MAXIMIZED)) {
                         for (int i = 0; i < game->numAmbientLights; i++) {
@@ -848,8 +862,15 @@ void updateDebugUI(game_state_t *game) {
                 nk_checkbox_label(ctx, "Wireframe", &game->drawWire);
                 nk_checkbox_label(ctx, "Filled", &game->drawFilled);
                 nk_layout_row_dynamic(ctx, row_size, 2);
-                nk_checkbox_label(ctx, "Backface culling", &game->backfaceCulling);
-                nk_checkbox_label(ctx, "Bilinear filtering", &game->bilinearFiltering);
+
+                nk_bool isBackfaceCulling = game->renderOptions & BACKFACE_CULLING;
+                nk_checkbox_label(ctx, "Backface culling", &isBackfaceCulling);
+                game->renderOptions = isBackfaceCulling ? game->renderOptions | BACKFACE_CULLING : game->renderOptions & ~BACKFACE_CULLING;
+
+                nk_bool isBilinearFiltering = game->renderOptions & BILINEAR_FILTERING;
+                nk_checkbox_label(ctx, "Bilinear filtering", &isBilinearFiltering);
+                game->renderOptions = isBilinearFiltering ? game->renderOptions | BILINEAR_FILTERING : game->renderOptions & ~BILINEAR_FILTERING;
+
                 nk_tree_pop(ctx);
             }
 

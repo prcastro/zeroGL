@@ -583,6 +583,20 @@ static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, canva
     }
 }
 
+static inline void drawTriangleWireframe(int x0, int x1, int x2,
+                           int y0, int y1, int y2,
+                           color_t color, canvas_t canvas) {
+    drawLine(x0, x1, y0, y1, color, canvas);
+    drawLine(x1, x2, y1, y2, color, canvas);
+    drawLine(x2, x0, y2, y0, color, canvas);
+}
+
+static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
+  point_t ab = { bx - ax, by - ay };
+  point_t ap = { px - ax, py - ay };
+  return ab.x * ap.y - ab.y * ap.x;
+}
+
 static inline point_t projectVertex(vec3_t v, canvas_t canvas, camera_t cam) {
   return (point_t) {
     (int) (v.x * cam.viewportDistance / v.z  * canvas.width/cam.viewportWidth + canvas.width/2),
