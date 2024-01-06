@@ -388,7 +388,6 @@ game_state_t* init() {
 
     pointLightObjects[0] = makeObject(&meshes[0], pointLights[0].position, 0.05, IDENTITY_M4x4);
 
-
     DEBUG_PRINT("INFO: Initializing game state\n");
     uint32_t *frameBuffer = (uint32_t*) malloc(WIDTH * HEIGHT * sizeof(uint32_t));
     float *depthBuffer = (float*) malloc(WIDTH * HEIGHT * sizeof(float));
