@@ -13,6 +13,9 @@
 #define DEBUG_PRINT(...) do {} while (0)
 #endif
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 /* VECTORS AND MATRICES */
 
 typedef struct vec3_t {
@@ -422,6 +425,15 @@ typedef struct point_light_t {
     vec3_t position;
 } point_light_t;
 
+typedef struct light_sources_t {
+    int              numAmbientLights;
+    ambient_light_t* ambientLights;
+    int              numDirectionalLights;
+    dir_light_t*     directionalLights;
+    int              numPointLights;
+    point_light_t*   pointLights;
+} light_sources_t;
+
 static inline vec3_t triangleNormal(vec3_t v0, vec3_t v1, vec3_t v2) {
     return crossProduct(sub(v1, v0), sub(v2, v0));
 }
@@ -544,6 +556,16 @@ static inline float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t c
 
 /* DRAWING */
 
+// Rendering options
+#define DIFFUSE_LIGHTING (1 << 0)
+#define SPECULAR_LIGHTING (1 << 1)
+#define BACKFACE_CULLING (1 << 2)
+#define BILINEAR_FILTERING (1 << 3)
+#define SHADED (1 << 4)
+#define SHADED_FLAT (1 << 5)
+#define SHADED_GOURAUD (1 << 6)
+#define SHADED_PHONG (1 << 7)
+
 typedef struct canvas_t {
     uint32_t* frameBuffer;
     int       width;
@@ -556,6 +578,28 @@ typedef struct point_t {
   int   x, y;
   float invz;
 } point_t;
+
+static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
+  point_t ab = { bx - ax, by - ay };
+  point_t ap = { px - ax, py - ay };
+  return ab.x * ap.y - ab.y * ap.x;
+}
+
+static inline point_t projectVertex(vec3_t v, canvas_t canvas, camera_t cam) {
+  return (point_t) {
+    (int) (v.x * cam.viewportDistance / v.z  * canvas.width/cam.viewportWidth + canvas.width/2),
+    (int) (canvas.height/2 - (v.y * cam.viewportDistance / v.z * canvas.height/cam.viewportHeight) - 1),
+    1.0f / v.z
+  };
+}
+
+static inline vec3_t unprojectPoint(point_t p, canvas_t canvas, camera_t cam) {
+  return (vec3_t) {
+    (p.x - canvas.width/2) * (cam.viewportWidth / canvas.width) / (p.invz * cam.viewportDistance),
+    (canvas.height/2 - p.y - 1) / (cam.viewportDistance * p.invz * canvas.height/cam.viewportHeight),
+    1.0f / p.invz
+  };
+}
 
 static inline void drawPixel(int i, int j, float z, uint32_t color, canvas_t canvas) {
     if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
@@ -591,26 +635,199 @@ static inline void drawTriangleWireframe(int x0, int x1, int x2,
     drawLine(x2, x0, y2, y0, color, canvas);
 }
 
-static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
-  point_t ab = { bx - ax, by - ay };
-  point_t ap = { px - ax, py - ay };
-  return ab.x * ap.y - ab.y * ap.x;
+// TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
+float shadeVertex(vec3_t v, vec3_t normal, float invMagnitudeNormal, float specularExponent,
+                  light_sources_t lightSources, uint8_t renderOptions) {
+    int numDirectionalLights = lightSources.numDirectionalLights;
+    dir_light_t* directionalLights = lightSources.directionalLights;
+    int numPointLights = lightSources.numPointLights;
+    point_light_t* pointLights = lightSources.pointLights;
+    int numAmbientLights = lightSources.numAmbientLights;
+    ambient_light_t* ambientLights = lightSources.ambientLights;
+
+
+    float diffuseIntensity  = 0.0;
+    float specularIntensity = 0.0;
+    float ambientIntensity  = 0.0;
+    
+    // Directional lights
+    for (int i = 0; i < numDirectionalLights; i++) {
+        vec3_t lightDirection = directionalLights[i].direction;
+        float magnitudeLightDirection = magnitude(lightDirection);
+        float invMagnitudeLightDirection = 1.0f / magnitudeLightDirection;
+        if (renderOptions & DIFFUSE_LIGHTING) {
+            float cos_alpha = -dot(lightDirection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
+            diffuseIntensity += MAX(cos_alpha, 0.0f) * directionalLights[i].intensity;
+        }
+
+        if (renderOptions & SPECULAR_LIGHTING) {
+            vec3_t reflection = sub(mulScalarV3(2 * -dot(lightDirection, normal), normal), lightDirection);
+            float cos_beta = -dot(reflection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
+            specularIntensity += pow(MAX(cos_beta, 0.0f), specularExponent) * directionalLights[i].intensity;
+        }
+    }
+
+    // Point lights
+    for (int i = 0; i < numPointLights; i++) {
+        vec3_t lightDirection = sub(pointLights[i].position, v);
+        float invMagnitudeLightDirection = 1.0f / magnitude(lightDirection);
+        if (renderOptions & DIFFUSE_LIGHTING) {
+            float cos_alpha = dot(lightDirection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
+            diffuseIntensity += MAX(cos_alpha, 0) * pointLights[i].intensity;
+        }
+
+        if (renderOptions & SPECULAR_LIGHTING) {
+            vec3_t reflection = sub(mulScalarV3(2 * dot(lightDirection, normal), normal), lightDirection);
+            float cos_beta = dot(reflection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
+            specularIntensity += pow(MAX(cos_beta, 0), specularExponent) * pointLights[i].intensity;
+        }
+    }
+
+    // Ambient light
+    for (int i = 0; i < numAmbientLights; i++) {
+        ambientIntensity += ambientLights[i].intensity;
+    }
+
+    return (diffuseIntensity + specularIntensity + ambientIntensity);
 }
 
-static inline point_t projectVertex(vec3_t v, canvas_t canvas, camera_t cam) {
-  return (point_t) {
-    (int) (v.x * cam.viewportDistance / v.z  * canvas.width/cam.viewportWidth + canvas.width/2),
-    (int) (canvas.height/2 - (v.y * cam.viewportDistance / v.z * canvas.height/cam.viewportHeight) - 1),
-    1.0f / v.z
-  };
-}
+// TODO: It's very weird to have the camera as a parameter here. This is because the phong shading
+//       needs the camera position. Maybe I should get rid of phong shading until I implement
+//       programmable shaders.
+// TODO: Pass texture as a canvas_t
+void drawTriangleFilled(int x0, int x1, int x2,
+                        int y0, int y1, int y2,
+                        float invz0, float invz1, float invz2,
+                        float i0, float i1, float i2,
+                        vec3_t n0, vec3_t n1, vec3_t n2,
+                        vec3_t t0, vec3_t t1, vec3_t t2,
+                        color_t c0, color_t c1, color_t c2,
+                        float specularExponent,
+                        uint32_t* texture, int textureWidth, int textureHeight,
+                        mat4x4_t invCameraTransform,
+                        int area,
+                        light_sources_t lightSources, camera_t camera,
+                        canvas_t canvas, uint8_t renderOptions) {
+    int x_min = MAX(MIN(MIN(x0, x1), x2), 0);
+    int x_max = MIN(MAX(MAX(x0, x1), x2), canvas.width - 1); 
+    int y_min = MAX(MIN(MIN(y0, y1), y2), 0);
+    int y_max = MIN(MAX(MAX(y0, y1), y2), canvas.height - 1);
 
-static inline vec3_t unprojectPoint(point_t p, canvas_t canvas, camera_t cam) {
-  return (vec3_t) {
-    (p.x - canvas.width/2) * (cam.viewportWidth / canvas.width) / (p.invz * cam.viewportDistance),
-    (canvas.height/2 - p.y - 1) / (cam.viewportDistance * p.invz * canvas.height/cam.viewportHeight),
-    1.0f / p.invz
-  };
+    float invArea = 1.0f / area;
+
+    // Compute the constant delta_s that will be used for the horizontal and vertical steps
+    int delta_w0_col = (y1 - y2);
+    int delta_w1_col = (y2 - y0);
+    int delta_w2_col = (y0 - y1);
+    int delta_w0_row = (x2 - x1);
+    int delta_w1_row = (x0 - x2);
+    int delta_w2_row = (x1 - x0);
+
+    // Compute the edge functions for the fist (top-left) point
+    int w0_row = edgeCross(x1, y1, x2, y2, x_min, y_min);
+    int w1_row = edgeCross(x2, y2, x0, y0, x_min, y_min);
+    int w2_row = edgeCross(x0, y0, x1, y1, x_min, y_min);
+
+    // Illuminate each vertex
+    if ((renderOptions & SHADED) && !(renderOptions & SHADED_PHONG)) {
+        c0 = mulScalarColor(i0, c0);
+        c1 = mulScalarColor(i1, c1);
+        c2 = mulScalarColor(i2, c2);
+    }
+    
+    for (int y = y_min; y <= y_max; y++) {
+        bool was_inside = false;
+        int w0 = w0_row;
+        int w1 = w1_row;
+        int w2 = w2_row;
+        for (int x = x_min; x <= x_max; x++) {
+            bool is_inside = (w0 | w1 | w2) >= 0;
+            if (is_inside) {
+                was_inside = true;
+            
+                float alpha = w0 * invArea;
+                float beta  = w1 * invArea;
+                float gamma = w2 * invArea;
+                float invz = alpha * invz0 + beta * invz1 + gamma * invz2;
+                if (invz > canvas.depthBuffer[y * canvas.width + x]) {
+                    uint32_t color = colorToUint32(c0); // Fallback in case of no texture and no shading
+                    float light = 1;
+
+                    if (renderOptions & SHADED_PHONG) {
+                        point_t p = {x, y, invz};
+                        vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p, canvas, camera));
+                        vec3_t normal = add(add(mulScalarV3(alpha, n0), mulScalarV3(beta, n1)), mulScalarV3(gamma, n2));
+                        light = shadeVertex(v, normal , 1/magnitude(normal), specularExponent, lightSources, renderOptions);
+                    } else if (renderOptions & SHADED) {
+                        light = alpha * i0 + beta * i1 + gamma * i2;
+                    }
+                    
+                    if (textureWidth != 0 && textureHeight != 0) {
+                        // Interpolate u/z and v/z to get perspective correct texture coordinates
+                        float u_over_z = alpha * (t0.x * invz0) + beta * (t1.x * invz1) + gamma * (t2.x * invz2);
+                        float v_over_z = alpha * (t0.y * invz0) + beta * (t1.y * invz1) + gamma * (t2.y * invz2);
+                        color_t color_typed;
+                        // TODO: Fix crash when we have overflow here
+                        if (renderOptions & BILINEAR_FILTERING) {
+                            float tex_u = u_over_z/invz;
+                            if (tex_u < 0) {
+                                tex_u = 1 + tex_u;
+                            }
+                            tex_u = MIN(tex_u * textureWidth, textureWidth - 1);
+
+                            float tex_v = v_over_z/invz;
+                            if (tex_v < 0) {
+                                tex_v = 1 + tex_v;
+                            }
+                            tex_v = MIN(tex_v * textureHeight, textureHeight - 1);
+
+                            int floor_u = floor(tex_u);
+                            int floor_v = floor(tex_v);
+                            int next_u = MIN(floor_u + 1, textureWidth - 1);
+                            int next_v = MIN(floor_v + 1, textureHeight - 1);
+                            float frac_u = tex_u - floor_u;
+                            float frac_v = tex_v - floor_v;
+                            color_t color_tl = colorFromUint32(texture[floor_v * textureWidth + floor_u]);
+                            color_t color_tr = colorFromUint32(texture[floor_v * textureWidth + next_u]);
+                            color_t color_bl = colorFromUint32(texture[next_v * textureWidth + floor_u]);
+                            color_t color_br = colorFromUint32(texture[next_v * textureWidth + next_u]);
+                            color_t color_b = sumColors(mulScalarColor(1 - frac_u, color_bl), mulScalarColor(frac_u, color_br));
+                            color_t color_tp = sumColors(mulScalarColor(1 - frac_u, color_tl), mulScalarColor(frac_u, color_tr));
+                            color_typed = sumColors(mulScalarColor(1 - frac_v, color_b), mulScalarColor(frac_v, color_tp));
+                        } else {
+                            int tex_x = MIN(abs((int)((u_over_z/invz) * textureWidth)), textureWidth - 1);
+                            int tex_y = MIN(abs((int)((v_over_z/invz) * textureHeight)), textureHeight - 1);
+                            color_typed = colorFromUint32(texture[tex_y * textureWidth + tex_x]);
+                        }
+                        
+                        color_t color_shaded = mulScalarColor(light, color_typed);
+                        color = colorToUint32(color_shaded);
+                    } else if (renderOptions & SHADED) {
+                        color_t color_typed = {
+                            (uint8_t) (c0.r * alpha + c1.r * beta + c2.r * gamma),
+                            (uint8_t) (c0.g * alpha + c1.g * beta + c2.g * gamma),
+                            (uint8_t) (c0.b * alpha + c1.b * beta + c2.b * gamma)
+                        };
+                        color_t color_shaded = mulScalarColor(light, color_typed);
+                        color = colorToUint32(color_shaded);
+                    }
+                    drawPixel(x, y, invz, color, canvas);
+                }
+            }
+
+            // Go to next row if we jumped outside the triangle
+            if (!is_inside && was_inside) {
+                break;
+            }
+
+            w0 += delta_w0_col;
+            w1 += delta_w1_col;
+            w2 += delta_w2_col;
+        }
+        w0_row += delta_w0_row;
+        w1_row += delta_w1_row;
+        w2_row += delta_w2_row;
+    }
 }
 
 #endif // SIMPLERENDERER_H
