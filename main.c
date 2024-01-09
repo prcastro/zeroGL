@@ -52,7 +52,7 @@ typedef struct game_state_t {
     uint8_t       renderOptions;
     int           drawLights;
     int           draw3DObjects;
-    bool          draw2DObjects;
+    int           draw2DObjects;
     bool          drawWire;
     bool          drawFilled;
     
