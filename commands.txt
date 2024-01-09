@@ -7,4 +7,4 @@ cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c external\u
 zig build-exe main.c external\upng\upng.c -O ReleaseFast --library c -I.\external\sdl2\include -Lexternal\sdl2\lib\x64 -lSDL2 -lSDL2main -femit-bin=target\main.exe
 
 MACOS
-zig build-exe main.c external/upng/upng.c -O ReleaseFast --library c -I./external/sdl2/include -L/usr/local/lib -lSDLmain -lSDL -Wl,-framework,Cocoa -femit-bin=target/main.exe
+zig build-exe main.c external/upng/upng.c -O ReleaseFast --library c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -femit-bin=target/main

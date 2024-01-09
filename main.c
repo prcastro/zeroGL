@@ -23,7 +23,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
 #include "simplerenderer.h"
 #include "objloader.h"
 
@@ -38,7 +37,7 @@
 
 typedef struct game_state_t {
     // Loop control
-    bool         running;
+    int          running;
     double       elapsedTime;
     uint64_t     lastTime;
 
@@ -50,11 +49,11 @@ typedef struct game_state_t {
     canvas_t      canvas;
     color_t       backgroundColor;
     uint8_t       renderOptions;
-    bool          drawLights;
-    bool          draw3DObjects;
-    bool          draw2DObjects;
-    bool          drawWire;
-    bool          drawFilled;
+    int           drawLights;
+    int           draw3DObjects;
+    int           draw2DObjects;
+    int           drawWire;
+    int           drawFilled;
     
     // Game objects
     int              numMeshes;
@@ -76,8 +75,8 @@ typedef struct game_state_t {
     // GUI
     #ifdef DEBUGUI
     struct nk_context* nuklearContext;
-    bool               showGUI;
-    bool               toggleGUIKeyPressed;
+    int                showGUI;
+    int                toggleGUIKeyPressed;
     #endif // DEBUG
 } game_state_t;
 
@@ -405,7 +404,7 @@ game_state_t* init() {
         .depthBuffer = depthBuffer
     };
     
-    game->running = true;
+    game->running = 1;
     game->elapsedTime = 0;
     game->lastTime = SDL_GetPerformanceCounter();
     game->window = SDL_CreateWindow("Rasterizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
@@ -413,12 +412,12 @@ game_state_t* init() {
     game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     game->canvas = canvas;
     game->backgroundColor = (color_t) {0, 0, 0};
-    game->drawLights    = true;
-    game->draw3DObjects =  true;
-    game->draw2DObjects =  false;
+    game->drawLights    = 1;
+    game->draw3DObjects = 1;
+    game->draw2DObjects = 0;
     game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_GOURAUD;
-    game->drawWire = false;
-    game->drawFilled = true;
+    game->drawWire = 0;
+    game->drawFilled = 1;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -459,8 +458,8 @@ game_state_t* init() {
     nk_sdl_font_stash_end();
     nk_style_set_font(ctx, &font->handle);
     game->nuklearContext = ctx;
-    game->showGUI = true;
-    game->toggleGUIKeyPressed = false;
+    game->showGUI = 1;
+    game->toggleGUIKeyPressed = 0;
     #endif // DEBUGUI
 
     return game;
@@ -481,7 +480,7 @@ void handleEvents(game_state_t* game) {
         case SDL_QUIT:
             // handling of close button
             DEBUG_PRINT("INFO: Quitting application\n");
-            game->running = false;
+            game->running = 0;
             break;
         }
     }
@@ -492,11 +491,11 @@ void updateDebugUI(game_state_t *game) {
     // Check for toggle key
     if (game->keys[SDL_SCANCODE_SPACE]) {
         if (!game->toggleGUIKeyPressed) {
-            game->toggleGUIKeyPressed = true;
+            game->toggleGUIKeyPressed = 1;
             game->showGUI = !game->showGUI; // Toggle state of ImGui display
         }
     } else {
-        game->toggleGUIKeyPressed = false;
+        game->toggleGUIKeyPressed = 0;
     }
 
     if (game->showGUI) {
@@ -636,16 +635,33 @@ void updateDebugUI(game_state_t *game) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_label(ctx, "What to draw", NK_TEXT_LEFT);
                 nk_layout_row_dynamic(ctx, row_size, 3);
-                nk_checkbox_label(ctx, "3D Obj", &game->draw3DObjects);
-                nk_checkbox_label(ctx, "2D Obj", &game->draw2DObjects);
-                nk_checkbox_label(ctx, "Lights", &game->drawLights);
+
+                nk_bool draw3DObjects = game->draw3DObjects;
+                nk_checkbox_label(ctx, "3D Obj", &draw3DObjects);
+                game->draw3DObjects = draw3DObjects;
+
+                nk_bool draw2DObjects = game->draw2DObjects;
+                nk_checkbox_label(ctx, "2D Obj", &draw2DObjects);
+                game->draw2DObjects = draw2DObjects;
+
+                nk_bool drawLights = game->drawLights; 
+                nk_checkbox_label(ctx, "Lights", &drawLights);
+                game->drawLights = drawLights;
+
                 nk_tree_pop(ctx);
             }
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Render Options", NK_MAXIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 2);
-                nk_checkbox_label(ctx, "Wireframe", &game->drawWire);
-                nk_checkbox_label(ctx, "Filled", &game->drawFilled);
+
+                nk_bool drawWire = game->drawWire;
+                nk_checkbox_label(ctx, "Wireframe", &drawWire);
+                game->drawWire = drawWire;
+
+                nk_bool drawFilled = game->drawFilled;
+                nk_checkbox_label(ctx, "Filled", &drawFilled);
+                game->drawFilled = drawFilled;
+
                 nk_layout_row_dynamic(ctx, row_size, 2);
 
                 nk_bool isBackfaceCulling = game->renderOptions & BACKFACE_CULLING;
@@ -729,7 +745,7 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
                                   COLOR_GREEN, game->canvas);
         }
         
-        if (game->drawFilled == 1) {
+        if (game->drawFilled) {
             DEBUG_PRINT("INFO: Drawing triangle\n");
             
             int area = edgeCross(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
