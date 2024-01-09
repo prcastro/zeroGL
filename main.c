@@ -54,7 +54,7 @@ typedef struct game_state_t {
     int           draw3DObjects;
     int           draw2DObjects;
     int           drawWire;
-    bool          drawFilled;
+    int           drawFilled;
     
     // Game objects
     int              numMeshes;
@@ -418,7 +418,7 @@ game_state_t* init() {
     game->draw2DObjects = 0;
     game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_GOURAUD;
     game->drawWire = 0;
-    game->drawFilled = true;
+    game->drawFilled = 1;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -659,7 +659,10 @@ void updateDebugUI(game_state_t *game) {
                 nk_checkbox_label(ctx, "Wireframe", &drawWire);
                 game->drawWire = drawWire;
 
-                nk_checkbox_label(ctx, "Filled", &game->drawFilled);
+                nk_bool drawFilled = game->drawFilled;
+                nk_checkbox_label(ctx, "Filled", &drawFilled);
+                game->drawFilled = drawFilled;
+
                 nk_layout_row_dynamic(ctx, row_size, 2);
 
                 nk_bool isBackfaceCulling = game->renderOptions & BACKFACE_CULLING;
@@ -743,7 +746,7 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
                                   COLOR_GREEN, game->canvas);
         }
         
-        if (game->drawFilled == 1) {
+        if (game->drawFilled) {
             DEBUG_PRINT("INFO: Drawing triangle\n");
             
             int area = edgeCross(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
