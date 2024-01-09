@@ -38,7 +38,7 @@
 
 typedef struct game_state_t {
     // Loop control
-    bool         running;
+    int          running;
     double       elapsedTime;
     uint64_t     lastTime;
 
@@ -76,8 +76,8 @@ typedef struct game_state_t {
     // GUI
     #ifdef DEBUGUI
     struct nk_context* nuklearContext;
-    bool               showGUI;
-    bool               toggleGUIKeyPressed;
+    int                showGUI;
+    int                toggleGUIKeyPressed;
     #endif // DEBUG
 } game_state_t;
 
@@ -405,7 +405,7 @@ game_state_t* init() {
         .depthBuffer = depthBuffer
     };
     
-    game->running = true;
+    game->running = 1;
     game->elapsedTime = 0;
     game->lastTime = SDL_GetPerformanceCounter();
     game->window = SDL_CreateWindow("Rasterizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
@@ -459,8 +459,8 @@ game_state_t* init() {
     nk_sdl_font_stash_end();
     nk_style_set_font(ctx, &font->handle);
     game->nuklearContext = ctx;
-    game->showGUI = true;
-    game->toggleGUIKeyPressed = false;
+    game->showGUI = 1;
+    game->toggleGUIKeyPressed = 0;
     #endif // DEBUGUI
 
     return game;
@@ -481,7 +481,7 @@ void handleEvents(game_state_t* game) {
         case SDL_QUIT:
             // handling of close button
             DEBUG_PRINT("INFO: Quitting application\n");
-            game->running = false;
+            game->running = 0;
             break;
         }
     }
@@ -492,11 +492,11 @@ void updateDebugUI(game_state_t *game) {
     // Check for toggle key
     if (game->keys[SDL_SCANCODE_SPACE]) {
         if (!game->toggleGUIKeyPressed) {
-            game->toggleGUIKeyPressed = true;
+            game->toggleGUIKeyPressed = 1;
             game->showGUI = !game->showGUI; // Toggle state of ImGui display
         }
     } else {
-        game->toggleGUIKeyPressed = false;
+        game->toggleGUIKeyPressed = 0;
     }
 
     if (game->showGUI) {
