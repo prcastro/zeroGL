@@ -498,6 +498,12 @@ void updateDebugUI(game_state_t *game) {
         game->toggleGUIKeyPressed = 0;
     }
 
+
+    if (game->showGUI) {
+        nk_window_show(game->nuklearContext, "Settings", NK_SHOWN);
+    }
+
+
     if (game->showGUI) {
         DEBUG_PRINT("INFO: Updating GUI\n");
         int row_size = 12;
@@ -695,9 +701,13 @@ void updateDebugUI(game_state_t *game) {
                 nk_property_float(ctx, "Rotation speed", -360.0f, &game->rotationSpeed, 360.0f, 0.1f, 0.1f);
                 nk_tree_pop(ctx);
             }
-
         }
+
         nk_end(game->nuklearContext);
+    }
+
+    if (game->showGUI && nk_window_is_hidden(game->nuklearContext, "Settings")) {
+        game->showGUI = 0;
     }
 }
 #endif // DEBUGUI
