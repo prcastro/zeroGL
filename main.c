@@ -53,7 +53,7 @@ typedef struct game_state_t {
     int           drawLights;
     int           draw3DObjects;
     int           draw2DObjects;
-    bool          drawWire;
+    int           drawWire;
     bool          drawFilled;
     
     // Game objects
@@ -415,9 +415,9 @@ game_state_t* init() {
     game->backgroundColor = (color_t) {0, 0, 0};
     game->drawLights    = 1;
     game->draw3DObjects = 1;
-    game->draw2DObjects =  false;
+    game->draw2DObjects = 0;
     game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_GOURAUD;
-    game->drawWire = false;
+    game->drawWire = 0;
     game->drawFilled = true;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
@@ -641,7 +641,9 @@ void updateDebugUI(game_state_t *game) {
                 nk_checkbox_label(ctx, "3D Obj", &draw3DObjects);
                 game->draw3DObjects = draw3DObjects;
 
-                nk_checkbox_label(ctx, "2D Obj", &game->draw2DObjects);
+                nk_bool draw2DObjects = game->draw2DObjects;
+                nk_checkbox_label(ctx, "2D Obj", &draw2DObjects);
+                game->draw2DObjects = draw2DObjects;
 
                 nk_bool drawLights = game->drawLights; 
                 nk_checkbox_label(ctx, "Lights", &drawLights);
@@ -652,7 +654,11 @@ void updateDebugUI(game_state_t *game) {
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Render Options", NK_MAXIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 2);
-                nk_checkbox_label(ctx, "Wireframe", &game->drawWire);
+
+                nk_bool drawWire = game->drawWire;
+                nk_checkbox_label(ctx, "Wireframe", &drawWire);
+                game->drawWire = drawWire;
+
                 nk_checkbox_label(ctx, "Filled", &game->drawFilled);
                 nk_layout_row_dynamic(ctx, row_size, 2);
 
