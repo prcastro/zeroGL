@@ -51,7 +51,7 @@ typedef struct game_state_t {
     color_t       backgroundColor;
     uint8_t       renderOptions;
     int           drawLights;
-    bool          draw3DObjects;
+    int           draw3DObjects;
     bool          draw2DObjects;
     bool          drawWire;
     bool          drawFilled;
@@ -414,7 +414,7 @@ game_state_t* init() {
     game->canvas = canvas;
     game->backgroundColor = (color_t) {0, 0, 0};
     game->drawLights    = 1;
-    game->draw3DObjects =  true;
+    game->draw3DObjects = 1;
     game->draw2DObjects =  false;
     game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_GOURAUD;
     game->drawWire = false;
@@ -636,13 +636,17 @@ void updateDebugUI(game_state_t *game) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_label(ctx, "What to draw", NK_TEXT_LEFT);
                 nk_layout_row_dynamic(ctx, row_size, 3);
-                nk_checkbox_label(ctx, "3D Obj", &game->draw3DObjects);
+
+                nk_bool draw3DObjects = game->draw3DObjects;
+                nk_checkbox_label(ctx, "3D Obj", &draw3DObjects);
+                game->draw3DObjects = draw3DObjects;
+
                 nk_checkbox_label(ctx, "2D Obj", &game->draw2DObjects);
 
                 nk_bool drawLights = game->drawLights; 
                 nk_checkbox_label(ctx, "Lights", &drawLights);
                 game->drawLights = drawLights;
-                
+
                 nk_tree_pop(ctx);
             }
 
