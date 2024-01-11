@@ -565,6 +565,8 @@ static inline float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t c
 #define SHADED_FLAT (1 << 5)
 #define SHADED_GOURAUD (1 << 6)
 #define SHADED_PHONG (1 << 7)
+#define DRAW_WIREFRAME (1 << 8)
+#define DRAW_FILLED (1 << 9)
 
 typedef struct canvas_t {
     uint32_t* frameBuffer;
@@ -707,7 +709,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         mat4x4_t invCameraTransform,
                         int area,
                         light_sources_t lightSources, camera_t camera,
-                        canvas_t canvas, uint8_t renderOptions) {
+                        canvas_t canvas, uint16_t renderOptions) {
     int x_min = MAX(MIN(MIN(x0, x1), x2), 0);
     int x_max = MIN(MAX(MAX(x0, x1), x2), canvas.width - 1); 
     int y_min = MAX(MIN(MIN(y0, y1), y2), 0);
@@ -828,6 +830,169 @@ void drawTriangleFilled(int x0, int x1, int x2,
         w1_row += delta_w1_row;
         w2_row += delta_w2_row;
     }
+}
+
+// TODO: This function is very dumb, as it is allocating transformed
+//       vertices just to allocate the projections right after.
+void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camera, canvas_t canvas, uint16_t renderOptions) {
+    mesh_t* mesh = object->mesh;
+    material_t* materials = mesh->materials;
+    mat4x4_t invCameraTransform = inverseM4(camera.transform);
+    
+    // Transform the bounding sphere and don't draw when object is fully out of the camera volume
+    mat4x4_t transform = mulMM4(camera.transform, object->transform);
+    vec3_t transformedCenter = mulMV3(transform, mesh->center);
+    float transformedBoundsRadius = mesh->boundsRadius * object->scale;
+    for (int p = 0; p < camera.numPlanes; p++) {
+        float distance = distancePlaneV3(camera.planes[p], transformedCenter);
+        if (distance < -transformedBoundsRadius) {
+            DEBUG_PRINT("DEBUG: Clipped an object fully outside of the clipping volume\n");
+            return;
+        }
+    }
+
+    // If the object is not discarded, transform and project all vertices
+    vec3_t *transformed = (vec3_t*) malloc(mesh->numVertices * sizeof(vec3_t));
+    vec3_t *camTransformed = (vec3_t*) malloc(mesh->numVertices * sizeof(vec3_t));
+    point_t *projected = (point_t*) malloc(mesh->numVertices * sizeof(point_t));
+    vec3_t *transformedNormals = (vec3_t*) malloc(mesh->numNormals * sizeof(vec3_t));
+    if (projected == NULL || transformed == NULL || camTransformed == NULL || transformedNormals == NULL) {
+        fprintf(stderr, "ERROR: Transformed vertices/normals memory couldn't be allocated.\n");
+        exit(-1);
+    }
+
+    for (int i = 0; i < mesh->numVertices; i++) {
+        transformed[i] = mulMV3(object->transform, mesh->vertices[i]);
+        camTransformed[i] = mulMV3(camera.transform, transformed[i]);
+        projected[i] = projectVertex(camTransformed[i], canvas, camera);
+    }
+
+    for (int i = 0; i < mesh->numNormals; i++) {
+        transformedNormals[i] = mulMV3(object->transform, mesh->normals[i]);
+    }
+
+    // Cull, shade and draw each triangle
+    for (int i = 0; i < mesh->numTriangles; i++) {
+        triangle_t triangle = mesh->triangles[i];
+
+        bool discarded = false;
+
+        // Backface culling
+        point_t p0 = projected[triangle.v0];
+        point_t p1 = projected[triangle.v1];
+        point_t p2 = projected[triangle.v2];
+        int area = edgeCross(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
+        if (area < 0 && (renderOptions & BACKFACE_CULLING)) {
+            discarded = true;
+        }
+
+        // Fustrum culling
+        // TODO: Add config for this
+        for (int p = 0; !discarded && p < camera.numPlanes; p++) {
+            plane_t plane = camera.planes[p];
+            if (distancePlaneV3(plane, camTransformed[triangle.v0]) < 0 &&
+                distancePlaneV3(plane, camTransformed[triangle.v1]) < 0 &&
+                distancePlaneV3(plane, camTransformed[triangle.v2]) < 0) {
+                    DEBUG_PRINT("DEBUG: Clipped triangle fully outside of the camera clipping volume\n");
+                    discarded = true;
+                    break;
+            }
+
+            // TODO: Deal with the case where only one or two vertexes of the triangle
+            //       are out of the volume. In this case, we should split the triangle
+            //       and create new ones.
+        }
+
+        // TODO: Check if this is right, but it fixes overflows when we
+        //       interpolate zs and we have z close to 0
+        // Don't draw if the triangle has any vertice behind the camera
+        if (camTransformed[triangle.v0].z < 0 ||
+            camTransformed[triangle.v1].z < 0 ||
+            camTransformed[triangle.v2].z < 0) {
+            DEBUG_PRINT("DEBUG: Clipped triangle with a vertice behind the camera\n");
+            discarded = true;
+        }
+
+        if (!discarded) {
+            float i0 = 1.0;
+            float i1 = 1.0;
+            float i2 = 1.0;
+
+            // Shading
+            if ((renderOptions & SHADED) && (renderOptions & SHADED_FLAT)) {
+                vec3_t v0 = transformed[triangle.v0];
+                vec3_t v1 = transformed[triangle.v1];
+                vec3_t v2 = transformed[triangle.v2];
+                vec3_t normal = triangleNormal(v0, v1, v2);
+                float invMag = 1.0f / magnitude(normal);
+                vec3_t center = {(v0.x + v1.x + v2.x)/3.0f, (v0.y + v1.y + v2.y)/3.0f, (v0.z + v1.z + v2.z)/3.0f};
+                float intensity = shadeVertex(center, normal, invMag, materials[triangle.materialIndex].specularExponent, lightSources, renderOptions);
+                i0 = intensity;
+                i1 = intensity;
+                i2 = intensity;
+            } else if ((renderOptions & SHADED)  && (renderOptions & SHADED_GOURAUD)) {
+                float specularExponent = 900.0f;
+                if (mesh->numMaterials != 0) {
+                    specularExponent = materials[triangle.materialIndex].specularExponent;
+                }
+
+                i0 = shadeVertex(transformed[triangle.v0], transformedNormals[triangle.n0], mesh->invMagnitudeNormals[triangle.n0], specularExponent, lightSources, renderOptions);
+                i1 = shadeVertex(transformed[triangle.v1], transformedNormals[triangle.n1], mesh->invMagnitudeNormals[triangle.n1], specularExponent, lightSources, renderOptions);
+                i2 = shadeVertex(transformed[triangle.v2], transformedNormals[triangle.n2], mesh->invMagnitudeNormals[triangle.n2], specularExponent, lightSources, renderOptions);
+            }
+
+            // Drawing
+            if (renderOptions & DRAW_WIREFRAME) {
+                drawTriangleWireframe(p0.x, p1.x, p2.x,
+                                      p0.y, p1.y, p2.y,
+                                      materials[triangle.materialIndex].diffuseColor,
+                                      canvas);
+            }
+            
+            if (renderOptions & DRAW_FILLED) {
+                vec3_t t0 = {0};
+                vec3_t t1 = {0};
+                vec3_t t2 = {0};
+                int textureWidth = 0;
+                int textureHeight = 0;
+                uint32_t* texture = NULL;
+                if (mesh->numTextureCoords > 0) {
+                    t0 = mesh->textureCoords[triangle.t0];
+                    t1 = mesh->textureCoords[triangle.t1];
+                    t2 = mesh->textureCoords[triangle.t2];
+                    textureWidth = materials[triangle.materialIndex].textureWidth;
+                    textureHeight = materials[triangle.materialIndex].textureHeight;
+                    texture = materials[triangle.materialIndex].texture;
+                }
+                
+                color_t color = COLOR_WHITE;
+                float specularExponent = 900.0f;
+
+                if (mesh->numMaterials != 0) {
+                    color = materials[triangle.materialIndex].diffuseColor;
+                    specularExponent = materials[triangle.materialIndex].specularExponent;
+                }
+                
+                drawTriangleFilled(p0.x, p1.x, p2.x,
+                                   p0.y, p1.y, p2.y,
+                                   p0.invz, p1.invz, p2.invz,
+                                   i0, i1, i2,
+                                   transformedNormals[triangle.n0], transformedNormals[triangle.n1], transformedNormals[triangle.n2],
+                                   t0, t1, t2,
+                                   color, color, color,
+                                   specularExponent,
+                                   texture, textureWidth, textureHeight,
+                                   invCameraTransform,
+                                   area,
+                                   lightSources, camera, canvas, renderOptions);
+            }
+        }
+    }
+
+    free(transformed);
+    free(camTransformed);
+    free(projected);
+    free(transformedNormals);
 }
 
 #endif // SIMPLERENDERER_H
