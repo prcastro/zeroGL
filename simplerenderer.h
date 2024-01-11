@@ -288,68 +288,45 @@ static inline float distancePlaneV3(plane_t plane, vec3_t v) {
 
 /* COLORS */
 
-typedef struct color_t {
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
-} color_t;
+static const uint32_t COLOR_WHITE  = 0x00FFFFFF;
+static const uint32_t COLOR_BLACK  = 0x00000000;
+static const uint32_t COLOR_RED    = 0x00FF0000;
+static const uint32_t COLOR_GREEN  = 0x0000FF00;
+static const uint32_t COLOR_BLUE   = 0x000000FF;
+static const uint32_t COLOR_YELLOW = 0x00FFFF00;
+static const uint32_t COLOR_PURPLE = 0x00FF00FF;
+static const uint32_t COLOR_CYAN   = 0x0000FFFF;
 
-static const color_t COLOR_WHITE      = {255, 255, 255};
-static const color_t COLOR_BLACK      = {0,   0,   0  };
-static const color_t COLOR_GREEN      = {0,   255, 0  };
-static const color_t COLOR_BLUE       = {0,   0,   255};
-static const color_t COLOR_RED        = {255, 0,   0  };
-static const color_t COLOR_YELLOW     = {255, 255, 0  };
-static const color_t COLOR_PURPLE     = {255, 0,   255};
-static const color_t COLOR_CYAN       = {0,   255, 255};
-
-static inline uint32_t colorToUint32(color_t c) {
-    return 0x00000000 | (c.r << 16) | (c.g << 8) |  c.b;    
+static inline uint32_t colorToUint32(uint8_t r, uint8_t g, uint8_t b) {
+    return 0x00000000 | (r << 16) | (g << 8) |  b;    
 }
 
-static inline color_t colorFromUint32(uint32_t c) {
-    return (color_t) {
-        (uint8_t) ((c & 0x00FF0000) >> 16),
-        (uint8_t) ((c & 0x0000FF00) >> 8),
-        (uint8_t) (c & 0x000000FF)
-    };
+static inline void colorFromUint32(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b) {
+    *r = (c & 0x00FF0000) >> 16;
+    *g = (c & 0x0000FF00) >> 8;
+    *b = c & 0x000000FF;
 }
 
 static inline float clamp(float v, float max) {
     return v > max ? max : v;
 }
 
-static inline color_t mulScalarColor(double x, color_t color) {
-    color_t result = {
-        (uint8_t) clamp(x * color.r, 255.0),
-        (uint8_t) clamp(x * color.g, 255.0),
-        (uint8_t) clamp(x * color.b, 255.0)
-    };
-    return result;
+static inline uint32_t mulScalarColor(double x, uint32_t color) {
+    uint8_t r, g, b;
+    colorFromUint32(color, &r, &g, &b);
+    return colorToUint32(clamp(x * r, 255.0), clamp(x * g, 255.0), clamp(x * b, 255.0));
 }
 
-static inline color_t sumColors3(color_t c0, color_t c1, color_t c2) {
-    return (color_t) {
-        (uint8_t) clamp(c0.r + c1.r + c2.r, 255.0),
-        (uint8_t) clamp(c0.g + c1.g + c2.g, 255.0),
-        (uint8_t) clamp(c0.b + c1.b + c2.b, 255.0)
-    };
+static inline uint32_t sumColors(uint32_t c0, uint32_t c1) {
+    uint8_t r0, g0, b0;
+    uint8_t r1, g1, b1;
+    colorFromUint32(c0, &r0, &g0, &b0);
+    colorFromUint32(c1, &r1, &g1, &b1);
+    return colorToUint32(clamp(r0 + r1, 255.0), clamp(g0 + g1, 255.0), clamp(b0 + b1, 255.0));
 }
 
-static inline color_t sumColors(color_t c0, color_t c1) {
-    return (color_t) {
-        (uint8_t) clamp(c0.r + c1.r, 255.0),
-        (uint8_t) clamp(c0.g + c1.g, 255.0),
-        (uint8_t) clamp(c0.b + c1.b, 255.0)
-    };
-}
-
-static inline color_t colorFromFloats(float r, float g, float b) {
-    return (color_t) {
-        (uint8_t) clamp(r * 255.0, 255.0),
-        (uint8_t) clamp(g * 255.0, 255.0),
-        (uint8_t) clamp(b * 255.0, 255.0)
-    };
+static inline uint32_t colorFromFloats(float r, float g, float b) {
+    return colorToUint32(clamp(r * 255.0, 255.0), clamp(g * 255.0, 255.0), clamp(b * 255.0, 255.0));
 }
 
 /* 3D OBJECTS */
@@ -365,8 +342,8 @@ typedef struct triangle_t {
 
 typedef struct material_t {
     char*   name;
-    color_t diffuseColor;
-    color_t specularColor;
+    uint32_t diffuseColor;
+    uint32_t specularColor;
     float   specularExponent;
     int     textureWidth;
     int     textureHeight;
@@ -600,7 +577,7 @@ static inline void drawPixel(int i, int j, float z, uint32_t color, canvas_t can
     }
 }
 
-static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, canvas_t canvas) {
+static inline void drawLine(int x0, int x1, int y0, int y1, uint32_t color, canvas_t canvas) {
     int delta_x = (x1 - x0);
     int delta_y = (y1 - y0);
 
@@ -612,7 +589,7 @@ static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, canva
     float current_x = x0;
     float current_y = y0;
     for (int i = 0; i <= longest_side_length; i++) {
-        drawPixel(round(current_x), round(current_y), 0.0, colorToUint32(color), canvas);
+        drawPixel(round(current_x), round(current_y), 0.0, color, canvas);
         current_x += x_inc;
         current_y += y_inc;
     }
@@ -620,7 +597,7 @@ static inline void drawLine(int x0, int x1, int y0, int y1, color_t color, canva
 
 static inline void drawTriangleWireframe(int x0, int x1, int x2,
                            int y0, int y1, int y2,
-                           color_t color, canvas_t canvas) {
+                           uint32_t color, canvas_t canvas) {
     drawLine(x0, x1, y0, y1, color, canvas);
     drawLine(x1, x2, y1, y2, color, canvas);
     drawLine(x2, x0, y2, y0, color, canvas);
@@ -692,7 +669,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         float i0, float i1, float i2,
                         vec3_t n0, vec3_t n1, vec3_t n2,
                         vec3_t t0, vec3_t t1, vec3_t t2,
-                        color_t c0, color_t c1, color_t c2,
+                        uint32_t c0, uint32_t c1, uint32_t c2,
                         float specularExponent,
                         uint32_t* texture, int textureWidth, int textureHeight,
                         mat4x4_t invCameraTransform,
@@ -741,7 +718,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                 float gamma = w2 * invArea;
                 float invz = alpha * invz0 + beta * invz1 + gamma * invz2;
                 if (invz > canvas.depthBuffer[y * canvas.width + x]) {
-                    uint32_t color = colorToUint32(c0); // Fallback in case of no texture and no shading
+                    uint32_t color = c0; // Fallback in case of no texture and no shading
                     float light = 1;
 
                     if (renderOptions & SHADED_PHONG) {
@@ -756,7 +733,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                         // Interpolate u/z and v/z to get perspective correct texture coordinates
                         float u_over_z = alpha * (t0.x * invz0) + beta * (t1.x * invz1) + gamma * (t2.x * invz2);
                         float v_over_z = alpha * (t0.y * invz0) + beta * (t1.y * invz1) + gamma * (t2.y * invz2);
-                        color_t color_typed;
+                        uint32_t unshaded_color;
                         // TODO: Fix crash when we have overflow here
                         if (renderOptions & BILINEAR_FILTERING) {
                             float tex_u = u_over_z/invz;
@@ -777,29 +754,32 @@ void drawTriangleFilled(int x0, int x1, int x2,
                             int next_v = MIN(floor_v + 1, textureHeight - 1);
                             float frac_u = tex_u - floor_u;
                             float frac_v = tex_v - floor_v;
-                            color_t color_tl = colorFromUint32(texture[floor_v * textureWidth + floor_u]);
-                            color_t color_tr = colorFromUint32(texture[floor_v * textureWidth + next_u]);
-                            color_t color_bl = colorFromUint32(texture[next_v * textureWidth + floor_u]);
-                            color_t color_br = colorFromUint32(texture[next_v * textureWidth + next_u]);
-                            color_t color_b = sumColors(mulScalarColor(1 - frac_u, color_bl), mulScalarColor(frac_u, color_br));
-                            color_t color_tp = sumColors(mulScalarColor(1 - frac_u, color_tl), mulScalarColor(frac_u, color_tr));
-                            color_typed = sumColors(mulScalarColor(1 - frac_v, color_b), mulScalarColor(frac_v, color_tp));
+                            uint32_t color_tl = texture[floor_v * textureWidth + floor_u];
+                            uint32_t color_tr = texture[floor_v * textureWidth + next_u];
+                            uint32_t color_bl = texture[next_v * textureWidth + floor_u];
+                            uint32_t color_br = texture[next_v * textureWidth + next_u];
+                            uint32_t color_b = sumColors(mulScalarColor(1 - frac_u, color_bl), mulScalarColor(frac_u, color_br));
+                            uint32_t color_tp = sumColors(mulScalarColor(1 - frac_u, color_tl), mulScalarColor(frac_u, color_tr));
+                            unshaded_color = sumColors(mulScalarColor(1 - frac_v, color_b), mulScalarColor(frac_v, color_tp));
                         } else {
                             int tex_x = MIN(abs((int)((u_over_z/invz) * textureWidth)), textureWidth - 1);
                             int tex_y = MIN(abs((int)((v_over_z/invz) * textureHeight)), textureHeight - 1);
-                            color_typed = colorFromUint32(texture[tex_y * textureWidth + tex_x]);
+                            unshaded_color = texture[tex_y * textureWidth + tex_x];
                         }
                         
-                        color_t color_shaded = mulScalarColor(light, color_typed);
-                        color = colorToUint32(color_shaded);
+                        color = mulScalarColor(light, unshaded_color);
                     } else if (renderOptions & SHADED) {
-                        color_t color_typed = {
-                            (uint8_t) (c0.r * alpha + c1.r * beta + c2.r * gamma),
-                            (uint8_t) (c0.g * alpha + c1.g * beta + c2.g * gamma),
-                            (uint8_t) (c0.b * alpha + c1.b * beta + c2.b * gamma)
-                        };
-                        color_t color_shaded = mulScalarColor(light, color_typed);
-                        color = colorToUint32(color_shaded);
+                        // TODO: There should be an easier route to interpolate colors
+                        uint8_t c0r, c0g, c0b;
+                        uint8_t c1r, c1g, c1b;
+                        uint8_t c2r, c2g, c2b;
+                        colorFromUint32(c0, &c0r, &c0g, &c0b);
+                        colorFromUint32(c1, &c1r, &c1g, &c1b);
+                        colorFromUint32(c2, &c2r, &c2g, &c2b);
+                        uint32_t unshaded_color = colorToUint32((c0r * alpha + c1r * beta + c2r * gamma),
+                                                                (c0g * alpha + c1g * beta + c2g * gamma),
+                                                                (c0b * alpha + c1b * beta + c2b * gamma));
+                        color = mulScalarColor(light, unshaded_color);
                     }
                     drawPixel(x, y, invz, color, canvas);
                 }
@@ -966,7 +946,7 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
                     texture = materials[triangle.materialIndex].texture;
                 }
                 
-                color_t color = COLOR_WHITE;
+                uint32_t color = COLOR_WHITE;
                 float specularExponent = 900.0f;
 
                 if (mesh->numMaterials != 0) {

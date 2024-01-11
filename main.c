@@ -47,7 +47,7 @@ typedef struct game_state_t {
     SDL_Renderer* renderer;
     SDL_Texture*  texture;
     canvas_t      canvas;
-    color_t       backgroundColor;
+    uint32_t      backgroundColor;
     uint16_t      renderOptions;
     int           drawLights;
     int           draw3DObjects;
@@ -139,7 +139,7 @@ game_state_t* init() {
     game->renderer = SDL_CreateRenderer(game->window, -1, 0);
     game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     game->canvas = canvas;
-    game->backgroundColor = (color_t) {0, 0, 0};
+    game->backgroundColor = COLOR_BLACK;
     game->drawLights    = 1;
     game->draw3DObjects = 1;
     game->draw2DObjects = 0;
@@ -411,14 +411,11 @@ void updateDebugUI(game_state_t *game) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_label(ctx, "Color", NK_TEXT_LEFT);
                 nk_layout_row_dynamic(ctx, row_size * 10, 1);
-                struct nk_colorf nkBackgroundColor = nk_color_cf(nk_rgb(game->backgroundColor.r, game->backgroundColor.g, game->backgroundColor.b));
+                uint8_t r, g, b;
+                colorFromUint32(game->backgroundColor, &r, &g, &b);
+                struct nk_colorf nkBackgroundColor = nk_color_cf(nk_rgb(r, g, b));
                 nk_color_pick(ctx, &nkBackgroundColor, NK_RGBA);
-                game->backgroundColor = (color_t) {
-                    (uint8_t) (nkBackgroundColor.r * 255.0f),
-                    (uint8_t) (nkBackgroundColor.g * 255.0f),
-                    (uint8_t) (nkBackgroundColor.b * 255.0f)
-                };
-
+                game->backgroundColor = colorFromFloats(nkBackgroundColor.r, nkBackgroundColor.g, nkBackgroundColor.b);
                 nk_tree_pop(ctx);
             }
 
@@ -548,9 +545,8 @@ void render(int p0x, int p0y, float p0invz, int p1x, int p1y, float p1invz, int 
     }
 
     DEBUG_PRINT("INFO: Drawing background\n");
-    uint32_t backgroundColor = colorToUint32(game->backgroundColor);
     for (int i = 0; i < canvas.width * canvas.height; i++) {
-        game->canvas.frameBuffer[i] = backgroundColor;
+        game->canvas.frameBuffer[i] = game->backgroundColor;
     }
 
     // Draw 3D Objects
