@@ -42,19 +42,6 @@ static const struct mat4x4_t IDENTITY_M4x4 = {{
     {0.0, 0.0, 0.0, 1.0}
 }};
 
-static inline void printMatrix(mat4x4_t matrix) {
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            DEBUG_PRINT("%f ", matrix.data[i][j]);
-        }
-        DEBUG_PRINT("\n");
-    }
-}
-
-static inline void printVertex(vec3_t vertex) {
-    DEBUG_PRINT("%f %f %f\n", vertex.x, vertex.y, vertex.z);
-}
-
 static inline vec3_t crossProduct(vec3_t a, vec3_t b) {
     vec3_t result;
 

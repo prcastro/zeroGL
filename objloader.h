@@ -279,7 +279,6 @@ static inline mesh_t* loadObjFile(const char* filename, bool flipTexturesVertica
                 vec3_t v0v1 = sub(vertices[v1 - 1], vertices[v0 - 1]);
                 vec3_t v0v2 = sub(vertices[v2 - 1], vertices[v0 - 1]);
                 vec3_t normal = crossProduct(v0v1, v0v2);
-                printVertex(normal);
                 normal = normalize(normal);
                 num_normals++;
                 normals = (vec3_t*) realloc(normals, num_normals * sizeof(vec3_t));
