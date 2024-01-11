@@ -576,11 +576,6 @@ typedef struct canvas_t {
     float*    depthBuffer;
 } canvas_t;
 
-// typedef struct point_t {
-//   int   x, y;
-//   float invz;
-// } point_t;
-
 static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
   int abx = bx - ax;
   int aby = by - ay;
@@ -588,14 +583,6 @@ static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
   int apy = py - ay;
   return abx * apy - aby * apx;
 }
-
-// static inline point_t projectVertex(vec3_t v, canvas_t canvas, camera_t cam) {
-//   return (point_t) {
-//     (int) (v.x * cam.viewportDistance / v.z  * canvas.width/cam.viewportWidth + canvas.width/2),
-//     (int) (canvas.height/2 - (v.y * cam.viewportDistance / v.z * canvas.height/cam.viewportHeight) - 1),
-//     1.0f / v.z
-//   };
-// }
 
 static inline vec3_t unprojectPoint(int x, int y, float invz, canvas_t canvas, camera_t cam) {
   return (vec3_t) {
@@ -886,19 +873,16 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
         bool discarded = false;
 
         // Backface culling
-        // point_t p0 = projected[triangle.v0];
-        // point_t p1 = projected[triangle.v1];
-        // point_t p2 = projected[triangle.v2];
-        int p0x    = projected_x[triangle.v0];
-        int p0y    = projected_y[triangle.v0];
-        int p0invz = projected_invz[triangle.v0];
-        int p1x    = projected_x[triangle.v1];
-        int p1y    = projected_y[triangle.v1];
-        int p1invz = projected_invz[triangle.v1];
-        int p2x    = projected_x[triangle.v2];
-        int p2y    = projected_y[triangle.v2];
-        int p2invz = projected_invz[triangle.v2];
-        int area   = edgeCross(p0x, p0y, p1x, p1y, p2x, p2y);
+        int p0x      = projected_x[triangle.v0];
+        int p0y      = projected_y[triangle.v0];
+        float p0invz = projected_invz[triangle.v0];
+        int p1x      = projected_x[triangle.v1];
+        int p1y      = projected_y[triangle.v1];
+        float p1invz = projected_invz[triangle.v1];
+        int p2x      = projected_x[triangle.v2];
+        int p2y      = projected_y[triangle.v2];
+        float p2invz = projected_invz[triangle.v2];
+        int area     = edgeCross(p0x, p0y, p1x, p1y, p2x, p2y);
         if (area < 0 && (renderOptions & BACKFACE_CULLING)) {
             discarded = true;
         }
