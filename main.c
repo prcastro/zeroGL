@@ -538,7 +538,7 @@ void drawLights(game_state_t* game) {
     }
 }
 
-void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
+void render(int p0x, int p0y, float p0invz, int p1x, int p1y, float p1invz, int p2x, int p2y, float p2invz, game_state_t* game) {
     DEBUG_PRINT("INFO: Rendering scene\n");
     canvas_t canvas = game->canvas;
 
@@ -570,18 +570,18 @@ void render(point_t p0, point_t p1, point_t p2, game_state_t* game) {
         DEBUG_PRINT("INFO: Drawing 2D Objects\n");
         if (game->renderOptions & DRAW_WIREFRAME) {
             DEBUG_PRINT("INFO: Drawing wireframe triangle\n");
-            drawTriangleWireframe(p0.x, p1.x, p2.x,
-                                  p0.y, p1.y, p2.y,
+            drawTriangleWireframe(p0x, p1x, p2x,
+                                  p0y, p1y, p2y,
                                   COLOR_GREEN, game->canvas);
         }
         
         if (game->renderOptions & DRAW_FILLED) {
             DEBUG_PRINT("INFO: Drawing triangle\n");
             
-            int area = edgeCross(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
-            drawTriangleFilled(p0.x, p1.x, p2.x,
-                               p0.y, p1.y, p2.y,
-                               p0.invz, p1.invz, p2.invz,
+            int area = edgeCross(p0x, p0y, p1x, p1y, p2x, p2y);
+            drawTriangleFilled(p0x, p1x, p2x,
+                               p0y, p1y, p2y,
+                               p0invz, p1invz, p2invz,
                                1.0, 1.0, 1.0,
                                (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0},
                                (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0},
@@ -636,9 +636,15 @@ int main(int argc, char* argv[])
 {
     DEBUG_PRINT("INFO: Initializing game objects\n");
     // TODO: Store 2D objects in game state
-    point_t p0 = {541, 199, 1.0f / 0.01f};
-    point_t p1 = {613, 279, 1.0f / 0.01f};
-    point_t p2 = {453, 399, 1.0f / 0.01f};
+    int p0x = 541;
+    int p0y = 199;
+    float p0invz = 1.0f / 0.01f;
+    int p1x = 613;
+    int p1y = 279;
+    float p1invz = 1.0f / 0.01f;
+    int p2x = 453;
+    int p2y = 399;
+    float p2invz = 1.0f / 0.01f;
     
     game_state_t* game = init();
 
@@ -650,7 +656,7 @@ int main(int argc, char* argv[])
         #endif // DEBUGUI
 
         update(game);
-        render(p0, p1, p2, game);
+        render(p0x, p0y, p0invz, p1x, p1y, p1invz, p2x, p2y, p2invz, game);
         
         #ifdef DEBUGUI
         renderDebugUI(game);

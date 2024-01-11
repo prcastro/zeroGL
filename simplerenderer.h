@@ -576,30 +576,32 @@ typedef struct canvas_t {
     float*    depthBuffer;
 } canvas_t;
 
-typedef struct point_t {
-  int   x, y;
-  float invz;
-} point_t;
+// typedef struct point_t {
+//   int   x, y;
+//   float invz;
+// } point_t;
 
 static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
-  point_t ab = { bx - ax, by - ay };
-  point_t ap = { px - ax, py - ay };
-  return ab.x * ap.y - ab.y * ap.x;
+  int abx = bx - ax;
+  int aby = by - ay;
+  int apx = px - ax;
+  int apy = py - ay;
+  return abx * apy - aby * apx;
 }
 
-static inline point_t projectVertex(vec3_t v, canvas_t canvas, camera_t cam) {
-  return (point_t) {
-    (int) (v.x * cam.viewportDistance / v.z  * canvas.width/cam.viewportWidth + canvas.width/2),
-    (int) (canvas.height/2 - (v.y * cam.viewportDistance / v.z * canvas.height/cam.viewportHeight) - 1),
-    1.0f / v.z
-  };
-}
+// static inline point_t projectVertex(vec3_t v, canvas_t canvas, camera_t cam) {
+//   return (point_t) {
+//     (int) (v.x * cam.viewportDistance / v.z  * canvas.width/cam.viewportWidth + canvas.width/2),
+//     (int) (canvas.height/2 - (v.y * cam.viewportDistance / v.z * canvas.height/cam.viewportHeight) - 1),
+//     1.0f / v.z
+//   };
+// }
 
-static inline vec3_t unprojectPoint(point_t p, canvas_t canvas, camera_t cam) {
+static inline vec3_t unprojectPoint(int x, int y, float invz, canvas_t canvas, camera_t cam) {
   return (vec3_t) {
-    (p.x - canvas.width/2) * (cam.viewportWidth / canvas.width) / (p.invz * cam.viewportDistance),
-    (canvas.height/2 - p.y - 1) / (cam.viewportDistance * p.invz * canvas.height/cam.viewportHeight),
-    1.0f / p.invz
+    (x - canvas.width/2) * (cam.viewportWidth / canvas.width) / (invz * cam.viewportDistance),
+    (canvas.height/2 - y - 1) / (cam.viewportDistance * invz * canvas.height/cam.viewportHeight),
+    1.0f / invz
   };
 }
 
@@ -756,8 +758,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                     float light = 1;
 
                     if (renderOptions & SHADED_PHONG) {
-                        point_t p = {x, y, invz};
-                        vec3_t v = mulMV3(invCameraTransform, unprojectPoint(p, canvas, camera));
+                        vec3_t v = mulMV3(invCameraTransform, unprojectPoint(x, y, invz, canvas, camera));
                         vec3_t normal = add(add(mulScalarV3(alpha, n0), mulScalarV3(beta, n1)), mulScalarV3(gamma, n2));
                         light = shadeVertex(v, normal , 1/magnitude(normal), specularExponent, lightSources, renderOptions);
                     } else if (renderOptions & SHADED) {
@@ -852,19 +853,26 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
     }
 
     // If the object is not discarded, transform and project all vertices
-    vec3_t *transformed = (vec3_t*) malloc(mesh->numVertices * sizeof(vec3_t));
+    vec3_t *transformed =    (vec3_t*) malloc(mesh->numVertices * sizeof(vec3_t));
     vec3_t *camTransformed = (vec3_t*) malloc(mesh->numVertices * sizeof(vec3_t));
-    point_t *projected = (point_t*) malloc(mesh->numVertices * sizeof(point_t));
+    int   *projected_x =     (int*) malloc(mesh->numVertices * sizeof(int));
+    int   *projected_y =     (int*) malloc(mesh->numVertices * sizeof(int));
+    float *projected_invz =  (float*) malloc(mesh->numVertices * sizeof(float));
+
     vec3_t *transformedNormals = (vec3_t*) malloc(mesh->numNormals * sizeof(vec3_t));
-    if (projected == NULL || transformed == NULL || camTransformed == NULL || transformedNormals == NULL) {
+    if (projected_x == NULL || projected_y == NULL || projected_invz == NULL || transformed == NULL || camTransformed == NULL || transformedNormals == NULL) {
         fprintf(stderr, "ERROR: Transformed vertices/normals memory couldn't be allocated.\n");
         exit(-1);
     }
 
     for (int i = 0; i < mesh->numVertices; i++) {
         transformed[i] = mulMV3(object->transform, mesh->vertices[i]);
-        camTransformed[i] = mulMV3(camera.transform, transformed[i]);
-        projected[i] = projectVertex(camTransformed[i], canvas, camera);
+        vec3_t v = mulMV3(camera.transform, transformed[i]);
+        camTransformed[i] = v;
+        // Project the vertex into screen coordinates
+        projected_x[i] = (int) (v.x * camera.viewportDistance / v.z  * canvas.width/camera.viewportWidth + canvas.width/2),
+        projected_y[i] = (int) (canvas.height/2 - (v.y * camera.viewportDistance / v.z * canvas.height/camera.viewportHeight) - 1),
+        projected_invz[i] = 1.0f / v.z;
     }
 
     for (int i = 0; i < mesh->numNormals; i++) {
@@ -878,10 +886,19 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
         bool discarded = false;
 
         // Backface culling
-        point_t p0 = projected[triangle.v0];
-        point_t p1 = projected[triangle.v1];
-        point_t p2 = projected[triangle.v2];
-        int area = edgeCross(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
+        // point_t p0 = projected[triangle.v0];
+        // point_t p1 = projected[triangle.v1];
+        // point_t p2 = projected[triangle.v2];
+        int p0x    = projected_x[triangle.v0];
+        int p0y    = projected_y[triangle.v0];
+        int p0invz = projected_invz[triangle.v0];
+        int p1x    = projected_x[triangle.v1];
+        int p1y    = projected_y[triangle.v1];
+        int p1invz = projected_invz[triangle.v1];
+        int p2x    = projected_x[triangle.v2];
+        int p2y    = projected_y[triangle.v2];
+        int p2invz = projected_invz[triangle.v2];
+        int area   = edgeCross(p0x, p0y, p1x, p1y, p2x, p2y);
         if (area < 0 && (renderOptions & BACKFACE_CULLING)) {
             discarded = true;
         }
@@ -943,8 +960,8 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
 
             // Drawing
             if (renderOptions & DRAW_WIREFRAME) {
-                drawTriangleWireframe(p0.x, p1.x, p2.x,
-                                      p0.y, p1.y, p2.y,
+                drawTriangleWireframe(p0x, p1x, p2x,
+                                      p0y, p1y, p2y,
                                       materials[triangle.materialIndex].diffuseColor,
                                       canvas);
             }
@@ -973,9 +990,9 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
                     specularExponent = materials[triangle.materialIndex].specularExponent;
                 }
                 
-                drawTriangleFilled(p0.x, p1.x, p2.x,
-                                   p0.y, p1.y, p2.y,
-                                   p0.invz, p1.invz, p2.invz,
+                drawTriangleFilled(p0x, p1x, p2x,
+                                   p0y, p1y, p2y,
+                                   p0invz, p1invz, p2invz,
                                    i0, i1, i2,
                                    transformedNormals[triangle.n0], transformedNormals[triangle.n1], transformedNormals[triangle.n2],
                                    t0, t1, t2,
@@ -991,7 +1008,9 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
 
     free(transformed);
     free(camTransformed);
-    free(projected);
+    free(projected_x);
+    free(projected_y);
+    free(projected_invz);
     free(transformedNormals);
 }
 
