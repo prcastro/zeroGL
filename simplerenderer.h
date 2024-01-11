@@ -44,11 +44,9 @@ static const struct mat4x4_t IDENTITY_M4x4 = {{
 
 static inline vec3_t crossProduct(vec3_t a, vec3_t b) {
     vec3_t result;
-
     result.x = a.y * b.z - a.z * b.y;
     result.y = a.z * b.x - a.x * b.z;
     result.z = a.x * b.y - a.y * b.x;
-
     return result;
 }
 
@@ -101,7 +99,6 @@ static inline mat4x4_t inverseM4(mat4x4_t matrix) {
 
     float invOut[16];
     float inv[16], det;
-    int i;
 
     inv[0] = m[5]  * m[10] * m[15] - 
              m[5]  * m[11] * m[14] - 
@@ -222,7 +219,7 @@ static inline mat4x4_t inverseM4(mat4x4_t matrix) {
 
     det = 1.0 / det;
 
-    for (i = 0; i < 16; i++)
+    for (int i = 0; i < 16; i++)
         invOut[i] = inv[i] * det;
     
     mat4x4_t invMatrix;
@@ -238,14 +235,12 @@ static inline mat4x4_t inverseM4(mat4x4_t matrix) {
 
 static inline vec4_t mulMV4(mat4x4_t mat4x4, vec4_t vec4) {
   float result[4] = {0};
-
   for (int i = 0; i < 4; i++) {
     result[i] += mat4x4.data[i][0]*vec4.x;
     result[i] += mat4x4.data[i][1]*vec4.y;
     result[i] += mat4x4.data[i][2]*vec4.z;
     result[i] += mat4x4.data[i][3]*vec4.w;
   }
-
   return (vec4_t) {result[0], result[1], result[2], result[3]};
 }
 
@@ -257,7 +252,6 @@ static inline vec3_t mulMV3(mat4x4_t mat4x4, vec3_t v) {
 
 static inline mat4x4_t mulMM4(mat4x4_t m1, mat4x4_t m2) {
     mat4x4_t result = {0};
-
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             for (int k = 0; k < 4; k++) {
@@ -265,7 +259,6 @@ static inline mat4x4_t mulMM4(mat4x4_t m1, mat4x4_t m2) {
             }
         }
     }
-
     return result;
 }
 
@@ -404,11 +397,9 @@ static inline vec3_t triangleNormal(vec3_t v0, vec3_t v1, vec3_t v2) {
 
 static inline vec3_t triangleCenter(vec3_t v0, vec3_t v1, vec3_t v2) {
     struct vec3_t result;
-
     result.x = (v0.x + v1.x + v2.x) / 3.0f;
     result.y = (v0.y + v1.y + v2.y) / 3.0f;
     result.z = (v0.z + v1.z + v2.z) / 3.0f;
-
     return result;
 }
 
@@ -434,7 +425,6 @@ static inline mat4x4_t rotationY(float degrees) {
     float radians = degrees * M_PI / 180.0f;
     float cos = cosf(radians);
     float sin = sinf(radians);
-
     return (mat4x4_t) {{
         { cos, 0, -sin, 0 },
         { 0,   1, 0,    0 },
@@ -447,7 +437,6 @@ static inline mat4x4_t rotationX(float degrees) {
     float radians = degrees * M_PI / 180.0f;
     float cos = cosf(radians);
     float sin = sinf(radians);
-
     return (mat4x4_t) {{
         { 1, 0,    0,   0 },
         { 0, cos,  sin, 0 },
@@ -497,24 +486,20 @@ static inline camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
 
 static inline vec3_t meshCenter(vec3_t* vertices, int numVertices) {
     vec3_t result = {0, 0, 0};
-
     for (int i = 0; i < numVertices; i++) {
         result = add(result, vertices[i]);
     }
-
     return mulScalarV3(1.0f / numVertices, result);
 }
 
 static inline float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t center) {
     float result = 0.0f;
-
     for (int i = 0; i < numVertices; i++) {
         float distance = magnitude(sub(vertices[i], center));
         if (distance > result) {
             result = distance;
         }
     }
-
     return result;
 }
 
@@ -567,12 +552,9 @@ static inline void drawPixel(int i, int j, float z, uint32_t color, canvas_t can
 static inline void drawLine(int x0, int x1, int y0, int y1, uint32_t color, canvas_t canvas) {
     int delta_x = (x1 - x0);
     int delta_y = (y1 - y0);
-
     int longest_side_length = (abs(delta_x) >= abs(delta_y)) ? abs(delta_x) : abs(delta_y);
-
     float x_inc = delta_x / (float)longest_side_length; 
     float y_inc = delta_y / (float)longest_side_length;
-
     float current_x = x0;
     float current_y = y0;
     for (int i = 0; i <= longest_side_length; i++) {
@@ -599,7 +581,6 @@ float shadeVertex(vec3_t v, vec3_t normal, float invMagnitudeNormal, float specu
     point_light_t* pointLights = lightSources.pointLights;
     int numAmbientLights = lightSources.numAmbientLights;
     ambient_light_t* ambientLights = lightSources.ambientLights;
-
 
     float diffuseIntensity  = 0.0;
     float specularIntensity = 0.0;
