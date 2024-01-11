@@ -672,14 +672,14 @@ void drawTriangleFilled(int x0, int x1, int x2,
     }
     
     for (int y = y_min; y <= y_max; y++) {
-        bool was_inside = false;
+        int was_inside = 0;
         int w0 = w0_row;
         int w1 = w1_row;
         int w2 = w2_row;
         for (int x = x_min; x <= x_max; x++) {
-            bool is_inside = (w0 | w1 | w2) >= 0;
+            int is_inside = (w0 | w1 | w2) >= 0;
             if (is_inside) {
-                was_inside = true;
+                was_inside = 1;
             
                 float alpha = w0 * invArea;
                 float beta  = w1 * invArea;
@@ -818,7 +818,7 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
     for (int i = 0; i < mesh->numTriangles; i++) {
         triangle_t triangle = mesh->triangles[i];
 
-        bool discarded = false;
+        int discarded = 0;
 
         // Backface culling
         int p0x      = projected_x[triangle.v0];
@@ -832,7 +832,7 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
         float p2invz = projected_invz[triangle.v2];
         int area     = edgeCross(p0x, p0y, p1x, p1y, p2x, p2y);
         if (area < 0 && (renderOptions & BACKFACE_CULLING)) {
-            discarded = true;
+            discarded = 1;
         }
 
         // Fustrum culling
@@ -843,7 +843,7 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
                 distancePlaneV3(plane, camTransformed[triangle.v1]) < 0 &&
                 distancePlaneV3(plane, camTransformed[triangle.v2]) < 0) {
                     DEBUG_PRINT("DEBUG: Clipped triangle fully outside of the camera clipping volume\n");
-                    discarded = true;
+                    discarded = 1;
                     break;
             }
 
@@ -859,7 +859,7 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
             camTransformed[triangle.v1].z < 0 ||
             camTransformed[triangle.v2].z < 0) {
             DEBUG_PRINT("DEBUG: Clipped triangle with a vertice behind the camera\n");
-            discarded = true;
+            discarded = 1;
         }
 
         if (!discarded) {
