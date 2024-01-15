@@ -1,4 +1,4 @@
-// #define SR_DEBUG
+#define SR_DEBUG
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
 
@@ -28,7 +28,8 @@
 
 #define WIDTH 1066
 #define HEIGHT 600
-#define ROTATION_SPEED 15.0f // degrees per second
+// #define ROTATION_SPEED 15.0f // degrees per second
+#define ROTATION_SPEED 0.0f // units per second
 #define VIEWPORT_WIDTH (WIDTH /(float) HEIGHT)
 #define VIEWPORT_HEIGHT 1.0f
 #define VIEWPORT_DISTANCE 1.0f
@@ -61,6 +62,7 @@ typedef struct game_state_t {
     light_sources_t  lightSources;
     object3D_t*      pointLightObjects;
     camera_t         camera;
+    camera2_t        camera2;
     float            rotationSpeed;
     const uint8_t*   keys;
 
@@ -81,7 +83,7 @@ game_state_t* init() {
 
     DEBUG_PRINT("INFO: Loading meshes and objects\n");
     int numObjects = 1;
-    int numMeshes = 4;
+    int numMeshes = 5;
     mesh_t* meshes = (mesh_t*) malloc(numMeshes * sizeof(mesh_t));
     object3D_t *objects = (object3D_t*) malloc(numObjects * sizeof(object3D_t));
     if (meshes == NULL || objects == NULL) {
@@ -94,7 +96,33 @@ game_state_t* init() {
     meshes[2] = *loadObjFile("assets/engineer/engineer.obj", false);
     meshes[3] = *loadObjFile("assets/cube.obj", false);
 
+    // Define a debug mesh
+    vec3_t* vertices = (vec3_t*) malloc(3 * sizeof(vec3_t));
+    triangle_t* triangles = (triangle_t*) malloc(1 * sizeof(triangle_t));
+    material_t* materials = (material_t*) malloc(1 * sizeof(material_t));
+    if (vertices == NULL || triangles == NULL || materials == NULL) {
+        fprintf(stderr, "ERROR: Debug mesh memory couldn't be allocated.\n");
+        exit(-1);
+    }
+
+    vertices[0] = (vec3_t) {0, 0, 0};
+    vertices[1] = (vec3_t) {1, 0, 0};
+    vertices[2] = (vec3_t) {0, 1, 0};
+    triangles[0] = (triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
+    materials[0] = (material_t) {"RedMaterial", COLOR_RED, COLOR_RED, 0.0f, 0, 0, NULL};
+    meshes[4] = (mesh_t) {
+        .name = "Debug",
+        .numVertices = 3,
+        .numTriangles = 1,
+        .numTextureCoords = 0,
+        .vertices = vertices,
+        .triangles = triangles,
+        .materials = materials
+    };
+
+
     objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = makeObject(&meshes[4], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -140,10 +168,10 @@ game_state_t* init() {
     game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     game->canvas = canvas;
     game->backgroundColor = COLOR_BLACK;
-    game->drawLights    = 1;
+    game->drawLights    = 0;
     game->draw3DObjects = 1;
     game->draw2DObjects = 0;
-    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_GOURAUD | DRAW_FILLED;
+    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_FLAT | DRAW_FILLED;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -170,7 +198,20 @@ game_state_t* init() {
         5.0f,
         90.0f
     );
-    game->rotationSpeed = 15.0f;
+
+    game->camera2 = makeCamera2(
+        (vec3_t) {0, 0, -5}, // position
+        (vec3_t) {0, 0, 1}, // direction
+        (vec3_t) {0, 1, 0}, // up
+        53.0f, // fov
+        VIEWPORT_WIDTH / VIEWPORT_HEIGHT, // aspect ratio
+        VIEWPORT_DISTANCE, // near plane
+        100.0f, // far plane
+        5.0f, // movement speed
+        90.0f // turning speed
+    );
+
+    game->rotationSpeed = ROTATION_SPEED;
     game->keys = SDL_GetKeyboardState(NULL);
 
     #ifdef DEBUGUI
@@ -436,15 +477,116 @@ void updateDebugUI(game_state_t *game) {
 #endif // DEBUGUI
 
 void updateCameraPosition(game_state_t* game) {
-    camera_t *camera = &game->camera;
     const uint8_t* keys = game->keys;
+
+    // Update camera 2
+    camera2_t *camera2 = &game->camera2;
+
+    // TODO: Store these in the camera struct
+    vec3_t cameraForward = mulScalarV3(-1.0, camera2->direction);
+    vec3_t cameraRight = crossProduct(camera2->up, cameraForward);
+    
+    float elapsedTime = game->elapsedTime / 1000.0f;
+    float movementSpeed = camera2->movementSpeed * elapsedTime;
+    float turningSpeed = camera2->turningSpeed * elapsedTime;
+    vec3_t newCameraPosition = camera2->position;
+    vec3_t newCameraDirection = camera2->direction;
+    vec3_t newCameraUp = camera2->up;
+    
+
+    if (keys[SDL_SCANCODE_A]) {
+        // Translate left       
+        newCameraPosition = add(camera2->position, mulScalarV3(movementSpeed, cameraRight));
+    }
+
+    if (keys[SDL_SCANCODE_D]) {
+        // Translate right
+        newCameraPosition = add(camera2->position, mulScalarV3(-movementSpeed, cameraRight));
+    }
+
+    if (keys[SDL_SCANCODE_PAGEDOWN]) {
+        // Translate down
+        newCameraPosition = add(camera2->position, mulScalarV3(-movementSpeed, camera2->up));
+    }
+
+    if (keys[SDL_SCANCODE_PAGEUP]) {
+        // Translate up
+        newCameraPosition = add(camera2->position, mulScalarV3(movementSpeed, camera2->up));
+    }
+
+    if (keys[SDL_SCANCODE_S]) {
+        // Translate back
+        newCameraPosition = add(camera2->position, mulScalarV3(-movementSpeed, camera2->direction));
+    }
+
+    if (keys[SDL_SCANCODE_W]) {
+        // Translate forward
+        newCameraPosition = add(camera2->position, mulScalarV3(movementSpeed, camera2->direction));
+    }
+
+    if (keys[SDL_SCANCODE_RIGHT]) {
+        // Rotate right around up axis using quaternion
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, camera2->up);
+        newCameraDirection = rotateVectorByQuaternion(camera2->direction, rotation);
+        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+    }
+
+    if (keys[SDL_SCANCODE_LEFT]) {
+        // Rotate left around up axis
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, camera2->up);
+        newCameraDirection = rotateVectorByQuaternion(camera2->direction, rotation);
+        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+    }
+
+    if (keys[SDL_SCANCODE_UP]) {
+        // Rotate up around right axis
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, cameraRight);
+        newCameraDirection = rotateVectorByQuaternion(camera2->direction, rotation);
+        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+    }
+
+    if (keys[SDL_SCANCODE_DOWN]) {
+        // Rotate down around right axis
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, cameraRight);
+        newCameraDirection = rotateVectorByQuaternion(camera2->direction, rotation);
+        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+    }
+
+    if (keys[SDL_SCANCODE_Q]) {
+        // Rotate left around direction axis
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, cameraForward);
+        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+    }
+
+    if (keys[SDL_SCANCODE_E]) {
+        // Rotate right around direction axis
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, cameraForward);
+        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+    }
+
+    game->camera2 = makeCamera2(
+        newCameraPosition,
+        newCameraDirection,
+        newCameraUp,
+        camera2->fov,
+        camera2->aspectRatio,
+        camera2->nearPlane,
+        camera2->farPlane,
+        camera2->movementSpeed,
+        camera2->turningSpeed
+    );
+
+
+
+    // Update camera 1
+    camera_t *camera = &game->camera;
     camera_t newCamera;
     vec3_t localTranslation = {0};
     vec3_t newTranslation = camera->translation;
     mat4x4_t newRotation = camera->rotation;
-    float elapsedTime = game->elapsedTime / 1000.0f;
-    float movementSpeed = camera->movementSpeed * elapsedTime;
-    float turningSpeed = camera->turningSpeed * elapsedTime;
+    elapsedTime = game->elapsedTime / 1000.0f;
+    movementSpeed = camera->movementSpeed * elapsedTime;
+    turningSpeed = camera->turningSpeed * elapsedTime;
     
 
     if (keys[SDL_SCANCODE_A]) {
@@ -521,7 +663,8 @@ void update(game_state_t* game) {
 
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
-        drawObject(&game->objects[i], game->lightSources, game->camera, game->canvas, game->renderOptions);
+        // drawObject(&game->objects[i], game->lightSources, game->camera, game->canvas, game->renderOptions);
+        drawObjectShader(&game->objects[i], game->lightSources, game->camera2, game->canvas, game->renderOptions);
     }
 }
 

@@ -355,19 +355,6 @@ typedef struct object3D_t {
     mat4x4_t transform;
 } object3D_t;
 
-typedef struct camera_t {
-    vec3_t   translation;
-    mat4x4_t rotation;
-    mat4x4_t transform;
-    int      numPlanes;
-    plane_t* planes;
-    float    viewportWidth;
-    float    viewportHeight;
-    float    viewportDistance;
-    float    movementSpeed;
-    float    turningSpeed;
-} camera_t;
-
 typedef struct ambient_light_t {
     float intensity;
 } ambient_light_t;
@@ -421,18 +408,6 @@ static inline mat4x4_t scaleToMatrix(float scale) {
     }};
 }
 
-static inline mat4x4_t rotationY(float degrees) {
-    float radians = degrees * M_PI / 180.0f;
-    float cos = cosf(radians);
-    float sin = sinf(radians);
-    return (mat4x4_t) {{
-        { cos, 0, -sin, 0 },
-        { 0,   1, 0,    0 },
-        { sin, 0, cos,  0 },
-        { 0,   0, 0,    1 }
-    }};
-}
-
 static inline mat4x4_t rotationX(float degrees) {
     float radians = degrees * M_PI / 180.0f;
     float cos = cosf(radians);
@@ -445,6 +420,31 @@ static inline mat4x4_t rotationX(float degrees) {
     }};
 }
 
+static inline mat4x4_t rotationY(float degrees) {
+    float radians = degrees * M_PI / 180.0f;
+    float cos = cosf(radians);
+    float sin = sinf(radians);
+    return (mat4x4_t) {{
+        { cos, 0, -sin, 0 },
+        { 0,   1, 0,    0 },
+        { sin, 0, cos,  0 },
+        { 0,   0, 0,    1 }
+    }};
+}
+
+static inline mat4x4_t rotationZ(float degrees) {
+    float radians = degrees * M_PI / 180.0f;
+    float cos = cosf(radians);
+    float sin = sinf(radians);
+    return (mat4x4_t) {{
+        { cos,  sin, 0, 0 },
+        { -sin, cos, 0, 0 },
+        { 0,    0,   1, 0 },
+        { 0,    0,   0, 1 }
+    }};
+}
+
+
 static inline object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scale, mat4x4_t rotation) {
     mat4x4_t translationMatrix = translationToMatrix(translation);
     mat4x4_t scaleMatrix = scaleToMatrix(scale);
@@ -452,8 +452,115 @@ static inline object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scal
     return (object3D_t) {mesh, translation, scale, rotation, transform};
 }
 
+typedef struct camera_t {
+    vec3_t   translation;
+    mat4x4_t rotation;
+    mat4x4_t transform;
+    mat4x4_t projection;
+    mat4x4_t viewProjection;
+    int      numPlanes;
+    plane_t* planes;
+    float    viewportWidth;
+    float    viewportHeight;
+    float    viewportDistance;
+    float    movementSpeed;
+    float    turningSpeed;
+} camera_t;
+
+typedef struct {
+    float w, x, y, z;
+} quaternion_t;
+
+quaternion_t quaternionMul(quaternion_t q1, quaternion_t q2) {
+    quaternion_t result;
+    result.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
+    result.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
+    result.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
+    result.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
+    return result;
+}
+
+quaternion_t quaternionFromAngleAxis(float degrees, vec3_t axis) {
+    float angle = degrees * M_PI / 180.0f;
+    float halfAngle = angle * 0.5f;
+    float sinHalfAngle = sinf(halfAngle);
+    quaternion_t result = {cosf(halfAngle), axis.x * sinHalfAngle, axis.y * sinHalfAngle, axis.z * sinHalfAngle};
+    return result;
+}
+
+vec3_t rotateVectorByQuaternion(vec3_t v, quaternion_t q) {
+    quaternion_t q_v = {0, v.x, v.y, v.z};
+    quaternion_t q_conjugate = {q.w, -q.x, -q.y, -q.z};
+    quaternion_t rotated = quaternionMul(quaternionMul(q, q_v), q_conjugate);
+    return (vec3_t){rotated.x, rotated.y, rotated.z};
+}
+
+typedef struct {
+    vec3_t position;            // x, y, z coordinates of the camera
+    vec3_t direction;           // Direction in which the camera is looking
+    vec3_t up;                  // Up direction for the camera (usually [0, 1, 0])
+    float fov;                  // Field of view (in degrees)
+    float aspectRatio;          // Aspect ratio of the viewport
+    float nearPlane;            // Distance to the near clipping plane
+    float farPlane;             // Distance to the far clipping plane
+    mat4x4_t viewMatrix;        // View matrix
+    mat4x4_t projectionMatrix;  // Projection matrix
+    mat4x4_t viewProjMatrix;    // View * Projection matrix
+    float movementSpeed;
+    float turningSpeed;
+} camera2_t;
+
+static inline camera2_t makeCamera2(vec3_t position, vec3_t direction, vec3_t up,
+                                    float fov, float aspectRatio, float nearPlane, float farPlane,
+                                    float movementSpeed, float turningSpeed) {
+    // Camera for left handed coordinate system
+
+    vec3_t forward = normalize(direction);
+    vec3_t right = normalize(crossProduct(up, forward));
+    vec3_t correctedUp = crossProduct(forward, right);
+
+    // Create the rotation matrix
+    mat4x4_t rotationMatrix = (mat4x4_t) {{
+        {right.x, correctedUp.x, forward.x, 0},
+        {right.y, correctedUp.y, forward.y, 0},
+        {right.z, correctedUp.z, forward.z, 0},
+        {0,       0,            0,          1}
+    }};
+
+    // Create the translation matrix
+    mat4x4_t translationMatrix = (mat4x4_t) {{
+        {1, 0, 0, -position.x},
+        {0, 1, 0, -position.y},
+        {0, 0, 1, -position.z},
+        {0, 0, 0, 1}
+    }};
+
+    // Create the view matrix
+    mat4x4_t viewMatrix = mulMM4(rotationMatrix, translationMatrix);
+
+    float fovRadians = fov * M_PI / 180.0;
+    float yScale = 1.0 / tan(fovRadians / 2.0);
+    float xScale = yScale / aspectRatio;
+    float zScale = farPlane / (farPlane - nearPlane);
+    float zTranslate = nearPlane * farPlane / (farPlane - nearPlane);
+
+    mat4x4_t projectionMatrix = (mat4x4_t) {{
+        {xScale, 0,      0,          0},
+        {0,      yScale, 0,          0},
+        {0,      0,      zScale,     1},
+        {0,      0,      zTranslate, 0}
+    }};
+
+    mat4x4_t viewProjMatrix = mulMM4(projectionMatrix, viewMatrix);
+
+    return (camera2_t) {
+        position, direction, up, fov, aspectRatio, nearPlane, farPlane,
+        viewMatrix, projectionMatrix, viewProjMatrix, movementSpeed, turningSpeed
+    };
+}
+
 static inline camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
-                    float viewportDist, float viewportWidth, float viewportHeight,
+                    float viewportWidth, float viewportHeight, float viewportDist,
                     float movSpeed, float turnSpeed) {
     mat4x4_t rotationMatrix = transposeM4(rotation);
     mat4x4_t translationMatrix = translationToMatrix(mulScalarV3(-1.0, translation));
@@ -477,10 +584,27 @@ static inline camera_t makeCamera(vec3_t translation, mat4x4_t rotation,
     planes[3] = (plane_t) {{0,      sqrt2,  sqrt2}, 0           }; // Top
     planes[4] = (plane_t) {{0,      -sqrt2, sqrt2}, 0           }; // Bottom
 
+    float far = 100.0f;
+    float near = viewportDist;
+    float right = viewportWidth / 2.0f;
+    float left = -right;
+    float top = viewportHeight / 2.0f;
+    float bottom = -top;
+
+    mat4x4_t m = {0};
+    m.data[0][0] = 2 * near / (right - left);
+    m.data[0][2] = (right + left) / (right - left);
+    m.data[1][1] = -(2 * near / (top - bottom));
+    m.data[1][2] = (top + bottom) / (top - bottom);
+    m.data[2][2] = -(far + near) / (far - near);
+    m.data[2][3] = -2 * far * near / (far - near);
+    m.data[3][2] = -1;
+
+    mat4x4_t viewProjection = mulMM4(m, transform);
+
     return (camera_t) {
-        translation, rotation, transform, numPlanes,  planes,
-        viewportDist, viewportWidth, viewportHeight,
-        movSpeed, turnSpeed
+        translation, rotation, transform, m, viewProjection, numPlanes,  planes,
+        viewportWidth, viewportHeight, viewportDist, movSpeed, turnSpeed
     };
 }
 
@@ -944,6 +1068,149 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
     free(projected_y);
     free(projected_invz);
     free(transformedNormals);
+}
+
+typedef struct {
+    // TODO: Rename to position
+    vec4_t clipPosition;
+    int numAttributes;
+    float* attributes;
+} shaderContext_t;
+
+typedef shaderContext_t *vertexShader_t(const vec3_t* inputVertex, void* uniformData, int* numAttributes);
+typedef uint32_t *fragmentShader_t(const shaderContext_t* interpolatedValues, void* uniformData);
+
+typedef struct {
+  mat4x4_t modelviewprojection;
+} defaultUniformData_t;
+
+static inline shaderContext_t defaultVertexShader(const vec3_t* inputVertex, void* uniformData) {
+    shaderContext_t result = {0};
+    defaultUniformData_t* defaultUniformData = (defaultUniformData_t*) uniformData;
+    vec4_t inputVertex4 = {inputVertex->x, inputVertex->y, inputVertex->z, 1.0f};
+    result.clipPosition = mulMV4(defaultUniformData->modelviewprojection, inputVertex4);
+    return result;
+}
+
+static inline uint32_t defaultFragmentShader(const shaderContext_t* interpolatedValues, void* uniformData) {
+    return COLOR_WHITE;
+}
+
+// TODO: Pass shaders as parameters
+void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_t camera, canvas_t canvas, uint16_t renderOptions) {
+  mesh_t* mesh = object->mesh;
+  defaultUniformData_t uniformData = {
+    .modelviewprojection = mulMM4(camera.viewProjMatrix, object->transform)
+  };
+  
+  for (int tri = 0; tri < mesh->numTriangles; tri++) {
+    triangle_t triangle = mesh->triangles[tri];
+    shaderContext_t vertexShaderOutput[3];
+    int xs[3];
+    int ys[3];
+    float invzs[3];
+
+    // TODO: Transform vertices only once, instead of one time per triangle
+    vec3_t vertices[3] = {mesh->vertices[triangle.v0], mesh->vertices[triangle.v1], mesh->vertices[triangle.v2]};     
+    for (int v = 0; v < 3; v++) {
+      
+      vertexShaderOutput[v] = defaultVertexShader(&vertices[v], &uniformData);
+
+      // Perspective divide
+      vertexShaderOutput[v].clipPosition.x /= vertexShaderOutput[v].clipPosition.w;
+      vertexShaderOutput[v].clipPosition.y /= vertexShaderOutput[v].clipPosition.w;
+      vertexShaderOutput[v].clipPosition.z /= vertexShaderOutput[v].clipPosition.w;
+      vertexShaderOutput[v].clipPosition.w = 1.0f;
+
+      // Viewport transform
+      xs[v] = (vertexShaderOutput[v].clipPosition.x + 1.0f) * canvas.width / 2.0f;
+      ys[v] = (1.0f - vertexShaderOutput[v].clipPosition.y) * canvas.height / 2.0f;
+      invzs[v] = 1.0f / vertexShaderOutput[v].clipPosition.z;
+    }
+
+    // TODO: Cull triangle
+    // TODO: Move to a function?
+    // Rasterization
+    int x_min = MAX(MIN(MIN(xs[0], xs[1]), xs[2]), 0);
+    int x_max = MIN(MAX(MAX(xs[0], xs[1]), xs[2]), canvas.width - 1);
+    int y_min = MAX(MIN(MIN(ys[0], ys[1]), ys[2]), 0);
+    int y_max = MIN(MAX(MAX(ys[0], ys[1]), ys[2]), canvas.height - 1);
+
+    int area = edgeCross(xs[0], ys[0], xs[1], ys[1], xs[2], ys[2]);
+    float invArea = 1.0f / area;
+
+    int delta_w0_col = (ys[1] - ys[2]);
+    int delta_w1_col = (ys[2] - ys[0]);
+    int delta_w2_col = (ys[0] - ys[1]);
+    int delta_w0_row = (xs[2] - xs[1]);
+    int delta_w1_row = (xs[0] - xs[2]);
+    int delta_w2_row = (xs[1] - xs[0]);
+
+    int w0_row = edgeCross(xs[1], ys[1], xs[2], ys[2], x_min, y_min);
+    int w1_row = edgeCross(xs[2], ys[2], xs[0], ys[0], x_min, y_min);
+    int w2_row = edgeCross(xs[0], ys[0], xs[1], ys[1], x_min, y_min);
+
+    for (int y = y_min; y <= y_max; y++) {
+        int was_inside = 0;
+        int w0 = w0_row;
+        int w1 = w1_row;
+        int w2 = w2_row;
+        for (int x = x_min; x <= x_max; x++) {
+            int is_inside = (w0 | w1 | w2) >= 0;
+            if (is_inside) {
+                was_inside = 1;
+                float alpha = w0 * invArea;
+                float beta  = w1 * invArea;
+                float gamma = w2 * invArea;
+                
+                // Interpolate attributes
+                float invz = alpha * invzs[0] + beta * invzs[1] + gamma * invzs[2];
+
+                shaderContext_t interpolatedValues = {0};
+                interpolatedValues.numAttributes = vertexShaderOutput[0].numAttributes;
+                interpolatedValues.clipPosition.x = alpha * vertexShaderOutput[0].clipPosition.x +
+                                                    beta  * vertexShaderOutput[1].clipPosition.x +
+                                                    gamma * vertexShaderOutput[2].clipPosition.x;
+                interpolatedValues.clipPosition.y = alpha * vertexShaderOutput[0].clipPosition.y +
+                                                    beta  * vertexShaderOutput[1].clipPosition.y +
+                                                    gamma * vertexShaderOutput[2].clipPosition.y;
+                interpolatedValues.clipPosition.z = alpha * vertexShaderOutput[0].clipPosition.z +
+                                                    beta  * vertexShaderOutput[1].clipPosition.z +
+                                                    gamma * vertexShaderOutput[2].clipPosition.z;
+                // Interpolated w is always one, because we already did the perspective divide
+
+                // TODO: Put a cap on the attributes instead of using malloc
+                interpolatedValues.attributes = (float*) malloc(interpolatedValues.numAttributes * sizeof(float));
+                if (!interpolatedValues.attributes) {
+                    fprintf(stderr, "ERROR: Failed to allocate memory for interpolated attributes.\n");
+                    exit(1);
+                }
+
+                for (int i = 0; i < interpolatedValues.numAttributes; i++) {
+                    interpolatedValues.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
+                                                       beta  * vertexShaderOutput[1].attributes[i] +
+                                                       gamma * vertexShaderOutput[2].attributes[i];
+                }
+
+                if (invz > canvas.depthBuffer[y * canvas.width + x]) {
+                    uint32_t color = defaultFragmentShader(&interpolatedValues, &uniformData);
+                    drawPixel(x, y, 0.0, COLOR_WHITE, canvas);
+                }
+            }
+
+            if (!is_inside && was_inside) {
+                break;
+            }
+
+            w0 += delta_w0_col;
+            w1 += delta_w1_col;
+            w2 += delta_w2_col;
+        }
+        w0_row += delta_w0_row;
+        w1_row += delta_w1_row;
+        w2_row += delta_w2_row;
+    }
+  }
 }
 
 #endif // SIMPLERENDERER_H
