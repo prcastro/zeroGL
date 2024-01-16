@@ -54,8 +54,18 @@ static inline float dot(vec3_t a, vec3_t b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+static inline float dotV4(vec4_t a, vec4_t b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+}
+
 static inline float magnitude(vec3_t v) {
     float result = sqrt(dot(v, v));
+    assert(result >= 0);
+    return result;
+}
+
+static inline float magnitudeV4(vec4_t v) {
+    float result = sqrt(dotV4(v, v));
     assert(result >= 0);
     return result;
 }
@@ -64,13 +74,26 @@ static inline vec3_t sub(vec3_t a, vec3_t b) {
     return (vec3_t) {a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
+static inline vec4_t subV4(vec4_t a, vec4_t b) {
+    return (vec4_t) {a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w};
+}
+
 static inline vec3_t add(vec3_t a, vec3_t b) {
     return (vec3_t) {a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+static inline vec4_t addV4(vec4_t a, vec4_t b) {
+    return (vec4_t) {a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};
 }
 
 static inline vec3_t normalize(vec3_t v) {
     float mag = magnitude(v);
     return (vec3_t) {v.x / mag, v.y / mag, v.z / mag};
+}
+
+static inline vec4_t normalizeV4(vec4_t v) {
+    float mag = magnitudeV4(v);
+    return (vec4_t) {v.x / mag, v.y / mag, v.z / mag, v.w / mag};
 }
 
 static inline vec3_t mulScalarV3(float k, vec3_t v) {
@@ -481,11 +504,11 @@ quaternion_t quaternionMul(quaternion_t q1, quaternion_t q2) {
 }
 
 quaternion_t quaternionFromAngleAxis(float degrees, vec3_t axis) {
+    vec3_t normalizedAxis = normalize(axis);
     float angle = degrees * M_PI / 180.0f;
     float halfAngle = angle * 0.5f;
     float sinHalfAngle = sinf(halfAngle);
-    quaternion_t result = {cosf(halfAngle), axis.x * sinHalfAngle, axis.y * sinHalfAngle, axis.z * sinHalfAngle};
-    return result;
+    return (quaternion_t) {cosf(halfAngle), normalizedAxis.x * sinHalfAngle, normalizedAxis.y * sinHalfAngle, normalizedAxis.z * sinHalfAngle};
 }
 
 vec3_t rotateVectorByQuaternion(vec3_t v, quaternion_t q) {
@@ -506,25 +529,31 @@ typedef struct {
     mat4x4_t viewMatrix;        // View matrix
     mat4x4_t projectionMatrix;  // Projection matrix
     mat4x4_t viewProjMatrix;    // View * Projection matrix
+    vec4_t fustrumPlanes[6];    // View frustum planes
     float movementSpeed;
     float turningSpeed;
 } camera2_t;
 
+static inline distanceToPlane(vec4_t point, vec4_t plane) {
+    assert(point.w == 1.0f); // The point must be in homogeneous coordinates (after perspective division)
+    return dotV4(plane, point);
+}
+
 static inline camera2_t makeCamera2(vec3_t position, vec3_t direction, vec3_t up,
-                                    float fov, float aspectRatio, float nearPlane, float farPlane,
+                                    float fov, float aspectRatio, float near, float far,
                                     float movementSpeed, float turningSpeed) {
     // Camera for left handed coordinate system
 
-    vec3_t forward = normalize(direction);
-    vec3_t right = normalize(crossProduct(up, forward));
-    vec3_t correctedUp = crossProduct(forward, right);
-
-    // Create the rotation matrix
+    direction = normalize(direction);
+    up = normalize(up);
+    vec3_t right = normalize(crossProduct(up, direction));
+    vec3_t correctedUp = crossProduct(direction, right);
+    
     mat4x4_t rotationMatrix = (mat4x4_t) {{
-        {right.x, correctedUp.x, forward.x, 0},
-        {right.y, correctedUp.y, forward.y, 0},
-        {right.z, correctedUp.z, forward.z, 0},
-        {0,       0,            0,          1}
+        {right.x,       right.y,       right.z,       0},
+        {correctedUp.x, correctedUp.y, correctedUp.z, 0},
+        {direction.x,   direction.y,   direction.z,   0},
+        {0,             0,             0,             1}
     }};
 
     // Create the translation matrix
@@ -532,7 +561,7 @@ static inline camera2_t makeCamera2(vec3_t position, vec3_t direction, vec3_t up
         {1, 0, 0, -position.x},
         {0, 1, 0, -position.y},
         {0, 0, 1, -position.z},
-        {0, 0, 0, 1}
+        {0, 0, 0, 1          }
     }};
 
     // Create the view matrix
@@ -541,8 +570,8 @@ static inline camera2_t makeCamera2(vec3_t position, vec3_t direction, vec3_t up
     float fovRadians = fov * M_PI / 180.0;
     float yScale = 1.0 / tan(fovRadians / 2.0);
     float xScale = yScale / aspectRatio;
-    float zScale = farPlane / (farPlane - nearPlane);
-    float zTranslate = nearPlane * farPlane / (farPlane - nearPlane);
+    float zScale = far / (far - near);
+    float zTranslate = near * far / (far - near);
 
     mat4x4_t projectionMatrix = (mat4x4_t) {{
         {xScale, 0,      0,          0},
@@ -552,10 +581,33 @@ static inline camera2_t makeCamera2(vec3_t position, vec3_t direction, vec3_t up
     }};
 
     mat4x4_t viewProjMatrix = mulMM4(projectionMatrix, viewMatrix);
+    
+    // Compute the view frustum planes
+    vec4_t viewProjMatrixCol0 = {viewProjMatrix.data[0][0], viewProjMatrix.data[0][1], viewProjMatrix.data[0][2], viewProjMatrix.data[0][3]};
+    vec4_t viewProjMatrixCol1 = {viewProjMatrix.data[1][0], viewProjMatrix.data[1][1], viewProjMatrix.data[1][2], viewProjMatrix.data[1][3]};
+    vec4_t viewProjMatrixCol2 = {viewProjMatrix.data[2][0], viewProjMatrix.data[2][1], viewProjMatrix.data[2][2], viewProjMatrix.data[2][3]};
+    vec4_t viewProjMatrixCol3 = {viewProjMatrix.data[3][0], viewProjMatrix.data[3][1], viewProjMatrix.data[3][2], viewProjMatrix.data[3][3]};
+    vec4_t leftPlane = normalizeV4(addV4(viewProjMatrixCol3, viewProjMatrixCol0));
+    vec4_t rightPlane = normalizeV4(subV4(viewProjMatrixCol3, viewProjMatrixCol0));
+    vec4_t bottomPlane = normalizeV4(addV4(viewProjMatrixCol3, viewProjMatrixCol1));
+    vec4_t topPlane = normalizeV4(subV4(viewProjMatrixCol3, viewProjMatrixCol1));
+    vec4_t nearPlane = normalizeV4(viewProjMatrixCol2);
+    vec4_t farPlane = normalizeV4(addV4(viewProjMatrixCol3, viewProjMatrixCol2));
 
     return (camera2_t) {
-        position, direction, up, fov, aspectRatio, nearPlane, farPlane,
-        viewMatrix, projectionMatrix, viewProjMatrix, movementSpeed, turningSpeed
+        .position = position,
+        .direction = direction,
+        .up = up,
+        .fov = fov,
+        .aspectRatio = aspectRatio,
+        .nearPlane = near,
+        .farPlane = far,
+        .viewMatrix = viewMatrix,
+        .projectionMatrix = projectionMatrix,
+        .viewProjMatrix = viewProjMatrix,
+        .fustrumPlanes = {leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane},
+        .movementSpeed = movementSpeed,
+        .turningSpeed = turningSpeed
     };
 }
 
@@ -987,6 +1039,10 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
         }
 
         if (!discarded) {
+            printf("[Tri %d vertice 0] Projected: x=%d, y=%d, invz=%f\n", i, p0x, p0y, p0invz);
+            printf("[Tri %d vertice 1] Projected: x=%d, y=%d, invz=%f\n", i, p1x, p1y, p1invz);
+            printf("[Tri %d vertice 2] Projected: x=%d, y=%d, invz=%f\n", i, p2x, p2y, p2invz);
+            printf("[Tri %d] Area: %d\n", i, area);
             float i0 = 1.0;
             float i1 = 1.0;
             float i2 = 1.0;
@@ -1033,6 +1089,10 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
                     t0 = mesh->textureCoords[triangle.t0];
                     t1 = mesh->textureCoords[triangle.t1];
                     t2 = mesh->textureCoords[triangle.t2];
+                    printf("[Tri %d vertice 0] Texture coords: u=%f, v=%f\n", i, t0.x, t0.y);
+                    printf("[Tri %d vertice 1] Texture coords: u=%f, v=%f\n", i, t1.x, t1.y);
+                    printf("[Tri %d vertice 2] Texture coords: u=%f, v=%f\n", i, t2.x, t2.y);
+
                     textureWidth = materials[triangle.materialIndex].textureWidth;
                     textureHeight = materials[triangle.materialIndex].textureHeight;
                     texture = materials[triangle.materialIndex].texture;
@@ -1070,30 +1130,72 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
     free(transformedNormals);
 }
 
+// The shader context is the data that is passed from the vertex shader to the fragment shader
 typedef struct {
     // TODO: Rename to position
-    vec4_t clipPosition;
+    vec4_t position;
     int numAttributes;
     float* attributes;
 } shaderContext_t;
 
-typedef shaderContext_t *vertexShader_t(const vec3_t* inputVertex, void* uniformData, int* numAttributes);
-typedef uint32_t *fragmentShader_t(const shaderContext_t* interpolatedValues, void* uniformData);
+typedef shaderContext_t *vertexShader_t(const void* inputVertex, void* uniformData, int* numAttributes);
+// TODO: Should we pass the texture as a parameter as we're doing now? What happens when we have multiple textures?
+typedef uint32_t *fragmentShader_t(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
 
 typedef struct {
   mat4x4_t modelviewprojection;
 } defaultUniformData_t;
 
-static inline shaderContext_t defaultVertexShader(const vec3_t* inputVertex, void* uniformData) {
+typedef struct {
+    vec3_t position;
+    vec3_t normal;
+    vec3_t textureCoord;
+    vec3_t diffuseColor;
+    vec3_t specularColor;
+    float specularExponent;
+} default_vertex_input_t;
+
+static inline shaderContext_t defaultVertexShader(void* inputVertex, void* uniformData) {
+    default_vertex_input_t* inputVertexData = (default_vertex_input_t*) inputVertex;
     shaderContext_t result = {0};
     defaultUniformData_t* defaultUniformData = (defaultUniformData_t*) uniformData;
-    vec4_t inputVertex4 = {inputVertex->x, inputVertex->y, inputVertex->z, 1.0f};
-    result.clipPosition = mulMV4(defaultUniformData->modelviewprojection, inputVertex4);
+    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
+    
+    // Transform vertex from local space to clip space 
+    result.position = mulMV4(defaultUniformData->modelviewprojection, inputVertex4);
+    
+    // TODO: Use MAX_NUM_ATTRIBUTES instead of malloc
+    result.numAttributes = 12;
+    result.attributes = (float*) malloc(result.numAttributes * sizeof(float));
+    if (!result.attributes) {
+        fprintf(stderr, "ERROR: Failed to allocate memory for vertex attributes.\n");
+        exit(1);
+    }
+
+    // TODO: Transform normals with the inverse transpose of the modelview matrix
+    result.attributes[0] = inputVertexData->normal.x;
+    result.attributes[1] = inputVertexData->normal.y;
+    result.attributes[2] = inputVertexData->normal.z;
+    result.attributes[3] = inputVertexData->textureCoord.x; // u
+    result.attributes[4] = inputVertexData->textureCoord.y; // v
+    result.attributes[5] = inputVertexData->diffuseColor.x; // R
+    result.attributes[6] = inputVertexData->diffuseColor.y; // G
+    result.attributes[7] = inputVertexData->diffuseColor.z; // B
+    result.attributes[8] = inputVertexData->specularColor.x; // R
+    result.attributes[9] = inputVertexData->specularColor.y; // G
+    result.attributes[10] = inputVertexData->specularColor.z; // B
+    result.attributes[11] = inputVertexData->specularExponent;
+
     return result;
 }
 
-static inline uint32_t defaultFragmentShader(const shaderContext_t* interpolatedValues, void* uniformData) {
-    return COLOR_WHITE;
+static inline uint32_t defaultFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+    float u = input->attributes[3];
+    float v = input->attributes[4];
+    int tex_x = MIN(abs((int)(u * textureWidth)), textureWidth - 1);
+    int tex_y = MIN(abs((int)(v * textureHeight)), textureHeight - 1);
+    uint32_t color = texture[tex_y * textureWidth + tex_x];
+    return color;
 }
 
 // TODO: Pass shaders as parameters
@@ -1102,6 +1204,8 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
   defaultUniformData_t uniformData = {
     .modelviewprojection = mulMM4(camera.viewProjMatrix, object->transform)
   };
+
+  // TODO: Object level fustrum culling
   
   for (int tri = 0; tri < mesh->numTriangles; tri++) {
     triangle_t triangle = mesh->triangles[tri];
@@ -1109,35 +1213,105 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
     int xs[3];
     int ys[3];
     float invzs[3];
+    float invws[3];
 
-    // TODO: Transform vertices only once, instead of one time per triangle
-    vec3_t vertices[3] = {mesh->vertices[triangle.v0], mesh->vertices[triangle.v1], mesh->vertices[triangle.v2]};     
+    // Get vertex data
+    vec3_t vertices[3] = {mesh->vertices[triangle.v0], mesh->vertices[triangle.v1], mesh->vertices[triangle.v2]};
+    vec3_t normals[3] = {0};
+    if (mesh->numNormals != 0) {
+      normals[0] = mesh->normals[triangle.n0];
+      normals[1] = mesh->normals[triangle.n1];
+      normals[2] = mesh->normals[triangle.n2];
+    }
+    vec3_t textureCoords[3] = {0};
+    if (mesh->numTextureCoords != 0) {
+      textureCoords[0] = mesh->textureCoords[triangle.t0];
+      textureCoords[1] = mesh->textureCoords[triangle.t1];
+      textureCoords[2] = mesh->textureCoords[triangle.t2];
+    }
+    
+    // Get material data
+    material_t material = mesh->materials[triangle.materialIndex];
+    uint8_t diffR, diffG, diffB;
+    colorFromUint32(material.diffuseColor, &diffR, &diffG, &diffB);
+    uint8_t specR, specG, specB;
+    colorFromUint32(material.specularColor, &specR, &specG, &specB);
+
+    // TODO: Transform vertices only once, instead of one time per triangle?
     for (int v = 0; v < 3; v++) {
+    //   printf("[Tri %d vertice %d] Texture coords: u=%f, v=%f\n", tri, v, textureCoords[v].x, textureCoords[v].y);
       
-      vertexShaderOutput[v] = defaultVertexShader(&vertices[v], &uniformData);
+      default_vertex_input_t input_vertex = {
+        .position = vertices[v],
+        .normal = normals[v],
+        .textureCoord = textureCoords[v],
+        .diffuseColor = {diffR/255.0f, diffG/255.0f, diffB/255.0f},
+        .specularColor = {specR/255.0f, specG/255.0f, specB/255.0f},
+        .specularExponent = material.specularExponent
+      };
 
-      // Perspective divide
-      vertexShaderOutput[v].clipPosition.x /= vertexShaderOutput[v].clipPosition.w;
-      vertexShaderOutput[v].clipPosition.y /= vertexShaderOutput[v].clipPosition.w;
-      vertexShaderOutput[v].clipPosition.z /= vertexShaderOutput[v].clipPosition.w;
-      vertexShaderOutput[v].clipPosition.w = 1.0f;
+      // Vertex shader (local space -> clip space and compute attributes)
+      vertexShaderOutput[v] = defaultVertexShader(&input_vertex, &uniformData);
+      
+      float invw = 1.0f / vertexShaderOutput[v].position.w;
 
-      // Viewport transform
-      xs[v] = (vertexShaderOutput[v].clipPosition.x + 1.0f) * canvas.width / 2.0f;
-      ys[v] = (1.0f - vertexShaderOutput[v].clipPosition.y) * canvas.height / 2.0f;
-      invzs[v] = 1.0f / vertexShaderOutput[v].clipPosition.z;
+      // Perspective divide (clip space -> NDC)
+      vertexShaderOutput[v].position.x *= invw;
+      vertexShaderOutput[v].position.y *= invw;
+      vertexShaderOutput[v].position.z *= invw;
+      vertexShaderOutput[v].position.w = 1.0f;
+
+      // Viewport transform (NDC -> screen space)
+      xs[v] = (vertexShaderOutput[v].position.x + 1.0f) * canvas.width / 2.0f;
+      ys[v] = (1.0f - vertexShaderOutput[v].position.y) * canvas.height / 2.0f;
+      
+      // Store 1/w and 1/z to avoid divisions later
+      invws[v] = invw; // For perspective correct interpolation
+      invzs[v] = 1.0f / vertexShaderOutput[v].position.z; // For z-buffer
     }
 
-    // TODO: Cull triangle
+    int area = edgeCross(xs[0], ys[0], xs[1], ys[1], xs[2], ys[2]);
+
+    // Culling
+    // TODO: Move to a function?
+    int discarded = 0;
+    // Backface culling
+    if (area < 0 && (renderOptions & BACKFACE_CULLING)) {
+        DEBUG_PRINT("DEBUG: Clipped triangle using backface culling\n");
+        discarded = 1;
+    }
+
+    // TODO: Add new renderOptions for this
+    // Triangle level fustrum culling (discard if the triangle is fully outside of the camera volume)
+    if (!discarded) {
+        for (int p = 0; p < 6; p++) {
+            vec4_t plane = camera.fustrumPlanes[p];
+            if (distanceToPlane(vertexShaderOutput[0].position, plane) < 0 &&
+                distanceToPlane(vertexShaderOutput[1].position, plane) < 0 &&
+                distanceToPlane(vertexShaderOutput[2].position, plane) < 0) {
+                    DEBUG_PRINT("DEBUG: Clipped triangle fully outside of the camera clipping volume (plane %d)\n", p);
+                    discarded = 1;
+                    break;
+            }
+
+            // TODO: Deal with the case where only one or two vertexes of the triangle
+            //       are out of the volume. In this case, we should split the triangle
+            //       and create new ones.
+        }
+    }
+
+    // Don't draw if the triangle was discarded
+    if (discarded == 1) {
+        DEBUG_PRINT("DEBUG: Discarded triangle\n");
+        continue;
+    }
+
     // TODO: Move to a function?
     // Rasterization
     int x_min = MAX(MIN(MIN(xs[0], xs[1]), xs[2]), 0);
     int x_max = MIN(MAX(MAX(xs[0], xs[1]), xs[2]), canvas.width - 1);
     int y_min = MAX(MIN(MIN(ys[0], ys[1]), ys[2]), 0);
     int y_max = MIN(MAX(MAX(ys[0], ys[1]), ys[2]), canvas.height - 1);
-
-    int area = edgeCross(xs[0], ys[0], xs[1], ys[1], xs[2], ys[2]);
-    float invArea = 1.0f / area;
 
     int delta_w0_col = (ys[1] - ys[2]);
     int delta_w1_col = (ys[2] - ys[0]);
@@ -1150,6 +1324,8 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
     int w1_row = edgeCross(xs[2], ys[2], xs[0], ys[0], x_min, y_min);
     int w2_row = edgeCross(xs[0], ys[0], xs[1], ys[1], x_min, y_min);
 
+    float invArea = 1.0f / area;
+
     for (int y = y_min; y <= y_max; y++) {
         int was_inside = 0;
         int w0 = w0_row;
@@ -1159,42 +1335,57 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
             int is_inside = (w0 | w1 | w2) >= 0;
             if (is_inside) {
                 was_inside = 1;
-                float alpha = w0 * invArea;
-                float beta  = w1 * invArea;
-                float gamma = w2 * invArea;
-                
-                // Interpolate attributes
+
+                // TODO: Maybe I can avoid dividing by sum here?
+                // Perspective correct baricentric coordinates
+                float alpha = w0 * invArea * invws[0];
+                float beta  = w1 * invArea * invws[1];
+                float gamma = w2 * invArea * invws[2];
+                float sum = alpha + beta + gamma;
+                alpha /= sum;
+                beta  /= sum;
+                gamma /= sum;
+
+                // Interpolate 1/z
                 float invz = alpha * invzs[0] + beta * invzs[1] + gamma * invzs[2];
+                
+                // Compute fragment input attributes from the outputs of the vertex shader
+                shaderContext_t fragmentShaderInput = {0};
+                
+                // TODO: Add a SHADED_FLAT option where we get the attributes from one of the vertices (the last one, same as OpenGL)
 
-                shaderContext_t interpolatedValues = {0};
-                interpolatedValues.numAttributes = vertexShaderOutput[0].numAttributes;
-                interpolatedValues.clipPosition.x = alpha * vertexShaderOutput[0].clipPosition.x +
-                                                    beta  * vertexShaderOutput[1].clipPosition.x +
-                                                    gamma * vertexShaderOutput[2].clipPosition.x;
-                interpolatedValues.clipPosition.y = alpha * vertexShaderOutput[0].clipPosition.y +
-                                                    beta  * vertexShaderOutput[1].clipPosition.y +
-                                                    gamma * vertexShaderOutput[2].clipPosition.y;
-                interpolatedValues.clipPosition.z = alpha * vertexShaderOutput[0].clipPosition.z +
-                                                    beta  * vertexShaderOutput[1].clipPosition.z +
-                                                    gamma * vertexShaderOutput[2].clipPosition.z;
+                // Interpolate clip position
+                fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
+                                                 beta  * vertexShaderOutput[1].position.x +
+                                                 gamma * vertexShaderOutput[2].position.x;
+                fragmentShaderInput.position.y = alpha * vertexShaderOutput[0].position.y +
+                                                 beta  * vertexShaderOutput[1].position.y +
+                                                 gamma * vertexShaderOutput[2].position.y;
+                fragmentShaderInput.position.z = alpha * vertexShaderOutput[0].position.z +
+                                                 beta  * vertexShaderOutput[1].position.z +
+                                                 gamma * vertexShaderOutput[2].position.z;
+                
                 // Interpolated w is always one, because we already did the perspective divide
+                fragmentShaderInput.position.w = 1.0f;
 
-                // TODO: Put a cap on the attributes instead of using malloc
-                interpolatedValues.attributes = (float*) malloc(interpolatedValues.numAttributes * sizeof(float));
-                if (!interpolatedValues.attributes) {
+                // TODO: Use MAX_NUM_ATTRIBUTES instead of using malloc
+                // Interpolate other attributes
+                fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
+                fragmentShaderInput.attributes    = (float*) malloc(fragmentShaderInput.numAttributes * sizeof(float));
+                if (!fragmentShaderInput.attributes) {
                     fprintf(stderr, "ERROR: Failed to allocate memory for interpolated attributes.\n");
                     exit(1);
                 }
 
-                for (int i = 0; i < interpolatedValues.numAttributes; i++) {
-                    interpolatedValues.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
-                                                       beta  * vertexShaderOutput[1].attributes[i] +
-                                                       gamma * vertexShaderOutput[2].attributes[i];
+                for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
+                    fragmentShaderInput.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
+                                                        beta  * vertexShaderOutput[1].attributes[i] +
+                                                        gamma * vertexShaderOutput[2].attributes[i];
                 }
 
                 if (invz > canvas.depthBuffer[y * canvas.width + x]) {
-                    uint32_t color = defaultFragmentShader(&interpolatedValues, &uniformData);
-                    drawPixel(x, y, 0.0, COLOR_WHITE, canvas);
+                    uint32_t color = defaultFragmentShader(&fragmentShaderInput, &uniformData, material.textureWidth, material.textureHeight, material.texture);
+                    drawPixel(x, y, invz, color, canvas);
                 }
             }
 
@@ -1212,5 +1403,8 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
     }
   }
 }
+
+// TODO: When I turn the camera around by pressing the arrow keys, the program crashes. This is probably due to some division by zero somewhere.
+// Maybe implementing fustrum culling will fix this.
 
 #endif // SIMPLERENDERER_H

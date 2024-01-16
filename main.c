@@ -28,8 +28,8 @@
 
 #define WIDTH 1066
 #define HEIGHT 600
-// #define ROTATION_SPEED 15.0f // degrees per second
-#define ROTATION_SPEED 0.0f // units per second
+#define ROTATION_SPEED 15.0f // degrees per second
+// #define ROTATION_SPEED 0.0f // units per second
 #define VIEWPORT_WIDTH (WIDTH /(float) HEIGHT)
 #define VIEWPORT_HEIGHT 1.0f
 #define VIEWPORT_DISTANCE 1.0f
@@ -121,8 +121,9 @@ game_state_t* init() {
     };
 
 
-    objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
     // objects[0] = makeObject(&meshes[4], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -402,6 +403,30 @@ void updateDebugUI(game_state_t *game) {
                 nk_tree_pop(ctx);
             }
 
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Camera", NK_MAXIMIZED)) {
+                // Details about game->camera2
+
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Camera: (%.1f, %.1f, %.1f)", game->camera2.position.x, game->camera2.position.y, game->camera2.position.z);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Direction: (%.1f, %.1f, %.1f)", game->camera2.direction.x, game->camera2.direction.y, game->camera2.direction.z);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Up: (%.1f, %.1f, %.1f)", game->camera2.up.x, game->camera2.up.y, game->camera2.up.z);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "FOV: %.1f", game->camera2.fov);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Aspect ratio: %.1f", game->camera2.aspectRatio);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Near plane: %.1f", game->camera2.nearPlane);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Far plane: %.1f", game->camera2.farPlane);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Movement speed: %.1f", game->camera2.movementSpeed);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Turning speed: %.1f", game->camera2.turningSpeed);
+                nk_tree_pop(ctx);
+            }
+
             if (nk_tree_push(ctx, NK_TREE_NODE, "Scene", NK_MAXIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_labelf(ctx, NK_TEXT_LEFT, "Camera: (%.1f, %.1f, %.1f)", game->camera.translation.x, game->camera.translation.y, game->camera.translation.z);
@@ -483,8 +508,8 @@ void updateCameraPosition(game_state_t* game) {
     camera2_t *camera2 = &game->camera2;
 
     // TODO: Store these in the camera struct
-    vec3_t cameraForward = mulScalarV3(-1.0, camera2->direction);
-    vec3_t cameraRight = crossProduct(camera2->up, cameraForward);
+    vec3_t cameraRight = crossProduct(camera2->up, camera2->direction);
+    printf("Camera right: %.2f, %.2f, %.2f\n", cameraRight.x, cameraRight.y, cameraRight.z);
     
     float elapsedTime = game->elapsedTime / 1000.0f;
     float movementSpeed = camera2->movementSpeed * elapsedTime;
@@ -496,72 +521,75 @@ void updateCameraPosition(game_state_t* game) {
 
     if (keys[SDL_SCANCODE_A]) {
         // Translate left       
-        newCameraPosition = add(camera2->position, mulScalarV3(movementSpeed, cameraRight));
+        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, cameraRight));
     }
 
     if (keys[SDL_SCANCODE_D]) {
         // Translate right
-        newCameraPosition = add(camera2->position, mulScalarV3(-movementSpeed, cameraRight));
-    }
-
-    if (keys[SDL_SCANCODE_PAGEDOWN]) {
-        // Translate down
-        newCameraPosition = add(camera2->position, mulScalarV3(-movementSpeed, camera2->up));
-    }
-
-    if (keys[SDL_SCANCODE_PAGEUP]) {
-        // Translate up
-        newCameraPosition = add(camera2->position, mulScalarV3(movementSpeed, camera2->up));
+        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, cameraRight));
     }
 
     if (keys[SDL_SCANCODE_S]) {
         // Translate back
-        newCameraPosition = add(camera2->position, mulScalarV3(-movementSpeed, camera2->direction));
+        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, newCameraDirection));
     }
 
     if (keys[SDL_SCANCODE_W]) {
         // Translate forward
-        newCameraPosition = add(camera2->position, mulScalarV3(movementSpeed, camera2->direction));
+        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, newCameraDirection));
+    }
+
+    if (keys[SDL_SCANCODE_PAGEDOWN]) {
+        // Translate down
+        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, newCameraUp));
+    }
+
+    if (keys[SDL_SCANCODE_PAGEUP]) {
+        // Translate up
+        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, newCameraUp));
     }
 
     if (keys[SDL_SCANCODE_RIGHT]) {
         // Rotate right around up axis using quaternion
-        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, camera2->up);
-        newCameraDirection = rotateVectorByQuaternion(camera2->direction, rotation);
-        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, newCameraUp);
+        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
+        cameraRight = crossProduct(newCameraUp, newCameraDirection);
     }
 
     if (keys[SDL_SCANCODE_LEFT]) {
         // Rotate left around up axis
-        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, camera2->up);
-        newCameraDirection = rotateVectorByQuaternion(camera2->direction, rotation);
-        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, newCameraUp);
+        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
+        cameraRight = crossProduct(newCameraUp, newCameraDirection);
     }
 
     if (keys[SDL_SCANCODE_UP]) {
         // Rotate up around right axis
-        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, cameraRight);
-        newCameraDirection = rotateVectorByQuaternion(camera2->direction, rotation);
-        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, cameraRight);
+        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
+        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
+
     }
 
     if (keys[SDL_SCANCODE_DOWN]) {
         // Rotate down around right axis
-        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, cameraRight);
-        newCameraDirection = rotateVectorByQuaternion(camera2->direction, rotation);
-        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, cameraRight);
+        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
+        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
     }
 
     if (keys[SDL_SCANCODE_Q]) {
         // Rotate left around direction axis
-        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, cameraForward);
-        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, newCameraDirection);
+        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
+        cameraRight = crossProduct(newCameraUp, newCameraDirection);
     }
 
     if (keys[SDL_SCANCODE_E]) {
         // Rotate right around direction axis
-        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, cameraForward);
-        newCameraUp = rotateVectorByQuaternion(camera2->up, rotation);
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, newCameraDirection);
+        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
+        cameraRight = crossProduct(newCameraUp, newCameraDirection);
     }
 
     game->camera2 = makeCamera2(
@@ -575,8 +603,6 @@ void updateCameraPosition(game_state_t* game) {
         camera2->movementSpeed,
         camera2->turningSpeed
     );
-
-
 
     // Update camera 1
     camera_t *camera = &game->camera;
@@ -650,6 +676,7 @@ object3D_t rotateObjectY(object3D_t object, float degrees) {
     return makeObject(object.mesh, object.translation, object.scale, mulMM4(rotationY(degrees), object.rotation));
 }
 
+// TODO: Use quaternions for rotation
 void animateObjects(game_state_t* game) {
     float degrees = game->rotationSpeed * (game->elapsedTime / 1000.0f);
     game->objects[0] = rotateObjectY(game->objects[0], fmod(degrees, 360.0f));

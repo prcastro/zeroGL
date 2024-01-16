@@ -4,6 +4,7 @@
         "nuklear_sdl_renderer.h": "c",
         "nuklear.h": "c",
         "simplerenderer.h": "c",
-        "upng.h": "c"
+        "upng.h": "c",
+        "objloader.h": "c"
     }
 }
