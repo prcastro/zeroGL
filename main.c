@@ -169,7 +169,7 @@ game_state_t* init() {
     game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     game->canvas = canvas;
     game->backgroundColor = COLOR_BLACK;
-    game->drawLights    = 0;
+    game->drawLights    = 1;
     game->draw3DObjects = 1;
     game->draw2DObjects = 0;
     game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_FLAT | DRAW_FILLED;
@@ -691,17 +691,14 @@ void update(game_state_t* game) {
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
         // drawObject(&game->objects[i], game->lightSources, game->camera, game->canvas, game->renderOptions);
-        drawObjectShader(&game->objects[i], game->lightSources, game->camera2, game->canvas, game->renderOptions);
+        drawObjectShader(&game->objects[i], game->lightSources, game->camera2, game->canvas, defaultVertexShader, defaultFragmentShader, game->renderOptions);
     }
 }
 
 // TODO: This is a huge hack, we should have a proper way to solve shading in this case
 void drawLights(game_state_t* game) {
     for (int i = 0; i < game->lightSources.numPointLights; i++) {
-        uint16_t renderOptionsBackup = game->renderOptions;
-        game->renderOptions &= ~SHADED;
-        drawObject(&game->pointLightObjects[i], game->lightSources, game->camera, game->canvas, game->renderOptions);
-        game->renderOptions = renderOptionsBackup;
+        drawObject(&game->pointLightObjects[i], game->lightSources, game->camera, game->canvas, game->renderOptions & ~SHADED);
     }
 }
 

@@ -1131,12 +1131,13 @@ typedef struct {
     float* attributes;
 } shaderContext_t;
 
-typedef shaderContext_t *vertexShader_t(const void* inputVertex, void* uniformData, int* numAttributes);
+typedef shaderContext_t vertexShader_t(void* inputVertex, void* uniformData);
 // TODO: Should we pass the texture as a parameter as we're doing now? What happens when we have multiple textures?
-typedef uint32_t *fragmentShader_t(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
+typedef uint32_t fragmentShader_t(shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
 
 typedef struct {
   mat4x4_t modelviewprojection;
+  light_sources_t lightSources;
 } defaultUniformData_t;
 
 typedef struct {
@@ -1191,11 +1192,11 @@ static inline uint32_t defaultFragmentShader(const shaderContext_t* input, void*
     return color;
 }
 
-// TODO: Pass shaders as parameters
-void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_t camera, canvas_t canvas, uint16_t renderOptions) {
+void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_t camera, canvas_t canvas, vertexShader_t vertexShader, fragmentShader_t fragmentShader, uint16_t renderOptions) {
     mesh_t* mesh = object->mesh;
     defaultUniformData_t uniformData = {
-        .modelviewprojection = mulMM4(camera.viewProjMatrix, object->transform)
+        .modelviewprojection = mulMM4(camera.viewProjMatrix, object->transform),
+        .lightSources = lightSources
     };
 
     // TODO: Object level fustrum culling
@@ -1242,7 +1243,7 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
             };
 
             // Vertex shader (local space -> clip space and compute attributes)
-            vertexShaderOutput[v] = defaultVertexShader(&input_vertex, &uniformData);
+            vertexShaderOutput[v] = vertexShader(&input_vertex, &uniformData);
 
             float invw = 1.0f/vertexShaderOutput[v].position.w;
 
@@ -1383,7 +1384,7 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
                     // TODO: Test depth before interpolating attributes
                     // TODO: Avoid scissor test in drawPixel
                     if (invz > canvas.depthBuffer[y * canvas.width + x]) {
-                        uint32_t color = defaultFragmentShader(&fragmentShaderInput, &uniformData, material.textureWidth, material.textureHeight, material.texture);
+                        uint32_t color = fragmentShader(&fragmentShaderInput, &uniformData, material.textureWidth, material.textureHeight, material.texture);
                         drawPixel(x, y, invz, color, canvas);
                     }
                 }
