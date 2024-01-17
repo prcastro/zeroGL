@@ -111,10 +111,6 @@ static inline vec3_t mulScalarV3(float k, vec3_t v) {
     return (vec3_t) {k*v.x, k*v.y, k*v.z};
 }
 
-static inline vec4_t mulScalarV4(float k, vec4_t v) {
-    return (vec4_t) {k*v.x, k*v.y, k*v.z, k*v.w};
-}
-
 static inline vec4_t mulMV4(mat4x4_t mat4x4, vec4_t vec4) {
   float result[4] = {0};
   for (int i = 0; i < 4; i++) {
