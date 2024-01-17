@@ -13,7 +13,6 @@
 #define DEBUG_PRINT(...) do {} while (0)
 #endif
 
-
 /* CONFIGURATION */
 
 #ifndef MAX_VERTEX_ATTRIBUTES
@@ -35,19 +34,19 @@
 
 #define M_PI 3.14159265358979323846264338327950288
 
-typedef struct vec3_t {
+typedef struct {
   float x, y, z;
 } vec3_t;
 
-typedef struct vec4_t {
+typedef struct {
   float x, y, z, w;
 } vec4_t;
 
-typedef struct mat4x4_t {
+typedef struct {
   float data[4][4];
 } mat4x4_t;
 
-static const struct mat4x4_t IDENTITY_M4x4 = {{
+static const mat4x4_t IDENTITY_M4x4 = {{
     {1.0, 0.0, 0.0, 0.0},
     {0.0, 1.0, 0.0, 0.0},
     {0.0, 0.0, 1.0, 0.0},
@@ -271,14 +270,14 @@ static inline uint32_t colorFromFloats(float r, float g, float b) {
 
 /* 3D OBJECTS */
 
-typedef struct triangle_t {
+typedef struct {
   int     v0, v1, v2;
   int     t0, t1, t2;
   int     n0, n1, n2;
   int     materialIndex;
 } triangle_t;
 
-typedef struct material_t {
+typedef struct {
     char*   name;
     uint32_t diffuseColor;
     uint32_t specularColor;
@@ -288,7 +287,7 @@ typedef struct material_t {
     uint32_t* texture;
 } material_t;
 
-typedef struct mesh_t {
+typedef struct {
     char*       name;
     int         numVertices;
     vec3_t*     vertices;
@@ -305,7 +304,7 @@ typedef struct mesh_t {
     float       boundsRadius;
 } mesh_t;
 
-typedef struct object3D_t {
+typedef struct {
     mesh_t*  mesh;
     vec3_t   translation;
     float    scale;
@@ -342,21 +341,21 @@ static inline float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t c
 
 /* LIGHTING */
 
-typedef struct ambient_light_t {
+typedef struct {
     float intensity;
 } ambient_light_t;
 
-typedef struct dir_light_t {
+typedef struct {
     float intensity;
     vec3_t direction;
 } dir_light_t;
 
-typedef struct point_light_t {
+typedef struct {
     float intensity;
     vec3_t position;
 } point_light_t;
 
-typedef struct light_sources_t {
+typedef struct {
     int              numAmbientLights;
     ambient_light_t* ambientLights;
     int              numDirectionalLights;
@@ -513,7 +512,7 @@ static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
 
 /* DRAWING */
 
-typedef struct canvas_t {
+typedef struct {
     uint32_t* frameBuffer;
     int       width;
     int       height;
@@ -783,12 +782,12 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
 // Draw with a single color, no lighting or textures
 typedef struct {
     mat4x4_t modelviewprojection;
-} basicUniformData_t;
+} basic_uniform_t;
 
 static inline shader_context_t basicVertexShader(void* inputVertex, void* uniformData) {
     vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
     shader_context_t result = {0};
-    basicUniformData_t* basicUniformData = (basicUniformData_t*) uniformData;
+    basic_uniform_t* basicUniformData = (basic_uniform_t*) uniformData;
     vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     result.position = mulMV4(basicUniformData->modelviewprojection, inputVertex4);
     return result;
@@ -804,12 +803,12 @@ typedef struct {
   mat4x4_t modelMatrix;
   mat4x4_t viewProjectionMatrix;
   light_sources_t lightSources;
-} gourardUniformData_t;
+} gourard_uniform_t;
 
 static inline shader_context_t gourardVertexShader(void* inputVertex, void* uniformData) {
     vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
     shader_context_t result = {0};
-    gourardUniformData_t* defaultUniformData = (gourardUniformData_t*) uniformData;
+    gourard_uniform_t* defaultUniformData = (gourard_uniform_t*) uniformData;
     vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
     vec4_t worldSpaceVertex = mulMV4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
     result.position = mulMV4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space

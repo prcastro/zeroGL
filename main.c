@@ -159,7 +159,7 @@ game_state_t* init() {
         exit(-1);
     }
 
-    struct canvas_t canvas = {
+    canvas_t canvas = {
         .width = WIDTH,
         .height = HEIGHT,
         .hasDepthBuffer = 1,
@@ -593,14 +593,14 @@ void update(game_state_t* game) {
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
         if (game->shaderType == GOURAUD_SHADER) {
-            gourardUniformData_t uniformData = {
+            gourard_uniform_t uniformData = {
                 .modelMatrix = game->objects[i].transform,
                 .viewProjectionMatrix = game->camera.viewProjMatrix,
                 .lightSources = game->lightSources,
             };
             drawObject(&game->objects[i], &uniformData, game->camera, game->canvas, gourardVertexShader, gourardFragmentShader, game->renderOptions);
         } else if (game->shaderType == BASIC_SHADER) {
-            basicUniformData_t uniformData = {
+            basic_uniform_t uniformData = {
                 .modelviewprojection = mulMM4(game->camera.viewProjMatrix, game->objects[i].transform),
             };
             drawObject(&game->objects[i], &uniformData, game->camera, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
@@ -613,7 +613,7 @@ void drawObjects(game_state_t* game) {
 void drawLights(game_state_t* game) {
     // Use basic shader to draw lights
     for (int i = 0; i < game->lightSources.numPointLights; i++) {
-        basicUniformData_t uniformData = {
+        basic_uniform_t uniformData = {
             .modelviewprojection = mulMM4(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
         };
         drawObject(&game->pointLightObjects[i], &uniformData, game->camera, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
