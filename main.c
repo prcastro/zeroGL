@@ -691,14 +691,22 @@ void update(game_state_t* game) {
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
         // drawObject(&game->objects[i], game->lightSources, game->camera, game->canvas, game->renderOptions);
-        drawObjectShader(&game->objects[i], game->lightSources, game->camera2, game->canvas, defaultVertexShader, defaultFragmentShader, game->renderOptions);
+        gourardUniformData_t uniformData = {
+            .modelviewprojection = mulMM4(game->camera2.viewProjMatrix, game->objects[i].transform),
+            .lightSources = game->lightSources,
+        };
+        drawObjectShader(&game->objects[i], &uniformData, game->camera2, game->canvas, gourardVertexShader, gourardFragmentShader, game->renderOptions);
     }
 }
 
 // TODO: This is a huge hack, we should have a proper way to solve shading in this case
 void drawLights(game_state_t* game) {
     for (int i = 0; i < game->lightSources.numPointLights; i++) {
-        drawObject(&game->pointLightObjects[i], game->lightSources, game->camera, game->canvas, game->renderOptions & ~SHADED);
+        // drawObject(&game->pointLightObjects[i], game->lightSources, game->camera, game->canvas, game->renderOptions & ~SHADED);
+        basicUniformData_t uniformData = {
+            .modelviewprojection = mulMM4(game->camera2.viewProjMatrix, game->pointLightObjects[i].transform),
+        };
+        drawObjectShader(&game->pointLightObjects[i], &uniformData, game->camera2, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
     }
 }
 

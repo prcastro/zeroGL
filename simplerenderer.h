@@ -686,7 +686,7 @@ static inline float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t c
 #define SPECULAR_LIGHTING (1 << 1)
 #define BACKFACE_CULLING (1 << 2)
 #define BILINEAR_FILTERING (1 << 3)
-#define SHADED (1 << 4)
+#define SHADED (1 << 4) // TODO: Remove this option when we have programmable shaders ready
 #define SHADED_FLAT (1 << 5)
 #define SHADED_GOURAUD (1 << 6)
 #define SHADED_PHONG (1 << 7)
@@ -1136,23 +1136,47 @@ typedef shaderContext_t vertexShader_t(void* inputVertex, void* uniformData);
 typedef uint32_t fragmentShader_t(shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
 
 typedef struct {
-  mat4x4_t modelviewprojection;
-  light_sources_t lightSources;
-} defaultUniformData_t;
-
-typedef struct {
     vec3_t position;
     vec3_t normal;
     vec3_t textureCoord;
     vec3_t diffuseColor;
     vec3_t specularColor;
     float specularExponent;
-} default_vertex_input_t;
+} vertex_input_t;
 
-static inline shaderContext_t defaultVertexShader(void* inputVertex, void* uniformData) {
-    default_vertex_input_t* inputVertexData = (default_vertex_input_t*) inputVertex;
+// Basic shaders
+// Draw with a single color, no lighting or textures
+typedef struct {
+    mat4x4_t modelviewprojection;
+} basicUniformData_t;
+
+static inline shaderContext_t basicVertexShader(void* inputVertex, void* uniformData) {
+    vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
     shaderContext_t result = {0};
-    defaultUniformData_t* defaultUniformData = (defaultUniformData_t*) uniformData;
+    basicUniformData_t* basicUniformData = (basicUniformData_t*) uniformData;
+    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
+    
+    // Transform vertex from local space to clip space 
+    result.position = mulMV4(basicUniformData->modelviewprojection, inputVertex4);
+    return result;
+}
+
+static inline uint32_t basicFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+    return COLOR_WHITE;
+}
+
+// Gouraud shading
+// Compute the lighting at each vertex and interpolate it
+
+typedef struct {
+  mat4x4_t modelviewprojection;
+  light_sources_t lightSources;
+} gourardUniformData_t;
+
+static inline shaderContext_t gourardVertexShader(void* inputVertex, void* uniformData) {
+    vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
+    shaderContext_t result = {0};
+    gourardUniformData_t* defaultUniformData = (gourardUniformData_t*) uniformData;
     vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     
     // Transform vertex from local space to clip space 
@@ -1183,7 +1207,7 @@ static inline shaderContext_t defaultVertexShader(void* inputVertex, void* unifo
     return result;
 }
 
-static inline uint32_t defaultFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+static inline uint32_t gourardFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
     float u = input->attributes[3];
     float v = input->attributes[4];
     int tex_x = MIN(abs((int)(u * textureWidth)), textureWidth - 1);
@@ -1192,12 +1216,9 @@ static inline uint32_t defaultFragmentShader(const shaderContext_t* input, void*
     return color;
 }
 
-void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_t camera, canvas_t canvas, vertexShader_t vertexShader, fragmentShader_t fragmentShader, uint16_t renderOptions) {
+// TODO: Maybe avoid passing the camera as a parameter here?
+void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, canvas_t canvas, vertexShader_t vertexShader, fragmentShader_t fragmentShader, uint16_t renderOptions) {
     mesh_t* mesh = object->mesh;
-    defaultUniformData_t uniformData = {
-        .modelviewprojection = mulMM4(camera.viewProjMatrix, object->transform),
-        .lightSources = lightSources
-    };
 
     // TODO: Object level fustrum culling
 
@@ -1233,7 +1254,7 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
 
         // TODO: Transform vertices only once, instead of one time per triangle?
         for (int v = 0; v < 3; v++) {
-            default_vertex_input_t input_vertex = {
+            vertex_input_t input_vertex = {
                 .position = vertices[v],
                 .normal = normals[v],
                 .textureCoord = textureCoords[v],
@@ -1243,7 +1264,7 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
             };
 
             // Vertex shader (local space -> clip space and compute attributes)
-            vertexShaderOutput[v] = vertexShader(&input_vertex, &uniformData);
+            vertexShaderOutput[v] = vertexShader(&input_vertex, uniformData);
 
             float invw = 1.0f/vertexShaderOutput[v].position.w;
 
@@ -1384,7 +1405,7 @@ void drawObjectShader(object3D_t* object, light_sources_t lightSources, camera2_
                     // TODO: Test depth before interpolating attributes
                     // TODO: Avoid scissor test in drawPixel
                     if (invz > canvas.depthBuffer[y * canvas.width + x]) {
-                        uint32_t color = fragmentShader(&fragmentShaderInput, &uniformData, material.textureWidth, material.textureHeight, material.texture);
+                        uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, material.textureWidth, material.textureHeight, material.texture);
                         drawPixel(x, y, invz, color, canvas);
                     }
                 }
