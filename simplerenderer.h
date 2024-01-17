@@ -13,6 +13,10 @@
 #define DEBUG_PRINT(...) do {} while (0)
 #endif
 
+#ifndef MAX_VERTEX_ATTRIBUTES
+#define MAX_VERTEX_ATTRIBUTES 50
+#endif // MAX_VERTEX_ATTRIBUTES
+
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
@@ -1124,11 +1128,12 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
 }
 
 // The shader context is the data that is passed from the vertex shader to the fragment shader
+
 typedef struct {
     // TODO: Rename to position
     vec4_t position;
     int numAttributes;
-    float* attributes;
+    float attributes[MAX_VERTEX_ATTRIBUTES];
 } shaderContext_t;
 
 typedef shaderContext_t vertexShader_t(void* inputVertex, void* uniformData);
@@ -1177,39 +1182,26 @@ static inline shaderContext_t gourardVertexShader(void* inputVertex, void* unifo
     shaderContext_t result = {0};
     gourardUniformData_t* defaultUniformData = (gourardUniformData_t*) uniformData;
     vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
-    vec4_t worldSpaceVertex = mulMV4(defaultUniformData->modelMatrix, inputVertex4);
+    vec4_t worldSpaceVertex = mulMV4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
     result.position = mulMV4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
     
-    // TODO: Use MAX_NUM_ATTRIBUTES instead of malloc
+    // Set other vertex attributes
     result.numAttributes = 13;
-    result.attributes = (float*) malloc(result.numAttributes * sizeof(float));
-    if (!result.attributes) {
-        fprintf(stderr, "ERROR: Failed to allocate memory for vertex attributes.\n");
-        exit(1);
-    }
-
-    // Transform normal from local space to world space
-    vec3_t worldSpaceNormal = mulMV3(defaultUniformData->modelMatrix, inputVertexData->normal);
+    vec3_t worldSpaceNormal = mulMV3(defaultUniformData->modelMatrix, inputVertexData->normal); // Local to world space
     float invMagNormal = 1.0f / magnitude(worldSpaceNormal);
     result.attributes[0] = worldSpaceNormal.x;
     result.attributes[1] = worldSpaceNormal.y;
     result.attributes[2] = worldSpaceNormal.z; 
-
     result.attributes[3] = inputVertexData->textureCoord.x; // u
     result.attributes[4] = inputVertexData->textureCoord.y; // v
-
     result.attributes[5] = inputVertexData->diffuseColor.x; // R
     result.attributes[6] = inputVertexData->diffuseColor.y; // G
     result.attributes[7] = inputVertexData->diffuseColor.z; // B
-    
     result.attributes[8] = inputVertexData->specularColor.x; // R
     result.attributes[9] = inputVertexData->specularColor.y; // G
     result.attributes[10] = inputVertexData->specularColor.z; // B
     result.attributes[11] = inputVertexData->specularExponent;
-    
-    // Light
     result.attributes[12] = computeLighting((vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, DIFFUSE_LIGHTING | SPECULAR_LIGHTING);
-
     return result;
 }
 
@@ -1260,7 +1252,6 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
         uint8_t specR, specG, specB;
         colorFromUint32(material.specularColor, &specR, &specG, &specB);
 
-        // TODO: Transform vertices only once, instead of one time per triangle?
         for (int v = 0; v < 3; v++) {
             vertex_input_t input_vertex = {
                 .position = vertices[v],
@@ -1393,14 +1384,8 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
                     // Interpolated w is always one, because we already did the perspective divide
                     fragmentShaderInput.position.w = 1.0f;
 
-                    // TODO: Use MAX_NUM_ATTRIBUTES instead of using malloc
                     // Interpolate other attributes
                     fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
-                    fragmentShaderInput.attributes    = (float*) malloc(fragmentShaderInput.numAttributes * sizeof(float));
-                    if (!fragmentShaderInput.attributes) {
-                        fprintf(stderr, "ERROR: Failed to allocate memory for interpolated attributes.\n");
-                        exit(1);
-                    }
 
                     for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
                         fragmentShaderInput.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
@@ -1408,8 +1393,6 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
                                                             gamma * vertexShaderOutput[2].attributes[i];
                     }
 
-                    
-                    
                     // Depth test
                     // TODO: Test depth before interpolating attributes
                     // TODO: Avoid scissor test in drawPixel
@@ -1417,8 +1400,6 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
                         uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, material.textureWidth, material.textureHeight, material.texture);
                         drawPixel(x, y, z, color, canvas);
                     }
-
-                    free(fragmentShaderInput.attributes);
                 }
 
                 if (!is_inside && was_inside) {
