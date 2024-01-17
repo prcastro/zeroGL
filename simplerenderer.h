@@ -749,8 +749,8 @@ static inline void drawTriangleWireframe(int x0, int x1, int x2,
 }
 
 // TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
-float shadeVertex(vec3_t v, vec3_t normal, float invMagnitudeNormal, float specularExponent,
-                  light_sources_t lightSources, uint8_t renderOptions) {
+float computeLighting(vec3_t position, vec3_t normal, float invMagnitudeNormal, float specularExponent,
+                      light_sources_t lightSources, uint8_t renderOptions) {
     int numDirectionalLights = lightSources.numDirectionalLights;
     dir_light_t* directionalLights = lightSources.directionalLights;
     int numPointLights = lightSources.numPointLights;
@@ -781,7 +781,7 @@ float shadeVertex(vec3_t v, vec3_t normal, float invMagnitudeNormal, float specu
 
     // Point lights
     for (int i = 0; i < numPointLights; i++) {
-        vec3_t lightDirection = sub(pointLights[i].position, v);
+        vec3_t lightDirection = sub(pointLights[i].position, position);
         float invMagnitudeLightDirection = 1.0f / magnitude(lightDirection);
         if (renderOptions & DIFFUSE_LIGHTING) {
             float cos_alpha = dot(lightDirection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
@@ -868,7 +868,7 @@ void drawTriangleFilled(int x0, int x1, int x2,
                     if (renderOptions & SHADED_PHONG) {
                         vec3_t v = mulMV3(invCameraTransform, unprojectPoint(x, y, invz, canvas, camera));
                         vec3_t normal = add(add(mulScalarV3(alpha, n0), mulScalarV3(beta, n1)), mulScalarV3(gamma, n2));
-                        light = shadeVertex(v, normal , 1/magnitude(normal), specularExponent, lightSources, renderOptions);
+                        light = computeLighting(v, normal , 1/magnitude(normal), specularExponent, lightSources, renderOptions);
                     } else if (renderOptions & SHADED) {
                         light = alpha * i0 + beta * i1 + gamma * i2;
                     }
@@ -1051,7 +1051,7 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
                 vec3_t normal = triangleNormal(v0, v1, v2);
                 float invMag = 1.0f / magnitude(normal);
                 vec3_t center = {(v0.x + v1.x + v2.x)/3.0f, (v0.y + v1.y + v2.y)/3.0f, (v0.z + v1.z + v2.z)/3.0f};
-                float intensity = shadeVertex(center, normal, invMag, materials[triangle.materialIndex].specularExponent, lightSources, renderOptions);
+                float intensity = computeLighting(center, normal, invMag, materials[triangle.materialIndex].specularExponent, lightSources, renderOptions);
                 i0 = intensity;
                 i1 = intensity;
                 i2 = intensity;
@@ -1061,9 +1061,9 @@ void drawObject(object3D_t* object, light_sources_t lightSources, camera_t camer
                     specularExponent = materials[triangle.materialIndex].specularExponent;
                 }
 
-                i0 = shadeVertex(transformed[triangle.v0], transformedNormals[triangle.n0], mesh->invMagnitudeNormals[triangle.n0], specularExponent, lightSources, renderOptions);
-                i1 = shadeVertex(transformed[triangle.v1], transformedNormals[triangle.n1], mesh->invMagnitudeNormals[triangle.n1], specularExponent, lightSources, renderOptions);
-                i2 = shadeVertex(transformed[triangle.v2], transformedNormals[triangle.n2], mesh->invMagnitudeNormals[triangle.n2], specularExponent, lightSources, renderOptions);
+                i0 = computeLighting(transformed[triangle.v0], transformedNormals[triangle.n0], mesh->invMagnitudeNormals[triangle.n0], specularExponent, lightSources, renderOptions);
+                i1 = computeLighting(transformed[triangle.v1], transformedNormals[triangle.n1], mesh->invMagnitudeNormals[triangle.n1], specularExponent, lightSources, renderOptions);
+                i2 = computeLighting(transformed[triangle.v2], transformedNormals[triangle.n2], mesh->invMagnitudeNormals[triangle.n2], specularExponent, lightSources, renderOptions);
             }
 
             // Drawing
@@ -1155,8 +1155,6 @@ static inline shaderContext_t basicVertexShader(void* inputVertex, void* uniform
     shaderContext_t result = {0};
     basicUniformData_t* basicUniformData = (basicUniformData_t*) uniformData;
     vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
-    
-    // Transform vertex from local space to clip space 
     result.position = mulMV4(basicUniformData->modelviewprojection, inputVertex4);
     return result;
 }
@@ -1166,10 +1164,11 @@ static inline uint32_t basicFragmentShader(const shaderContext_t* input, void* u
 }
 
 // Gouraud shading
-// Compute the lighting at each vertex and interpolate it
+// Compute the lighting at each vertex
 
 typedef struct {
-  mat4x4_t modelviewprojection;
+  mat4x4_t modelMatrix;
+  mat4x4_t viewProjectionMatrix;
   light_sources_t lightSources;
 } gourardUniformData_t;
 
@@ -1177,42 +1176,51 @@ static inline shaderContext_t gourardVertexShader(void* inputVertex, void* unifo
     vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
     shaderContext_t result = {0};
     gourardUniformData_t* defaultUniformData = (gourardUniformData_t*) uniformData;
-    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
-    
-    // Transform vertex from local space to clip space 
-    result.position = mulMV4(defaultUniformData->modelviewprojection, inputVertex4);
+    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
+    vec4_t worldSpaceVertex = mulMV4(defaultUniformData->modelMatrix, inputVertex4);
+    result.position = mulMV4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
     
     // TODO: Use MAX_NUM_ATTRIBUTES instead of malloc
-    result.numAttributes = 12;
+    result.numAttributes = 13;
     result.attributes = (float*) malloc(result.numAttributes * sizeof(float));
     if (!result.attributes) {
         fprintf(stderr, "ERROR: Failed to allocate memory for vertex attributes.\n");
         exit(1);
     }
 
-    // TODO: Transform normals with the inverse transpose of the modelview matrix
-    result.attributes[0] = inputVertexData->normal.x;
-    result.attributes[1] = inputVertexData->normal.y;
-    result.attributes[2] = inputVertexData->normal.z;
+    // Transform normal from local space to world space
+    vec3_t worldSpaceNormal = mulMV3(defaultUniformData->modelMatrix, inputVertexData->normal);
+    float invMagNormal = 1.0f / magnitude(worldSpaceNormal);
+    result.attributes[0] = worldSpaceNormal.x;
+    result.attributes[1] = worldSpaceNormal.y;
+    result.attributes[2] = worldSpaceNormal.z; 
+
     result.attributes[3] = inputVertexData->textureCoord.x; // u
     result.attributes[4] = inputVertexData->textureCoord.y; // v
+
     result.attributes[5] = inputVertexData->diffuseColor.x; // R
     result.attributes[6] = inputVertexData->diffuseColor.y; // G
     result.attributes[7] = inputVertexData->diffuseColor.z; // B
+    
     result.attributes[8] = inputVertexData->specularColor.x; // R
     result.attributes[9] = inputVertexData->specularColor.y; // G
     result.attributes[10] = inputVertexData->specularColor.z; // B
     result.attributes[11] = inputVertexData->specularExponent;
+    
+    // Light
+    result.attributes[12] = computeLighting((vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, DIFFUSE_LIGHTING | SPECULAR_LIGHTING);
 
     return result;
 }
 
+// TODO: Deal with fragments without textures
 static inline uint32_t gourardFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
     float u = input->attributes[3];
     float v = input->attributes[4];
     int tex_x = MIN(abs((int)(u * textureWidth)), textureWidth - 1);
     int tex_y = MIN(abs((int)(v * textureHeight)), textureHeight - 1);
-    uint32_t color = texture[tex_y * textureWidth + tex_x];
+    uint32_t unshadedColor = texture[tex_y * textureWidth + tex_x];
+    uint32_t color = mulScalarColor(input->attributes[12], unshadedColor);
     return color;
 }
 
@@ -1227,7 +1235,7 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
         shaderContext_t vertexShaderOutput[3];
         int xs[3];
         int ys[3];
-        float invzs[3];
+        float zs[3];
         float invws[3];
 
         // Get vertex data
@@ -1278,9 +1286,9 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
             xs[v] = (vertexShaderOutput[v].position.x + 1.0f) * canvas.width / 2.0f;
             ys[v] = (1.0f - vertexShaderOutput[v].position.y) * canvas.height / 2.0f;
 
-            // Store 1/w and 1/z to avoid divisions later
-            invws[v] = invw; // For perspective correct interpolation
-            invzs[v] = 1.0f/vertexShaderOutput[v].position.z; // For z-buffer
+            
+            invws[v] = invw; // Store 1/w to avoid divisions later when performing perspective correct interpolation
+            zs[v] = vertexShaderOutput[v].position.z; // For z-buffer
         }
 
         int area = edgeCross(xs[0], ys[0], xs[1], ys[1], xs[2], ys[2]);
@@ -1297,6 +1305,7 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
 
         // TODO: Add new renderOptions to toggle this
         // TODO: Add a #define to set the slack
+        // FIXME: Objects that are too far away are still being drawn, maybe the planes are not being computed correctly?
         // Triangle level fustrum culling (discard if the triangle is fully outside of the camera volume)
         float planeDistanceSlack = 10.0f;
         if (!discarded) {
@@ -1363,8 +1372,8 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
                 if (is_inside) {
                     was_inside = 1;
 
-                    // Interpolate 1/z
-                    float invz = alpha * invzs[0] + beta * invzs[1] + gamma * invzs[2];
+                    // Interpolate z
+                    float z = alpha * zs[0] + beta * zs[1] + gamma * zs[2];
                     
                     // Compute fragment input attributes from the outputs of the vertex shader
                     // TODO: Add a SHADED_FLAT option where we get the attributes from one of the vertices (the last one, same as OpenGL)
@@ -1404,10 +1413,12 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
                     // Depth test
                     // TODO: Test depth before interpolating attributes
                     // TODO: Avoid scissor test in drawPixel
-                    if (invz > canvas.depthBuffer[y * canvas.width + x]) {
+                    if (z > canvas.depthBuffer[y * canvas.width + x]) {
                         uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, material.textureWidth, material.textureHeight, material.texture);
-                        drawPixel(x, y, invz, color, canvas);
+                        drawPixel(x, y, z, color, canvas);
                     }
+
+                    free(fragmentShaderInput.attributes);
                 }
 
                 if (!is_inside && was_inside) {
@@ -1424,8 +1435,5 @@ void drawObjectShader(object3D_t* object, void *uniformData, camera2_t camera, c
         }
     }
 }
-
-// TODO: When I turn the camera around by pressing the arrow keys, the program crashes. This is probably due to some division by zero somewhere.
-// Maybe implementing fustrum culling will fix this.
 
 #endif // SIMPLERENDERER_H

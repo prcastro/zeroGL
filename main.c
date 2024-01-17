@@ -1,4 +1,4 @@
-#define SR_DEBUG
+// #define SR_DEBUG
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
 
@@ -121,9 +121,9 @@ game_state_t* init() {
     };
 
 
-    // objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
     // objects[0] = makeObject(&meshes[4], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -394,6 +394,7 @@ void updateDebugUI(game_state_t *game) {
                                 nk_property_float(ctx, "y", -10.0f, &game->lightSources.pointLights[i].position.y, 10.0f, 0.1f, 0.1f);
                                 nk_layout_row_dynamic(ctx, row_size, 1);
                                 nk_property_float(ctx, "z", -10.0f, &game->lightSources.pointLights[i].position.z, 10.0f, 0.1f, 0.1f);
+                                game->pointLightObjects[i] = makeObject(&game->meshes[0], game->lightSources.pointLights[i].position, 0.05, IDENTITY_M4x4);
                                 nk_group_end(ctx);
                             }
                         }
@@ -692,7 +693,8 @@ void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
         // drawObject(&game->objects[i], game->lightSources, game->camera, game->canvas, game->renderOptions);
         gourardUniformData_t uniformData = {
-            .modelviewprojection = mulMM4(game->camera2.viewProjMatrix, game->objects[i].transform),
+            .modelMatrix = game->objects[i].transform,
+            .viewProjectionMatrix = game->camera2.viewProjMatrix,
             .lightSources = game->lightSources,
         };
         drawObjectShader(&game->objects[i], &uniformData, game->camera2, game->canvas, gourardVertexShader, gourardFragmentShader, game->renderOptions);
