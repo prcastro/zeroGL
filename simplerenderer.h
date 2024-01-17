@@ -647,7 +647,6 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
             discarded = 1;
         }
 
-        // TODO: Add a #define to set the slack
         // FIXME: Objects that are too far away are still being drawn, maybe the planes are not being computed correctly?
         // Triangle level fustrum culling (discard if the triangle is fully outside of the camera volume)
         if (!discarded && (renderOptions & FUSTRUM_CULLING)) {
