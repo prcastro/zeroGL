@@ -13,14 +13,27 @@
 #define DEBUG_PRINT(...) do {} while (0)
 #endif
 
+
+/* CONFIGURATION */
+
 #ifndef MAX_VERTEX_ATTRIBUTES
 #define MAX_VERTEX_ATTRIBUTES 50
 #endif // MAX_VERTEX_ATTRIBUTES
+
+// Rendering options
+#define DIFFUSE_LIGHTING (1 << 0)
+#define SPECULAR_LIGHTING (1 << 1)
+#define BACKFACE_CULLING (1 << 2)
+#define FUSTRUM_CULLING (1 << 3)
+#define BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
+#define SHADED_FLAT (1 << 5)
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
 /* VECTORS AND MATRICES */
+
+#define M_PI 3.14159265358979323846264338327950288
 
 typedef struct vec3_t {
   float x, y, z;
@@ -128,6 +141,91 @@ static inline mat4x4_t mulMM4(mat4x4_t m1, mat4x4_t m2) {
     return result;
 }
 
+static inline mat4x4_t translationToMatrix(vec3_t vector) {
+    return (mat4x4_t) {{
+        {1, 0, 0, vector.x},
+        {0, 1, 0, vector.y},
+        {0, 0, 1, vector.z},
+        {0, 0, 0,        1}
+    }};
+}
+
+static inline mat4x4_t scaleToMatrix(float scale) {
+    return (mat4x4_t) {{
+        {scale, 0,     0,     0},
+        {0,     scale, 0,     0},
+        {0,     0,     scale, 0},
+        {0,     0,     0,     1}
+    }};
+}
+
+// TODO: Only use quaternion for rotation
+static inline mat4x4_t rotationX(float degrees) {
+    float radians = degrees * M_PI / 180.0f;
+    float cos = cosf(radians);
+    float sin = sinf(radians);
+    return (mat4x4_t) {{
+        { 1, 0,    0,   0 },
+        { 0, cos,  sin, 0 },
+        { 0, -sin, cos, 0 },
+        { 0, 0,    0,   1 }
+    }};
+}
+
+static inline mat4x4_t rotationY(float degrees) {
+    float radians = degrees * M_PI / 180.0f;
+    float cos = cosf(radians);
+    float sin = sinf(radians);
+    return (mat4x4_t) {{
+        { cos, 0, -sin, 0 },
+        { 0,   1, 0,    0 },
+        { sin, 0, cos,  0 },
+        { 0,   0, 0,    1 }
+    }};
+}
+
+static inline mat4x4_t rotationZ(float degrees) {
+    float radians = degrees * M_PI / 180.0f;
+    float cos = cosf(radians);
+    float sin = sinf(radians);
+    return (mat4x4_t) {{
+        { cos,  sin, 0, 0 },
+        { -sin, cos, 0, 0 },
+        { 0,    0,   1, 0 },
+        { 0,    0,   0, 1 }
+    }};
+}
+
+/* QUATERNIONS */
+
+typedef struct {
+    float w, x, y, z;
+} quaternion_t;
+
+quaternion_t quaternionMul(quaternion_t q1, quaternion_t q2) {
+    quaternion_t result;
+    result.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
+    result.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
+    result.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
+    result.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
+    return result;
+}
+
+quaternion_t quaternionFromAngleAxis(float degrees, vec3_t axis) {
+    vec3_t normalizedAxis = normalize(axis);
+    float angle = degrees * M_PI / 180.0f;
+    float halfAngle = angle * 0.5f;
+    float sinHalfAngle = sinf(halfAngle);
+    return (quaternion_t) {cosf(halfAngle), normalizedAxis.x * sinHalfAngle, normalizedAxis.y * sinHalfAngle, normalizedAxis.z * sinHalfAngle};
+}
+
+vec3_t rotateVectorByQuaternion(vec3_t v, quaternion_t q) {
+    quaternion_t q_v = {0, v.x, v.y, v.z};
+    quaternion_t q_conjugate = {q.w, -q.x, -q.y, -q.z};
+    quaternion_t rotated = quaternionMul(quaternionMul(q, q_v), q_conjugate);
+    return (vec3_t){rotated.x, rotated.y, rotated.z};
+}
+
 /* COLORS */
 
 static const uint32_t COLOR_WHITE  = 0x00FFFFFF;
@@ -173,8 +271,6 @@ static inline uint32_t colorFromFloats(float r, float g, float b) {
 
 /* 3D OBJECTS */
 
-#define M_PI 3.14159265358979323846264338327950288
-
 typedef struct triangle_t {
   int     v0, v1, v2;
   int     t0, t1, t2;
@@ -217,6 +313,35 @@ typedef struct object3D_t {
     mat4x4_t transform;
 } object3D_t;
 
+static inline object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scale, mat4x4_t rotation) {
+    mat4x4_t translationMatrix = translationToMatrix(translation);
+    mat4x4_t scaleMatrix = scaleToMatrix(scale);
+    mat4x4_t transform = mulMM4(translationMatrix, mulMM4(rotation, scaleMatrix));
+    return (object3D_t) {mesh, translation, scale, rotation, transform};
+}
+
+// TODO: Use the following two functions to perform object level fustrum culling
+static inline vec3_t meshCenter(vec3_t* vertices, int numVertices) {
+    vec3_t result = {0, 0, 0};
+    for (int i = 0; i < numVertices; i++) {
+        result = add(result, vertices[i]);
+    }
+    return mulScalarV3(1.0f / numVertices, result);
+}
+
+static inline float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t center) {
+    float result = 0.0f;
+    for (int i = 0; i < numVertices; i++) {
+        float distance = magnitude(sub(vertices[i], center));
+        if (distance > result) {
+            result = distance;
+        }
+    }
+    return result;
+}
+
+/* LIGHTING */
+
 typedef struct ambient_light_t {
     float intensity;
 } ambient_light_t;
@@ -239,172 +364,6 @@ typedef struct light_sources_t {
     int              numPointLights;
     point_light_t*   pointLights;
 } light_sources_t;
-
-static inline vec3_t meshCenter(vec3_t* vertices, int numVertices) {
-    vec3_t result = {0, 0, 0};
-    for (int i = 0; i < numVertices; i++) {
-        result = add(result, vertices[i]);
-    }
-    return mulScalarV3(1.0f / numVertices, result);
-}
-
-static inline float meshBoundsRadius(vec3_t* vertices, int numVertices, vec3_t center) {
-    float result = 0.0f;
-    for (int i = 0; i < numVertices; i++) {
-        float distance = magnitude(sub(vertices[i], center));
-        if (distance > result) {
-            result = distance;
-        }
-    }
-    return result;
-}
-
-static inline mat4x4_t translationToMatrix(vec3_t vector) {
-    return (mat4x4_t) {{
-        {1, 0, 0, vector.x},
-        {0, 1, 0, vector.y},
-        {0, 0, 1, vector.z},
-        {0, 0, 0,        1}
-    }};
-}
-
-static inline mat4x4_t scaleToMatrix(float scale) {
-    return (mat4x4_t) {{
-        {scale, 0,     0,     0},
-        {0,     scale, 0,     0},
-        {0,     0,     scale, 0},
-        {0,     0,     0,     1}
-    }};
-}
-
-static inline mat4x4_t rotationX(float degrees) {
-    float radians = degrees * M_PI / 180.0f;
-    float cos = cosf(radians);
-    float sin = sinf(radians);
-    return (mat4x4_t) {{
-        { 1, 0,    0,   0 },
-        { 0, cos,  sin, 0 },
-        { 0, -sin, cos, 0 },
-        { 0, 0,    0,   1 }
-    }};
-}
-
-static inline mat4x4_t rotationY(float degrees) {
-    float radians = degrees * M_PI / 180.0f;
-    float cos = cosf(radians);
-    float sin = sinf(radians);
-    return (mat4x4_t) {{
-        { cos, 0, -sin, 0 },
-        { 0,   1, 0,    0 },
-        { sin, 0, cos,  0 },
-        { 0,   0, 0,    1 }
-    }};
-}
-
-static inline mat4x4_t rotationZ(float degrees) {
-    float radians = degrees * M_PI / 180.0f;
-    float cos = cosf(radians);
-    float sin = sinf(radians);
-    return (mat4x4_t) {{
-        { cos,  sin, 0, 0 },
-        { -sin, cos, 0, 0 },
-        { 0,    0,   1, 0 },
-        { 0,    0,   0, 1 }
-    }};
-}
-
-
-static inline object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scale, mat4x4_t rotation) {
-    mat4x4_t translationMatrix = translationToMatrix(translation);
-    mat4x4_t scaleMatrix = scaleToMatrix(scale);
-    mat4x4_t transform = mulMM4(translationMatrix, mulMM4(rotation, scaleMatrix));
-    return (object3D_t) {mesh, translation, scale, rotation, transform};
-}
-
-typedef struct {
-    float w, x, y, z;
-} quaternion_t;
-
-quaternion_t quaternionMul(quaternion_t q1, quaternion_t q2) {
-    quaternion_t result;
-    result.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
-    result.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
-    result.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
-    result.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
-    return result;
-}
-
-quaternion_t quaternionFromAngleAxis(float degrees, vec3_t axis) {
-    vec3_t normalizedAxis = normalize(axis);
-    float angle = degrees * M_PI / 180.0f;
-    float halfAngle = angle * 0.5f;
-    float sinHalfAngle = sinf(halfAngle);
-    return (quaternion_t) {cosf(halfAngle), normalizedAxis.x * sinHalfAngle, normalizedAxis.y * sinHalfAngle, normalizedAxis.z * sinHalfAngle};
-}
-
-vec3_t rotateVectorByQuaternion(vec3_t v, quaternion_t q) {
-    quaternion_t q_v = {0, v.x, v.y, v.z};
-    quaternion_t q_conjugate = {q.w, -q.x, -q.y, -q.z};
-    quaternion_t rotated = quaternionMul(quaternionMul(q, q_v), q_conjugate);
-    return (vec3_t){rotated.x, rotated.y, rotated.z};
-}
-
-/* DRAWING */
-
-// Rendering options
-#define DIFFUSE_LIGHTING (1 << 0)
-#define SPECULAR_LIGHTING (1 << 1)
-#define BACKFACE_CULLING (1 << 2)
-#define FUSTRUM_CULLING (1 << 3)
-#define BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
-#define SHADED_FLAT (1 << 5)
-
-typedef struct canvas_t {
-    uint32_t* frameBuffer;
-    int       width;
-    int       height;
-    int       hasDepthBuffer;
-    float*    depthBuffer;
-} canvas_t;
-
-static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
-  int abx = bx - ax;
-  int aby = by - ay;
-  int apx = px - ax;
-  int apy = py - ay;
-  return abx * apy - aby * apx;
-}
-
-static inline void drawPixel(int i, int j, float z, uint32_t color, canvas_t canvas) {
-    if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
-        int position = j * canvas.width + i;
-        canvas.frameBuffer[position] = color;
-        canvas.depthBuffer[position] = z;
-    }
-}
-
-static inline void drawLine(int x0, int x1, int y0, int y1, uint32_t color, canvas_t canvas) {
-    int delta_x = (x1 - x0);
-    int delta_y = (y1 - y0);
-    int longest_side_length = (abs(delta_x) >= abs(delta_y)) ? abs(delta_x) : abs(delta_y);
-    float x_inc = delta_x / (float)longest_side_length; 
-    float y_inc = delta_y / (float)longest_side_length;
-    float current_x = x0;
-    float current_y = y0;
-    for (int i = 0; i <= longest_side_length; i++) {
-        drawPixel(round(current_x), round(current_y), 0.0, color, canvas);
-        current_x += x_inc;
-        current_y += y_inc;
-    }
-}
-
-static inline void drawTriangleWireframe(int x0, int x1, int x2,
-                           int y0, int y1, int y2,
-                           uint32_t color, canvas_t canvas) {
-    drawLine(x0, x1, y0, y1, color, canvas);
-    drawLine(x1, x2, y1, y2, color, canvas);
-    drawLine(x2, x0, y2, y0, color, canvas);
-}
 
 // TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
 float computeLighting(vec3_t position, vec3_t normal, float invMagnitudeNormal, float specularExponent,
@@ -461,6 +420,9 @@ float computeLighting(vec3_t position, vec3_t normal, float invMagnitudeNormal, 
     return (diffuseIntensity + specularIntensity + ambientIntensity);
 }
 
+/* 3D CAMERA */
+
+// Camera for left handed coordinate system
 typedef struct {
     vec3_t position;            // x, y, z coordinates of the camera
     vec3_t direction;           // Direction in which the camera is looking
@@ -480,7 +442,7 @@ typedef struct {
 static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
                                   float fov, float aspectRatio, float near, float far,
                                   float movementSpeed, float turningSpeed) {
-    // Camera for left handed coordinate system
+    
 
     direction = normalize(direction);
     up = normalize(up);
@@ -549,6 +511,55 @@ static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
     };
 }
 
+/* DRAWING */
+
+typedef struct canvas_t {
+    uint32_t* frameBuffer;
+    int       width;
+    int       height;
+    int       hasDepthBuffer;
+    float*    depthBuffer;
+} canvas_t;
+
+static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
+  int abx = bx - ax;
+  int aby = by - ay;
+  int apx = px - ax;
+  int apy = py - ay;
+  return abx * apy - aby * apx;
+}
+
+static inline void drawPixel(int i, int j, float z, uint32_t color, canvas_t canvas) {
+    if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
+        int position = j * canvas.width + i;
+        canvas.frameBuffer[position] = color;
+        canvas.depthBuffer[position] = z;
+    }
+}
+
+static inline void drawLine(int x0, int x1, int y0, int y1, uint32_t color, canvas_t canvas) {
+    int delta_x = (x1 - x0);
+    int delta_y = (y1 - y0);
+    int longest_side_length = (abs(delta_x) >= abs(delta_y)) ? abs(delta_x) : abs(delta_y);
+    float x_inc = delta_x / (float)longest_side_length; 
+    float y_inc = delta_y / (float)longest_side_length;
+    float current_x = x0;
+    float current_y = y0;
+    for (int i = 0; i <= longest_side_length; i++) {
+        drawPixel(round(current_x), round(current_y), 0.0, color, canvas);
+        current_x += x_inc;
+        current_y += y_inc;
+    }
+}
+
+static inline void drawTriangleWireframe(int x0, int x1, int x2,
+                           int y0, int y1, int y2,
+                           uint32_t color, canvas_t canvas) {
+    drawLine(x0, x1, y0, y1, color, canvas);
+    drawLine(x1, x2, y1, y2, color, canvas);
+    drawLine(x2, x0, y2, y0, color, canvas);
+}
+
 typedef struct {
     vec3_t position;
     vec3_t normal;
@@ -562,14 +573,14 @@ typedef struct {
     vec4_t position;
     int numAttributes;
     float attributes[MAX_VERTEX_ATTRIBUTES];
-} shaderContext_t;
+} shader_context_t;
 
-typedef shaderContext_t vertexShader_t(void* inputVertex, void* uniformData);
+typedef shader_context_t vertexShader_t(void* inputVertex, void* uniformData);
 // TODO: Should we pass the texture as a parameter as we're doing now? What happens when we have multiple textures?
-typedef uint32_t fragmentShader_t(shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
+typedef uint32_t fragmentShader_t(shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
 
 // TODO: Pass texture as a canvas_t
-// TODO: Maybe avoid passing the camera as a parameter here?
+// TODO: Maybe avoid passing the camera as a parameter here? It's only passed for fustrum culling
 void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t canvas, vertexShader_t vertexShader, fragmentShader_t fragmentShader, uint16_t renderOptions) {
     mesh_t* mesh = object->mesh;
 
@@ -577,7 +588,7 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
 
     for (int tri = 0; tri < mesh->numTriangles; tri++) {
         triangle_t triangle = mesh->triangles[tri];
-        shaderContext_t vertexShaderOutput[3];
+        shader_context_t vertexShaderOutput[3];
         int xs[3];
         int ys[3];
         float zs[3];
@@ -638,7 +649,6 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
         int area = edgeCross(xs[0], ys[0], xs[1], ys[1], xs[2], ys[2]);
 
         // Culling
-        // TODO: Move to a function?
         int discarded = 0;
 
         // Backface culling
@@ -648,7 +658,8 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
         }
 
         // FIXME: Objects that are too far away are still being drawn, maybe the planes are not being computed correctly?
-        // Triangle level fustrum culling (discard if the triangle is fully outside of the camera volume)
+        // Triangle level fustrum culling (discard if the triangle is fully outside of the camera volume).
+        // This is currently performed in NDC space (is this right?)
         if (!discarded && (renderOptions & FUSTRUM_CULLING)) {
             for (int p = 0; p < 6; p++) {
                 vec4_t plane = camera.fustrumPlanes[p];
@@ -672,7 +683,6 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
             continue;
         }
 
-        // TODO: Move to a function?
         // Rasterization
         int x_min = MAX(MIN(MIN(xs[0], xs[1]), xs[2]), 0);
         int x_max = MIN(MAX(MAX(xs[0], xs[1]), xs[2]), canvas.width - 1);
@@ -718,7 +728,7 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
                     
                     // Compute fragment input attributes from the outputs of the vertex shader
                     // TODO: Add a SHADED_FLAT option where we get the attributes from one of the vertices (the last one, same as OpenGL)
-                    shaderContext_t fragmentShaderInput = {0};
+                    shader_context_t fragmentShaderInput = {0};
                     
                     // Interpolate clip position
                     fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
@@ -769,26 +779,26 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
 
 /* SHADER IMPLEMENTATIONS */
 
-// Basic shading
+/* Basic shading */
 // Draw with a single color, no lighting or textures
 typedef struct {
     mat4x4_t modelviewprojection;
 } basicUniformData_t;
 
-static inline shaderContext_t basicVertexShader(void* inputVertex, void* uniformData) {
+static inline shader_context_t basicVertexShader(void* inputVertex, void* uniformData) {
     vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
-    shaderContext_t result = {0};
+    shader_context_t result = {0};
     basicUniformData_t* basicUniformData = (basicUniformData_t*) uniformData;
     vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     result.position = mulMV4(basicUniformData->modelviewprojection, inputVertex4);
     return result;
 }
 
-static inline uint32_t basicFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+static inline uint32_t basicFragmentShader(const shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
     return COLOR_WHITE;
 }
 
-// Gouraud shading
+/* Gouraud shading */
 // Compute the lighting at each vertex
 typedef struct {
   mat4x4_t modelMatrix;
@@ -796,9 +806,9 @@ typedef struct {
   light_sources_t lightSources;
 } gourardUniformData_t;
 
-static inline shaderContext_t gourardVertexShader(void* inputVertex, void* uniformData) {
+static inline shader_context_t gourardVertexShader(void* inputVertex, void* uniformData) {
     vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
-    shaderContext_t result = {0};
+    shader_context_t result = {0};
     gourardUniformData_t* defaultUniformData = (gourardUniformData_t*) uniformData;
     vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
     vec4_t worldSpaceVertex = mulMV4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
@@ -825,7 +835,7 @@ static inline shaderContext_t gourardVertexShader(void* inputVertex, void* unifo
 }
 
 // TODO: Deal with fragments without textures
-static inline uint32_t gourardFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+static inline uint32_t gourardFragmentShader(const shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
     float u = input->attributes[3];
     float v = input->attributes[4];
     int tex_x = MIN(abs((int)(u * textureWidth)), textureWidth - 1);
