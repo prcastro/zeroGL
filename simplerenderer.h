@@ -438,6 +438,12 @@ typedef struct {
     float turningSpeed;
 } camera_t;
 
+static inline vec4_t pointsToPlane(vec3_t p0, vec3_t p1, vec3_t p2) {
+    vec3_t normal = normalize(crossProduct(sub(p1, p0), sub(p2, p1)));
+    float d = -dot(normal, p0);
+    return (vec4_t) {normal.x, normal.y, normal.z, d};
+}
+
 static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
                                   float fov, float aspectRatio, float near, float far,
                                   float movementSpeed, float turningSpeed) {
@@ -481,17 +487,33 @@ static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
 
     mat4x4_t viewProjMatrix = mulMM4(projectionMatrix, viewMatrix);
     
-    // Compute the view frustum planes
-    vec4_t viewProjMatrixCol0 = {viewProjMatrix.data[0][0], viewProjMatrix.data[0][1], viewProjMatrix.data[0][2], viewProjMatrix.data[0][3]};
-    vec4_t viewProjMatrixCol1 = {viewProjMatrix.data[1][0], viewProjMatrix.data[1][1], viewProjMatrix.data[1][2], viewProjMatrix.data[1][3]};
-    vec4_t viewProjMatrixCol2 = {viewProjMatrix.data[2][0], viewProjMatrix.data[2][1], viewProjMatrix.data[2][2], viewProjMatrix.data[2][3]};
-    vec4_t viewProjMatrixCol3 = {viewProjMatrix.data[3][0], viewProjMatrix.data[3][1], viewProjMatrix.data[3][2], viewProjMatrix.data[3][3]};
-    vec4_t leftPlane = normalizeV4(addV4(viewProjMatrixCol3, viewProjMatrixCol0));
-    vec4_t rightPlane = normalizeV4(subV4(viewProjMatrixCol3, viewProjMatrixCol0));
-    vec4_t bottomPlane = normalizeV4(addV4(viewProjMatrixCol3, viewProjMatrixCol1));
-    vec4_t topPlane = normalizeV4(subV4(viewProjMatrixCol3, viewProjMatrixCol1));
-    vec4_t nearPlane = normalizeV4(viewProjMatrixCol2);
-    vec4_t farPlane = normalizeV4(addV4(viewProjMatrixCol3, viewProjMatrixCol2));
+    // TODO: Define the camera fustrum planes in clip space instead of world space
+    
+    // Center of the near and far planes
+    vec3_t nearCenter = add(position, mulScalarV3(near, direction));
+    vec3_t farCenter = add(position, mulScalarV3(far, direction));
+    float nearHeight = 2 * tan(fovRadians / 2) * near;
+    float farHeight = 2 * tan(fovRadians / 2) * far;
+    float nearWidth = nearHeight * aspectRatio;
+    float farWidth = farHeight * aspectRatio;
+
+    // Near and far plane bounds
+    vec3_t farTopLeft  = add(farCenter, add(mulScalarV3(farHeight * 0.5, up), mulScalarV3(-farWidth * 0.5, right)));
+    vec3_t farTopRight = add(farCenter, add(mulScalarV3(farHeight * 0.5, up), mulScalarV3(farWidth * 0.5, right)));
+    vec3_t farBottomLeft = add(farCenter, add(mulScalarV3(-farHeight * 0.5, up), mulScalarV3(-farWidth * 0.5, right)));
+    vec3_t farBottomRight = add(farCenter, add(mulScalarV3(-farHeight * 0.5, up), mulScalarV3(farWidth * 0.5, right)));
+    vec3_t nearTopLeft = add(nearCenter, add(mulScalarV3(nearHeight * 0.5, up), mulScalarV3(-nearWidth * 0.5, right)));
+    vec3_t nearTopRight = add(nearCenter, add(mulScalarV3(nearHeight * 0.5, up), mulScalarV3(nearWidth * 0.5, right)));
+    vec3_t nearBottomLeft = add(nearCenter, add(mulScalarV3(-nearHeight * 0.5, up), mulScalarV3(-nearWidth * 0.5, right)));
+    vec3_t nearBottomRight = add(nearCenter, add(mulScalarV3(-nearHeight * 0.5, up), mulScalarV3(nearWidth * 0.5, right)));
+    
+    // Compute normals in left handed coordinate system
+    vec4_t leftPlane = pointsToPlane(nearBottomLeft, farTopLeft, farBottomLeft);
+    vec4_t topPlane = pointsToPlane(nearTopLeft, farTopRight, farTopLeft);
+    vec4_t rightPlane = pointsToPlane(nearTopRight, farBottomRight, farTopRight);
+    vec4_t bottomPlane = pointsToPlane(nearBottomRight, farBottomLeft, farBottomRight);
+    vec4_t nearPlane = pointsToPlane(nearBottomLeft, nearTopRight, nearTopLeft);
+    vec4_t farPlane = pointsToPlane(farBottomLeft, farTopLeft, farTopRight);
 
     return (camera_t) {
         .position = position,
@@ -588,6 +610,7 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
     for (int tri = 0; tri < mesh->numTriangles; tri++) {
         triangle_t triangle = mesh->triangles[tri];
         shader_context_t vertexShaderOutput[3];
+        vec4_t clipSpaceVertices[3] = {0};
         int xs[3];
         int ys[3];
         float zs[3];
@@ -616,7 +639,7 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
         colorFromUint32(material.specularColor, &specR, &specG, &specB);
 
         for (int v = 0; v < 3; v++) {
-            vertex_input_t input_vertex = {
+            vertex_input_t inputVertex = {
                 .position = vertices[v],
                 .normal = normals[v],
                 .textureCoord = textureCoords[v],
@@ -626,7 +649,12 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
             };
 
             // Vertex shader (local space -> clip space and compute attributes)
-            vertexShaderOutput[v] = vertexShader(&input_vertex, uniformData);
+            vertexShaderOutput[v] = vertexShader(&inputVertex, uniformData);
+
+            // TODO: It sucks to compute the world space transformation here again, but I need it for fustrum culling
+            // Maybe I can perform fustrum culling in clip space?
+            vec4_t vertex = {vertices[v].x, vertices[v].y, vertices[v].z, 1.0f};
+            clipSpaceVertices[v] = mulMV4(object->transform, vertex);
 
             float invw = 1.0f/vertexShaderOutput[v].position.w;
 
@@ -656,15 +684,14 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
             discarded = 1;
         }
 
-        // FIXME: Objects that are too far away are still being drawn, maybe the planes are not being computed correctly?
         // Triangle level fustrum culling (discard if the triangle is fully outside of the camera volume).
-        // This is currently performed in NDC space (is this right?)
+        // TODO: Perform fustrum culling in clip space instead of world space
         if (!discarded && (renderOptions & FUSTRUM_CULLING)) {
             for (int p = 0; p < 6; p++) {
                 vec4_t plane = camera.fustrumPlanes[p];
-                if (dotV4(vertexShaderOutput[0].position, plane) < 0 &&
-                    dotV4(vertexShaderOutput[1].position, plane) < 0 &&
-                    dotV4(vertexShaderOutput[2].position, plane) < 0) {
+                if (dotV4(clipSpaceVertices[0], plane) < 0 &&
+                    dotV4(clipSpaceVertices[1], plane) < 0 &&
+                    dotV4(clipSpaceVertices[2], plane) < 0) {
                         DEBUG_PRINT("DEBUG: Clipped triangle %d fully outside of the camera clipping volume (plane %d)\n", tri, p);
                         discarded = 1;
                         break;
