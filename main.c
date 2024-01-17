@@ -1,4 +1,4 @@
-#define SR_DEBUG
+// #define SR_DEBUG
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
 
@@ -20,6 +20,7 @@
 #include <SDL.h>
 #include <math.h>
 #include <assert.h>
+#include <float.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,7 +29,7 @@
 
 #define WIDTH 1066
 #define HEIGHT 600
-#define ROTATION_SPEED 0.0f //15.0f // degrees per second
+#define ROTATION_SPEED 15.0f // degrees per second
 #define VIEWPORT_WIDTH (WIDTH /(float) HEIGHT)
 #define VIEWPORT_HEIGHT 1.0f
 #define VIEWPORT_DISTANCE 1.0f
@@ -127,8 +128,8 @@ game_state_t* init() {
     };
 
 
-    // objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
     // objects[0] = makeObject(&meshes[4], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     DEBUG_PRINT("INFO: Loading lights\n");
@@ -626,7 +627,7 @@ void render(game_state_t* game) {
 
     // Init depthBuffer
     for (int i = 0; i < canvas.width * canvas.height; i++) {
-        canvas.depthBuffer[i] = 0.0;
+        canvas.depthBuffer[i] = FLT_MAX;
     }
 
     DEBUG_PRINT("INFO: Drawing background\n");

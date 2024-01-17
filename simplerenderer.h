@@ -500,6 +500,16 @@ static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
     };
 }
 
+static inline int triangleInNDCFustrum(vec4_t v1, vec4_t v2, vec4_t v3) {
+    if (v1.x < -1 && v2.x < -1 && v3.x < -1) return 0;
+    if (v1.x >  1 && v2.x >  1 && v3.x >  1) return 0;
+    if (v1.y < -1 && v2.y < -1 && v3.y < -1) return 0;
+    if (v1.y >  1 && v2.y >  1 && v3.y >  1) return 0;
+    if (v1.z <  0 && v2.z <  0 && v3.z <  0) return 0;
+    if (v1.z >  1 && v2.z >  1 && v3.z >  1) return 0;
+    return 1;
+}
+
 /* DRAWING */
 
 typedef struct {
@@ -567,17 +577,6 @@ typedef struct {
 typedef shader_context_t vertexShader_t(void* inputVertex, void* uniformData);
 // TODO: Should we pass the texture as a parameter as we're doing now? What happens when we have multiple textures?
 typedef uint32_t fragmentShader_t(shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
-
-
-static inline int triangleInNDCFustrum(vec4_t v1, vec4_t v2, vec4_t v3) {
-    if (v1.x < -1 && v2.x < -1 && v3.x < -1) return 0;
-    if (v1.x >  1 && v2.x >  1 && v3.x >  1) return 0;
-    if (v1.y < -1 && v2.y < -1 && v3.y < -1) return 0;
-    if (v1.y >  1 && v2.y >  1 && v3.y >  1) return 0;
-    if (v1.z <  0 && v2.z <  0 && v3.z <  0) return 0;
-    if (v1.z >  1 && v2.z >  1 && v3.z >  1) return 0;
-    return 1;
-}
 
 // TODO: Pass texture as a canvas_t
 // TODO: Maybe avoid passing the camera as a parameter here? It's only passed for fustrum culling
@@ -741,7 +740,7 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
                     // Depth test
                     // TODO: Test depth before interpolating attributes
                     // TODO: Avoid scissor test in drawPixel
-                    if (z > canvas.depthBuffer[y * canvas.width + x]) {
+                    if (z < canvas.depthBuffer[y * canvas.width + x]) {
                         uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, material.textureWidth, material.textureHeight, material.texture);
                         drawPixel(x, y, z, color, canvas);
                     }
