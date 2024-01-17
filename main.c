@@ -178,7 +178,7 @@ game_state_t* init() {
     game->drawLights    = 1;
     game->draw3DObjects = 1;
     game->shaderType = GOURAUD_SHADER;
-    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | BACKFACE_CULLING | SHADED_FLAT;
+    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | BACKFACE_CULLING | FUSTRUM_CULLING | SHADED_FLAT;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -427,14 +427,17 @@ void updateDebugUI(game_state_t *game) {
             }
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Render Options", NK_MAXIMIZED)) {
-                nk_layout_row_dynamic(ctx, row_size, 2);
-
-                nk_layout_row_dynamic(ctx, row_size, 2);
-
+                nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_bool isBackfaceCulling = game->renderOptions & BACKFACE_CULLING;
                 nk_checkbox_label(ctx, "Backface culling", &isBackfaceCulling);
                 game->renderOptions = isBackfaceCulling ? game->renderOptions | BACKFACE_CULLING : game->renderOptions & ~BACKFACE_CULLING;
 
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_bool isFustrumCulling = game->renderOptions & FUSTRUM_CULLING;
+                nk_checkbox_label(ctx, "Fustrum culling", &isFustrumCulling);
+                game->renderOptions = isFustrumCulling ? game->renderOptions | FUSTRUM_CULLING : game->renderOptions & ~FUSTRUM_CULLING;
+
+                nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_bool isBilinearFiltering = game->renderOptions & BILINEAR_FILTERING;
                 nk_checkbox_label(ctx, "Bilinear filtering", &isBilinearFiltering);
                 game->renderOptions = isBilinearFiltering ? game->renderOptions | BILINEAR_FILTERING : game->renderOptions & ~BILINEAR_FILTERING;

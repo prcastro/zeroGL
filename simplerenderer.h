@@ -355,8 +355,9 @@ vec3_t rotateVectorByQuaternion(vec3_t v, quaternion_t q) {
 #define DIFFUSE_LIGHTING (1 << 0)
 #define SPECULAR_LIGHTING (1 << 1)
 #define BACKFACE_CULLING (1 << 2)
-#define BILINEAR_FILTERING (1 << 3) // TODO: Implement bilinear filtering
-#define SHADED_FLAT (1 << 4)
+#define FUSTRUM_CULLING (1 << 3)
+#define BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
+#define SHADED_FLAT (1 << 5)
 
 typedef struct canvas_t {
     uint32_t* frameBuffer;
@@ -567,72 +568,6 @@ typedef shaderContext_t vertexShader_t(void* inputVertex, void* uniformData);
 // TODO: Should we pass the texture as a parameter as we're doing now? What happens when we have multiple textures?
 typedef uint32_t fragmentShader_t(shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
 
-// Basic shaders
-// Draw with a single color, no lighting or textures
-typedef struct {
-    mat4x4_t modelviewprojection;
-} basicUniformData_t;
-
-static inline shaderContext_t basicVertexShader(void* inputVertex, void* uniformData) {
-    vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
-    shaderContext_t result = {0};
-    basicUniformData_t* basicUniformData = (basicUniformData_t*) uniformData;
-    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
-    result.position = mulMV4(basicUniformData->modelviewprojection, inputVertex4);
-    return result;
-}
-
-static inline uint32_t basicFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
-    return COLOR_WHITE;
-}
-
-// Gouraud shading
-// Compute the lighting at each vertex
-typedef struct {
-  mat4x4_t modelMatrix;
-  mat4x4_t viewProjectionMatrix;
-  light_sources_t lightSources;
-} gourardUniformData_t;
-
-static inline shaderContext_t gourardVertexShader(void* inputVertex, void* uniformData) {
-    vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
-    shaderContext_t result = {0};
-    gourardUniformData_t* defaultUniformData = (gourardUniformData_t*) uniformData;
-    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
-    vec4_t worldSpaceVertex = mulMV4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
-    result.position = mulMV4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
-    
-    // Set other vertex attributes
-    result.numAttributes = 13;
-    vec3_t worldSpaceNormal = mulMV3(defaultUniformData->modelMatrix, inputVertexData->normal); // Local to world space
-    float invMagNormal = 1.0f / magnitude(worldSpaceNormal);
-    result.attributes[0] = worldSpaceNormal.x;
-    result.attributes[1] = worldSpaceNormal.y;
-    result.attributes[2] = worldSpaceNormal.z; 
-    result.attributes[3] = inputVertexData->textureCoord.x; // u
-    result.attributes[4] = inputVertexData->textureCoord.y; // v
-    result.attributes[5] = inputVertexData->diffuseColor.x; // R
-    result.attributes[6] = inputVertexData->diffuseColor.y; // G
-    result.attributes[7] = inputVertexData->diffuseColor.z; // B
-    result.attributes[8] = inputVertexData->specularColor.x; // R
-    result.attributes[9] = inputVertexData->specularColor.y; // G
-    result.attributes[10] = inputVertexData->specularColor.z; // B
-    result.attributes[11] = inputVertexData->specularExponent;
-    result.attributes[12] = computeLighting((vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, DIFFUSE_LIGHTING | SPECULAR_LIGHTING);
-    return result;
-}
-
-// TODO: Deal with fragments without textures
-static inline uint32_t gourardFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
-    float u = input->attributes[3];
-    float v = input->attributes[4];
-    int tex_x = MIN(abs((int)(u * textureWidth)), textureWidth - 1);
-    int tex_y = MIN(abs((int)(v * textureHeight)), textureHeight - 1);
-    uint32_t unshadedColor = texture[tex_y * textureWidth + tex_x];
-    uint32_t color = mulScalarColor(input->attributes[12], unshadedColor);
-    return color;
-}
-
 // TODO: Pass texture as a canvas_t
 // TODO: Maybe avoid passing the camera as a parameter here?
 void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t canvas, vertexShader_t vertexShader, fragmentShader_t fragmentShader, uint16_t renderOptions) {
@@ -712,17 +647,15 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
             discarded = 1;
         }
 
-        // TODO: Add new renderOptions to toggle this
         // TODO: Add a #define to set the slack
         // FIXME: Objects that are too far away are still being drawn, maybe the planes are not being computed correctly?
         // Triangle level fustrum culling (discard if the triangle is fully outside of the camera volume)
-        float planeDistanceSlack = 10.0f;
-        if (!discarded) {
+        if (!discarded && (renderOptions & FUSTRUM_CULLING)) {
             for (int p = 0; p < 6; p++) {
                 vec4_t plane = camera.fustrumPlanes[p];
-                if (dotV4(vertexShaderOutput[0].position, plane) < -planeDistanceSlack &&
-                    dotV4(vertexShaderOutput[1].position, plane) < -planeDistanceSlack &&
-                    dotV4(vertexShaderOutput[2].position, plane) < -planeDistanceSlack) {
+                if (dotV4(vertexShaderOutput[0].position, plane) < 0 &&
+                    dotV4(vertexShaderOutput[1].position, plane) < 0 &&
+                    dotV4(vertexShaderOutput[2].position, plane) < 0) {
                         DEBUG_PRINT("DEBUG: Clipped triangle %d fully outside of the camera clipping volume (plane %d)\n", tri, p);
                         discarded = 1;
                         break;
@@ -833,6 +766,74 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
             w2_row += delta_w2_row;
         }
     }
+}
+
+/* SHADER IMPLEMENTATIONS */
+
+// Basic shading
+// Draw with a single color, no lighting or textures
+typedef struct {
+    mat4x4_t modelviewprojection;
+} basicUniformData_t;
+
+static inline shaderContext_t basicVertexShader(void* inputVertex, void* uniformData) {
+    vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
+    shaderContext_t result = {0};
+    basicUniformData_t* basicUniformData = (basicUniformData_t*) uniformData;
+    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
+    result.position = mulMV4(basicUniformData->modelviewprojection, inputVertex4);
+    return result;
+}
+
+static inline uint32_t basicFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+    return COLOR_WHITE;
+}
+
+// Gouraud shading
+// Compute the lighting at each vertex
+typedef struct {
+  mat4x4_t modelMatrix;
+  mat4x4_t viewProjectionMatrix;
+  light_sources_t lightSources;
+} gourardUniformData_t;
+
+static inline shaderContext_t gourardVertexShader(void* inputVertex, void* uniformData) {
+    vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
+    shaderContext_t result = {0};
+    gourardUniformData_t* defaultUniformData = (gourardUniformData_t*) uniformData;
+    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
+    vec4_t worldSpaceVertex = mulMV4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
+    result.position = mulMV4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
+    
+    // Set other vertex attributes
+    result.numAttributes = 13;
+    vec3_t worldSpaceNormal = mulMV3(defaultUniformData->modelMatrix, inputVertexData->normal); // Local to world space
+    float invMagNormal = 1.0f / magnitude(worldSpaceNormal);
+    result.attributes[0] = worldSpaceNormal.x;
+    result.attributes[1] = worldSpaceNormal.y;
+    result.attributes[2] = worldSpaceNormal.z; 
+    result.attributes[3] = inputVertexData->textureCoord.x; // u
+    result.attributes[4] = inputVertexData->textureCoord.y; // v
+    result.attributes[5] = inputVertexData->diffuseColor.x; // R
+    result.attributes[6] = inputVertexData->diffuseColor.y; // G
+    result.attributes[7] = inputVertexData->diffuseColor.z; // B
+    result.attributes[8] = inputVertexData->specularColor.x; // R
+    result.attributes[9] = inputVertexData->specularColor.y; // G
+    result.attributes[10] = inputVertexData->specularColor.z; // B
+    result.attributes[11] = inputVertexData->specularExponent;
+    result.attributes[12] = computeLighting((vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, DIFFUSE_LIGHTING | SPECULAR_LIGHTING);
+    return result;
+}
+
+// TODO: Deal with fragments without textures
+static inline uint32_t gourardFragmentShader(const shaderContext_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+    float u = input->attributes[3];
+    float v = input->attributes[4];
+    int tex_x = MIN(abs((int)(u * textureWidth)), textureWidth - 1);
+    int tex_y = MIN(abs((int)(v * textureHeight)), textureHeight - 1);
+    uint32_t unshadedColor = texture[tex_y * textureWidth + tex_x];
+    uint32_t color = mulScalarColor(input->attributes[12], unshadedColor);
+    return color;
 }
 
 #endif // SIMPLERENDERER_H
