@@ -710,9 +710,8 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
 
                     // Depth test
                     if (z < canvas.depthBuffer[y * canvas.width + x]) {
-                        shader_context_t fragmentShaderInput = {0};
-
                         // Compute fragment input attributes from the outputs of the vertex shader
+                        shader_context_t fragmentShaderInput = {0};
                         if (renderOptions & FLAT_SHADING) {
                             fragmentShaderInput.position = vertexShaderOutput[0].position;
                             fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
@@ -805,13 +804,13 @@ static inline shader_context_t gourardVertexShader(void* inputVertex, void* unif
     result.attributes[0] = worldSpaceNormal.x;
     result.attributes[1] = worldSpaceNormal.y;
     result.attributes[2] = worldSpaceNormal.z; 
-    result.attributes[3] = inputVertexData->textureCoord.x; // u
-    result.attributes[4] = inputVertexData->textureCoord.y; // v
-    result.attributes[5] = inputVertexData->diffuseColor.x; // R
-    result.attributes[6] = inputVertexData->diffuseColor.y; // G
-    result.attributes[7] = inputVertexData->diffuseColor.z; // B
-    result.attributes[8] = inputVertexData->specularColor.x; // R
-    result.attributes[9] = inputVertexData->specularColor.y; // G
+    result.attributes[3] = inputVertexData->textureCoord.x;   // u
+    result.attributes[4] = inputVertexData->textureCoord.y;   // v
+    result.attributes[5] = inputVertexData->diffuseColor.x;   // R
+    result.attributes[6] = inputVertexData->diffuseColor.y;   // G
+    result.attributes[7] = inputVertexData->diffuseColor.z;   // B
+    result.attributes[8] = inputVertexData->specularColor.x;  // R
+    result.attributes[9] = inputVertexData->specularColor.y;  // G
     result.attributes[10] = inputVertexData->specularColor.z; // B
     result.attributes[11] = inputVertexData->specularExponent;
     result.attributes[12] = computeLighting((vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, DIFFUSE_LIGHTING | SPECULAR_LIGHTING);
@@ -825,8 +824,7 @@ static inline uint32_t gourardFragmentShader(const shader_context_t* input, void
     int tex_x = MIN(abs((int)(u * textureWidth)), textureWidth - 1);
     int tex_y = MIN(abs((int)(v * textureHeight)), textureHeight - 1);
     uint32_t unshadedColor = texture[tex_y * textureWidth + tex_x];
-    uint32_t color = mulScalarColor(input->attributes[12], unshadedColor);
-    return color;
+    return mulScalarColor(input->attributes[12], unshadedColor);
 }
 
 #endif // SIMPLERENDERER_H
