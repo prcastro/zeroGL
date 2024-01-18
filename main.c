@@ -179,7 +179,7 @@ game_state_t* init() {
     game->drawLights    = 1;
     game->draw3DObjects = 1;
     game->shaderType = GOURAUD_SHADER;
-    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | BACKFACE_CULLING | FUSTRUM_CULLING | SHADED_FLAT;
+    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | BACKFACE_CULLING | FUSTRUM_CULLING;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -442,6 +442,11 @@ void updateDebugUI(game_state_t *game) {
                 nk_bool isBilinearFiltering = game->renderOptions & BILINEAR_FILTERING;
                 nk_checkbox_label(ctx, "Bilinear filtering", &isBilinearFiltering);
                 game->renderOptions = isBilinearFiltering ? game->renderOptions | BILINEAR_FILTERING : game->renderOptions & ~BILINEAR_FILTERING;
+
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_bool isFlatShading = game->renderOptions & FLAT_SHADING;
+                nk_checkbox_label(ctx, "Flat shading", &isFlatShading);
+                game->renderOptions = isFlatShading ? game->renderOptions | FLAT_SHADING : game->renderOptions & ~FLAT_SHADING;
 
                 nk_tree_pop(ctx);
             }
