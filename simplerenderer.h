@@ -268,6 +268,14 @@ static inline uint32_t colorFromFloats(float r, float g, float b) {
     return colorToUint32(clamp(r * 255.0, 255.0), clamp(g * 255.0, 255.0), clamp(b * 255.0, 255.0));
 }
 
+static inline void colorToFloats(uint32_t color, float* r, float* g, float* b) {
+    uint8_t r8, g8, b8;
+    colorFromUint32(color, &r8, &g8, &b8);
+    *r = r8 / 255.0f;
+    *g = g8 / 255.0f;
+    *b = b8 / 255.0f;
+}
+
 /* 3D OBJECTS */
 
 typedef struct {
@@ -579,7 +587,6 @@ typedef shader_context_t vertexShader_t(void* inputVertex, void* uniformData);
 typedef uint32_t fragmentShader_t(shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
 
 // TODO: Pass texture as a canvas_t
-// TODO: Maybe avoid passing the camera as a parameter here? It's only passed for fustrum culling
 void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t canvas, vertexShader_t vertexShader, fragmentShader_t fragmentShader, uint16_t renderOptions) {
     mesh_t* mesh = object->mesh;
 
@@ -610,12 +617,10 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
         
         // Get material data
         material_t material = mesh->materials[triangle.materialIndex];
-        uint8_t diffR, diffG, diffB;
-        colorFromUint32(material.diffuseColor, &diffR, &diffG, &diffB);
-        diffR /= 255.0f; diffG /= 255.0f; diffB /= 255.0f;
-        uint8_t specR, specG, specB;
-        colorFromUint32(material.specularColor, &specR, &specG, &specB);
-        specR /= 255.0f; specG /= 255.0f; specB /= 255.0f;
+        float diffR, diffG, diffB;
+        colorToFloats(material.diffuseColor, &diffR, &diffG, &diffB);
+        float specR, specG, specB;
+        colorToFloats(material.specularColor, &specR, &specG, &specB);
 
         for (int v = 0; v < 3; v++) {
             vertex_input_t inputVertex = {
@@ -702,47 +707,42 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
 
                     // Interpolate z
                     float z = alpha * zs[0] + beta * zs[1] + gamma * zs[2];
-                    shader_context_t fragmentShaderInput = {0};
 
-                    // Compute fragment input attributes from the outputs of the vertex shader
-                    if (renderOptions & FLAT_SHADING) {
-                        fragmentShaderInput.position = vertexShaderOutput[0].position;
-                        fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
-                        for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
-                            fragmentShaderInput.attributes[i] = vertexShaderOutput[0].attributes[i];
-                        }
-                    } else {
-                        // Interpolate clip position
-                        fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
-                                                         beta  * vertexShaderOutput[1].position.x +
-                                                         gamma * vertexShaderOutput[2].position.x;
-                        fragmentShaderInput.position.y = alpha * vertexShaderOutput[0].position.y +
-                                                         beta  * vertexShaderOutput[1].position.y +
-                                                         gamma * vertexShaderOutput[2].position.y;
-                        fragmentShaderInput.position.z = alpha * vertexShaderOutput[0].position.z +
-                                                         beta  * vertexShaderOutput[1].position.z +
-                                                         gamma * vertexShaderOutput[2].position.z;
-                        
-                        // Interpolated w is always one, because we already did the perspective divide
-                        fragmentShaderInput.position.w = 1.0f;
-
-                        // Interpolate other attributes
-                        fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
-
-                        for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
-                            fragmentShaderInput.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
-                                                                beta  * vertexShaderOutput[1].attributes[i] +
-                                                                gamma * vertexShaderOutput[2].attributes[i];
-                        }
-                    }
-                    
-                    
-                    // TODO: Test depth before interpolating attributes
-                    // TODO: Avoid scissor test in drawPixel
                     // Depth test
                     if (z < canvas.depthBuffer[y * canvas.width + x]) {
+                        shader_context_t fragmentShaderInput = {0};
+
+                        // Compute fragment input attributes from the outputs of the vertex shader
+                        if (renderOptions & FLAT_SHADING) {
+                            fragmentShaderInput.position = vertexShaderOutput[0].position;
+                            fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
+                            for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
+                                fragmentShaderInput.attributes[i] = vertexShaderOutput[0].attributes[i];
+                            }
+                        } else {
+                            // Interpolate clip position
+                            fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
+                                                            beta  * vertexShaderOutput[1].position.x +
+                                                            gamma * vertexShaderOutput[2].position.x;
+                            fragmentShaderInput.position.y = alpha * vertexShaderOutput[0].position.y +
+                                                            beta  * vertexShaderOutput[1].position.y +
+                                                            gamma * vertexShaderOutput[2].position.y;
+                            fragmentShaderInput.position.z = alpha * vertexShaderOutput[0].position.z +
+                                                            beta  * vertexShaderOutput[1].position.z +
+                                                            gamma * vertexShaderOutput[2].position.z;                        
+                            fragmentShaderInput.position.w = 1.0f; // w is always one, because we already did the perspective divide
+
+                            // Interpolate other attributes
+                            fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
+                            for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
+                                fragmentShaderInput.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
+                                                                    beta  * vertexShaderOutput[1].attributes[i] +
+                                                                    gamma * vertexShaderOutput[2].attributes[i];
+                            }
+                        }
+
                         uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, material.textureWidth, material.textureHeight, material.texture);
-                        drawPixel(x, y, z, color, canvas);
+                        drawPixel(x, y, z, color, canvas); // TODO: Avoid scissor test in drawPixel
                     }
                 }
 
