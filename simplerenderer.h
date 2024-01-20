@@ -75,12 +75,6 @@ static inline float magnitude(vec3_t v) {
     return result;
 }
 
-static inline float magnitudeV4(vec4_t v) {
-    float result = sqrt(dotV4(v, v));
-    assert(result >= 0);
-    return result;
-}
-
 static inline vec3_t sub(vec3_t a, vec3_t b) {
     return (vec3_t) {a.x - b.x, a.y - b.y, a.z - b.z};
 }
@@ -100,11 +94,6 @@ static inline vec4_t addV4(vec4_t a, vec4_t b) {
 static inline vec3_t normalize(vec3_t v) {
     float mag = magnitude(v);
     return (vec3_t) {v.x / mag, v.y / mag, v.z / mag};
-}
-
-static inline vec4_t normalizeV4(vec4_t v) {
-    float mag = magnitudeV4(v);
-    return (vec4_t) {v.x / mag, v.y / mag, v.z / mag, v.w / mag};
 }
 
 static inline vec3_t mulScalarV3(float k, vec3_t v) {
@@ -327,7 +316,6 @@ static inline object3D_t makeObject(mesh_t *mesh, vec3_t translation, float scal
     return (object3D_t) {mesh, translation, scale, rotation, transform};
 }
 
-// TODO: Use the following two functions to perform object level fustrum culling
 static inline vec3_t meshCenter(vec3_t* vertices, int numVertices) {
     vec3_t result = {0, 0, 0};
     for (int i = 0; i < numVertices; i++) {
@@ -441,14 +429,14 @@ typedef struct {
     mat4x4_t viewMatrix;        // View matrix
     mat4x4_t projectionMatrix;  // Projection matrix
     mat4x4_t viewProjMatrix;    // View * Projection matrix
+    vec4_t fustrumPlanes[6];    // View frustum planes
     float movementSpeed;
     float turningSpeed;
 } camera_t;
 
-static inline vec4_t pointsToPlane(vec3_t p0, vec3_t p1, vec3_t p2) {
-    vec3_t normal = normalize(crossProduct(sub(p1, p0), sub(p2, p1)));
-    float d = -dot(normal, p0);
-    return (vec4_t) {normal.x, normal.y, normal.z, d};
+vec4_t normalizePlane(vec4_t plane) {
+    float mag = sqrt(plane.x*plane.x + plane.y*plane.y + plane.z*plane.z);
+    return (vec4_t) {plane.x / mag, plane.y / mag, plane.z / mag, plane.w / mag};
 }
 
 static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
@@ -492,6 +480,18 @@ static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
 
     mat4x4_t viewProjMatrix = mulMM4(projectionMatrix, viewMatrix);
 
+    // Compute the view frustum planes
+    vec4_t viewProjMatrixCol0 = {viewProjMatrix.data[0][0], viewProjMatrix.data[0][1], viewProjMatrix.data[0][2], viewProjMatrix.data[0][3]};
+    vec4_t viewProjMatrixCol1 = {viewProjMatrix.data[1][0], viewProjMatrix.data[1][1], viewProjMatrix.data[1][2], viewProjMatrix.data[1][3]};
+    vec4_t viewProjMatrixCol2 = {viewProjMatrix.data[2][0], viewProjMatrix.data[2][1], viewProjMatrix.data[2][2], viewProjMatrix.data[2][3]};
+    vec4_t viewProjMatrixCol3 = {viewProjMatrix.data[3][0], viewProjMatrix.data[3][1], viewProjMatrix.data[3][2], viewProjMatrix.data[3][3]};
+    vec4_t leftPlane = normalizePlane(addV4(viewProjMatrixCol3, viewProjMatrixCol0));
+    vec4_t rightPlane = normalizePlane(subV4(viewProjMatrixCol3, viewProjMatrixCol0));
+    vec4_t bottomPlane = normalizePlane(addV4(viewProjMatrixCol3, viewProjMatrixCol1));
+    vec4_t topPlane = normalizePlane(subV4(viewProjMatrixCol3, viewProjMatrixCol1));
+    vec4_t nearPlane = normalizePlane(viewProjMatrixCol2);
+    vec4_t farPlane = normalizePlane(addV4(viewProjMatrixCol3, viewProjMatrixCol2));
+
     return (camera_t) {
         .position = position,
         .direction = direction,
@@ -503,12 +503,14 @@ static inline camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
         .viewMatrix = viewMatrix,
         .projectionMatrix = projectionMatrix,
         .viewProjMatrix = viewProjMatrix,
+        .fustrumPlanes = {leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane},
         .movementSpeed = movementSpeed,
         .turningSpeed = turningSpeed
     };
 }
 
-static inline int triangleInNDCFustrum(vec4_t v1, vec4_t v2, vec4_t v3) {
+static inline int triangleInFustrum(vec4_t v1, vec4_t v2, vec4_t v3) {
+    // Using NDC coordinates
     if (v1.x < -1 && v2.x < -1 && v3.x < -1) return 0;
     if (v1.x >  1 && v2.x >  1 && v3.x >  1) return 0;
     if (v1.y < -1 && v2.y < -1 && v3.y < -1) return 0;
@@ -590,7 +592,18 @@ typedef uint32_t fragmentShader_t(shader_context_t* input, void* uniformData, in
 void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t canvas, vertexShader_t vertexShader, fragmentShader_t fragmentShader, uint16_t renderOptions) {
     mesh_t* mesh = object->mesh;
 
-    // TODO: Object level fustrum culling
+    // Don't draw if the object is fully outside the camera fustrum
+    if (renderOptions & FUSTRUM_CULLING) {
+        for (int p = 0; p < 6; p++) {
+            vec4_t plane = camera.fustrumPlanes[p];
+            int isInside = 1;
+            vec4_t center = mulMV4(object->transform, (vec4_t) {mesh->center.x, mesh->center.y, mesh->center.z, 1});
+            if (dotV4(plane, center) < -(object->scale * mesh->boundsRadius)) {
+                DEBUG_PRINT("DEBUG: Culled object using fustrum culling {plane %d}\n", p);
+                return;
+            }
+        }
+    }
 
     for (int tri = 0; tri < mesh->numTriangles; tri++) {
         triangle_t triangle = mesh->triangles[tri];
@@ -658,7 +671,7 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
             continue;
         }
 
-        if ((renderOptions & FUSTRUM_CULLING) && !triangleInNDCFustrum(vertexShaderOutput[0].position,
+        if ((renderOptions & FUSTRUM_CULLING) && !triangleInFustrum(vertexShaderOutput[0].position,
                                                                        vertexShaderOutput[1].position,
                                                                        vertexShaderOutput[2].position)) {
             DEBUG_PRINT("DEBUG: Culled triangle using fustrum culling\n");
