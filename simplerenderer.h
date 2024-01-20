@@ -800,6 +800,7 @@ typedef struct {
   mat4x4_t modelMatrix;
   mat4x4_t viewProjectionMatrix;
   light_sources_t lightSources;
+  int bilinearFiltering;
 } gourard_uniform_t;
 
 static inline shader_context_t gourardVertexShader(void* inputVertex, void* uniformData) {
@@ -832,11 +833,31 @@ static inline shader_context_t gourardVertexShader(void* inputVertex, void* unif
 
 // TODO: Deal with fragments without textures
 static inline uint32_t gourardFragmentShader(const shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+    gourard_uniform_t* uniform = (gourard_uniform_t*) uniformData;
     float u = input->attributes[3];
     float v = input->attributes[4];
-    int tex_x = MIN(abs((int)(u * textureWidth)), textureWidth - 1);
-    int tex_y = MIN(abs((int)(v * textureHeight)), textureHeight - 1);
-    uint32_t unshadedColor = texture[tex_y * textureWidth + tex_x];
+    
+    float tex_u = MIN(fabs(u * textureWidth), textureWidth - 1);
+    float tex_v = MIN(fabs(v * textureHeight), textureHeight - 1);
+    int floor_u = floor(tex_u);
+    int floor_v = floor(tex_v);
+    uint32_t unshadedColor;
+    if (uniform->bilinearFiltering) {
+        // Bilinear filtering
+        float ratio_u = tex_u - floor_u;
+        float ratio_v = tex_v - floor_v;
+        int next_u = MIN(floor_u + 1, textureWidth - 1);
+        int next_v = MIN(floor_v + 1, textureHeight - 1);
+        uint32_t color00 = texture[floor_v * textureWidth + floor_u];
+        uint32_t color10 = texture[floor_v * textureWidth + next_u];
+        uint32_t color01 = texture[next_v * textureWidth + floor_u];
+        uint32_t color11 = texture[next_v * textureWidth + next_u];
+        uint32_t color0 = sumColors(mulScalarColor(1.0f - ratio_u, color00), mulScalarColor(ratio_u, color10));
+        uint32_t color1 = sumColors(mulScalarColor(1.0f - ratio_u, color01), mulScalarColor(ratio_u, color11));
+        unshadedColor = sumColors(mulScalarColor(1.0f - ratio_v, color0), mulScalarColor(ratio_v, color1));
+    } else {
+        unshadedColor = texture[floor_v * textureWidth + floor_u];
+    }
     return mulScalarColor(input->attributes[12], unshadedColor);
 }
 

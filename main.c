@@ -58,6 +58,7 @@ typedef struct game_state_t {
     uint16_t      renderOptions;
     int           drawLights;
     int           draw3DObjects;
+    int           bilinearFiltering;
     shader_type_t shaderType;
     
     // Game objects
@@ -67,7 +68,7 @@ typedef struct game_state_t {
     object3D_t*      objects;
     light_sources_t  lightSources;
     object3D_t*      pointLightObjects;
-    camera_t        camera;
+    camera_t         camera;
     float            rotationSpeed;
     const uint8_t*   keys;
 
@@ -178,6 +179,7 @@ game_state_t* init() {
     game->backgroundColor = COLOR_BLACK;
     game->drawLights    = 1;
     game->draw3DObjects = 1;
+    game->bilinearFiltering = 0;
     game->shaderType = GOURAUD_SHADER;
     game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | BACKFACE_CULLING | FUSTRUM_CULLING;
     game->numMeshes = numMeshes;
@@ -439,9 +441,9 @@ void updateDebugUI(game_state_t *game) {
                 game->renderOptions = isFustrumCulling ? game->renderOptions | FUSTRUM_CULLING : game->renderOptions & ~FUSTRUM_CULLING;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
-                nk_bool isBilinearFiltering = game->renderOptions & BILINEAR_FILTERING;
+                nk_bool isBilinearFiltering = game->bilinearFiltering;
                 nk_checkbox_label(ctx, "Bilinear filtering", &isBilinearFiltering);
-                game->renderOptions = isBilinearFiltering ? game->renderOptions | BILINEAR_FILTERING : game->renderOptions & ~BILINEAR_FILTERING;
+                game->bilinearFiltering = isBilinearFiltering;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_bool isFlatShading = game->renderOptions & FLAT_SHADING;
@@ -603,6 +605,7 @@ void drawObjects(game_state_t* game) {
                 .modelMatrix = game->objects[i].transform,
                 .viewProjectionMatrix = game->camera.viewProjMatrix,
                 .lightSources = game->lightSources,
+                .bilinearFiltering = game->bilinearFiltering
             };
             drawObject(&game->objects[i], &uniformData, game->camera, game->canvas, gourardVertexShader, gourardFragmentShader, game->renderOptions);
         } else if (game->shaderType == BASIC_SHADER) {
