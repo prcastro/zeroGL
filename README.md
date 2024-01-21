@@ -1,5 +1,5 @@
 # zeroGL
-Software (CPU) 3D Rasterizer capable of drawing 3D objects with programmable shaders
+Software (CPU) graphics library capable of drawing 3D objects with programmable shaders
 
 <img src="assets/rasterizer.gif" width="500">
 
