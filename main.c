@@ -20,6 +20,7 @@
 #include <SDL.h>
 #include <math.h>
 #include <assert.h>
+#include <float.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,6 +35,12 @@
 #define VIEWPORT_DISTANCE 1.0f
 #define PIXEL_DEPTH 4
 #define PITCH (PIXEL_DEPTH * WIDTH)
+
+typedef enum {
+    BASIC_SHADER,
+    GOURAUD_SHADER,
+    PHONG_SHADER // TODO: Uninplemented
+} shader_type_t;
 
 typedef struct game_state_t {
     // Loop control
@@ -51,7 +58,8 @@ typedef struct game_state_t {
     uint16_t      renderOptions;
     int           drawLights;
     int           draw3DObjects;
-    int           draw2DObjects;
+    int           bilinearFiltering;
+    shader_type_t shaderType;
     
     // Game objects
     int              numMeshes;
@@ -73,6 +81,8 @@ typedef struct game_state_t {
 } game_state_t;
 
 game_state_t* init() {
+    DEBUG_PRINT("INFO: Initializing game objects\n");
+
     DEBUG_PRINT("INFO: Initializing SDL\n");
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         fprintf(stderr, "ERROR: error initializing SDL: %s\n", SDL_GetError());
@@ -81,7 +91,7 @@ game_state_t* init() {
 
     DEBUG_PRINT("INFO: Loading meshes and objects\n");
     int numObjects = 1;
-    int numMeshes = 4;
+    int numMeshes = 6;
     mesh_t* meshes = (mesh_t*) malloc(numMeshes * sizeof(mesh_t));
     object3D_t *objects = (object3D_t*) malloc(numObjects * sizeof(object3D_t));
     if (meshes == NULL || objects == NULL) {
@@ -93,8 +103,37 @@ game_state_t* init() {
     meshes[1] = *loadObjFile("assets/snake/snake.obj", true);
     meshes[2] = *loadObjFile("assets/engineer/engineer.obj", false);
     meshes[3] = *loadObjFile("assets/cube.obj", false);
+    meshes[4] = *loadObjFile("assets/sphere.obj", false);
+
+    // Define a debug mesh
+    vec3_t* vertices = (vec3_t*) malloc(3 * sizeof(vec3_t));
+    triangle_t* triangles = (triangle_t*) malloc(1 * sizeof(triangle_t));
+    material_t* materials = (material_t*) malloc(1 * sizeof(material_t));
+    if (vertices == NULL || triangles == NULL || materials == NULL) {
+        fprintf(stderr, "ERROR: Debug mesh memory couldn't be allocated.\n");
+        exit(-1);
+    }
+
+    vertices[0] = (vec3_t) {0, 0, 0};
+    vertices[1] = (vec3_t) {1, 0, 0};
+    vertices[2] = (vec3_t) {0, 1, 0};
+    triangles[0] = (triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
+    materials[0] = (material_t) {"RedMaterial", COLOR_RED, COLOR_RED, 0.0f, 0, 0, NULL};
+    meshes[5] = (mesh_t) {
+        .name = "Debug",
+        .numVertices = 3,
+        .numTriangles = 1,
+        .numTextureCoords = 0,
+        .vertices = vertices,
+        .triangles = triangles,
+        .materials = materials
+    };
+
 
     objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = makeObject(&meshes[4], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = makeObject(&meshes[5], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -124,7 +163,7 @@ game_state_t* init() {
         exit(-1);
     }
 
-    struct canvas_t canvas = {
+    canvas_t canvas = {
         .width = WIDTH,
         .height = HEIGHT,
         .hasDepthBuffer = 1,
@@ -142,8 +181,9 @@ game_state_t* init() {
     game->backgroundColor = COLOR_BLACK;
     game->drawLights    = 1;
     game->draw3DObjects = 1;
-    game->draw2DObjects = 0;
-    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | SHADED | BACKFACE_CULLING | SHADED_GOURAUD | DRAW_FILLED;
+    game->bilinearFiltering = 0;
+    game->shaderType = GOURAUD_SHADER;
+    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | BACKFACE_CULLING | FUSTRUM_CULLING;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -160,17 +200,20 @@ game_state_t* init() {
     };
     
     game->pointLightObjects = pointLightObjects;
-    
+
     game->camera = makeCamera(
-        (vec3_t) {0, 0, -5},
-        rotationY(0.0f),
-        VIEWPORT_WIDTH,
-        VIEWPORT_HEIGHT,
-        VIEWPORT_DISTANCE,
-        5.0f,
-        90.0f
+        (vec3_t) {0, 0, -5}, // position
+        (vec3_t) {0, 0, 1}, // direction
+        (vec3_t) {0, 1, 0}, // up
+        53.0f, // fov
+        VIEWPORT_WIDTH / VIEWPORT_HEIGHT, // aspect ratio
+        VIEWPORT_DISTANCE, // near plane
+        100.0f, // far plane
+        5.0f, // movement speed
+        90.0f // turning speed
     );
-    game->rotationSpeed = 15.0f;
+
+    game->rotationSpeed = ROTATION_SPEED;
     game->keys = SDL_GetKeyboardState(NULL);
 
     #ifdef DEBUGUI
@@ -265,105 +308,96 @@ void updateDebugUI(game_state_t *game) {
             }
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Lights", NK_MINIMIZED)) {
-                nk_layout_row_dynamic(ctx, row_size, 1);
-                
-                nk_bool shaded = game->renderOptions & SHADED;
-                nk_checkbox_label(ctx, "Shaded", &shaded);
-                game->renderOptions = shaded ? game->renderOptions | SHADED : game->renderOptions & ~SHADED;
+                nk_layout_row_dynamic(ctx, row_size, 2);
 
-                if (game->renderOptions & SHADED) {
-                    nk_layout_row_dynamic(ctx, row_size, 3);
-                    nk_bool isFlat = game->renderOptions & SHADED_FLAT;
-                    if (nk_radio_label(ctx, "Flat", &isFlat)) {
-                        game->renderOptions = game->renderOptions | SHADED_FLAT;
-                        game->renderOptions = game->renderOptions & ~SHADED_GOURAUD;
-                        game->renderOptions = game->renderOptions & ~SHADED_PHONG;
-                    };
+                nk_bool isDiffuse = game->renderOptions & DIFFUSE_LIGHTING;
+                nk_checkbox_label(ctx, "Difuse", &isDiffuse);
+                game->renderOptions = isDiffuse ? game->renderOptions | DIFFUSE_LIGHTING : game->renderOptions & ~DIFFUSE_LIGHTING;
 
-                    nk_bool isGouraud = game->renderOptions & SHADED_GOURAUD;
-                    if (nk_radio_label(ctx, "Gouraud", &isGouraud)) {
-                        game->renderOptions = game->renderOptions & ~SHADED_FLAT;
-                        game->renderOptions = game->renderOptions | SHADED_GOURAUD;
-                        game->renderOptions = game->renderOptions & ~SHADED_PHONG;
-                    };
+                nk_bool isSpecular = game->renderOptions & SPECULAR_LIGHTING;
+                nk_checkbox_label(ctx, "Specular", &isSpecular);
+                game->renderOptions = isSpecular ? game->renderOptions | SPECULAR_LIGHTING : game->renderOptions & ~SPECULAR_LIGHTING;
 
-                    nk_bool isPhong = game->renderOptions & SHADED_PHONG;
-                    if (nk_radio_label(ctx, "Phong", &isPhong)) {
-                        game->renderOptions = game->renderOptions & ~SHADED_FLAT;
-                        game->renderOptions = game->renderOptions & ~SHADED_GOURAUD;
-                        game->renderOptions = game->renderOptions | SHADED_PHONG;
-                    };
-
-                    nk_layout_row_dynamic(ctx, row_size, 2);
-
-                    nk_bool isDiffuse = game->renderOptions & DIFFUSE_LIGHTING;
-                    nk_checkbox_label(ctx, "Difuse", &isDiffuse);
-                    game->renderOptions = isDiffuse ? game->renderOptions | DIFFUSE_LIGHTING : game->renderOptions & ~DIFFUSE_LIGHTING;
-
-                    nk_bool isSpecular = game->renderOptions & SPECULAR_LIGHTING;
-                    nk_checkbox_label(ctx, "Specular", &isSpecular);
-                    game->renderOptions = isSpecular ? game->renderOptions | SPECULAR_LIGHTING : game->renderOptions & ~SPECULAR_LIGHTING;
-
-                    if (nk_tree_push(ctx, NK_TREE_NODE, "Ambient", NK_MAXIMIZED)) {
-                        for (int i = 0; i < game->lightSources.numAmbientLights; i++) {
-                            nk_layout_row_dynamic(ctx, row_size * 4, 1);
-                            char label[100];
-                            sprintf(label, "Ambient Light %d", i);
-                            if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.ambientLights[i].intensity, 3.0f, 0.1f, 0.1f);
-                                nk_group_end(ctx);
-                            }
+                if (nk_tree_push(ctx, NK_TREE_NODE, "Ambient", NK_MAXIMIZED)) {
+                    for (int i = 0; i < game->lightSources.numAmbientLights; i++) {
+                        nk_layout_row_dynamic(ctx, row_size * 4, 1);
+                        char label[100];
+                        sprintf(label, "Ambient Light %d", i);
+                        if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.ambientLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                            nk_group_end(ctx);
                         }
-                        nk_tree_pop(ctx);
                     }
+                    nk_tree_pop(ctx);
+                }
 
-                    if (nk_tree_push(ctx, NK_TREE_NODE, "Directional", NK_MAXIMIZED)) {
-                        for (int i = 0; i < game->lightSources.numDirectionalLights; i++) {
-                            nk_layout_row_dynamic(ctx, row_size * 8, 1);
-                            char label[100];
-                            sprintf(label, "Directional Light %d", i);
-                            if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.directionalLights[i].intensity, 3.0f, 0.1f, 0.1f);
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "x", -1.0f, &game->lightSources.directionalLights[i].direction.x, 1.0f, 0.1f, 0.1f);
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "y", -1.0f, &game->lightSources.directionalLights[i].direction.y, 1.0f, 0.1f, 0.1f);
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "z", -1.0f, &game->lightSources.directionalLights[i].direction.z, 1.0f, 0.1f, 0.1f);
-                                nk_group_end(ctx);
-                            }
+                if (nk_tree_push(ctx, NK_TREE_NODE, "Directional", NK_MAXIMIZED)) {
+                    for (int i = 0; i < game->lightSources.numDirectionalLights; i++) {
+                        nk_layout_row_dynamic(ctx, row_size * 8, 1);
+                        char label[100];
+                        sprintf(label, "Directional Light %d", i);
+                        if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.directionalLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "x", -1.0f, &game->lightSources.directionalLights[i].direction.x, 1.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "y", -1.0f, &game->lightSources.directionalLights[i].direction.y, 1.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "z", -1.0f, &game->lightSources.directionalLights[i].direction.z, 1.0f, 0.1f, 0.1f);
+                            nk_group_end(ctx);
                         }
-                        nk_tree_pop(ctx);
                     }
+                    nk_tree_pop(ctx);
+                }
 
-                    if (nk_tree_push(ctx, NK_TREE_NODE, "Point", NK_MAXIMIZED)) {
-                        for (int i = 0; i < game->lightSources.numPointLights; i++) {
-                            nk_layout_row_dynamic(ctx, row_size * 8, 1);
-                            char label[100];
-                            sprintf(label, "Point Light %d", i);
-                            if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.pointLights[i].intensity, 3.0f, 0.1f, 0.1f);
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "x", -10.0f, &game->lightSources.pointLights[i].position.x, 10.0f, 0.1f, 0.1f);
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "y", -10.0f, &game->lightSources.pointLights[i].position.y, 10.0f, 0.1f, 0.1f);
-                                nk_layout_row_dynamic(ctx, row_size, 1);
-                                nk_property_float(ctx, "z", -10.0f, &game->lightSources.pointLights[i].position.z, 10.0f, 0.1f, 0.1f);
-                                nk_group_end(ctx);
-                            }
+                if (nk_tree_push(ctx, NK_TREE_NODE, "Point", NK_MAXIMIZED)) {
+                    for (int i = 0; i < game->lightSources.numPointLights; i++) {
+                        nk_layout_row_dynamic(ctx, row_size * 8, 1);
+                        char label[100];
+                        sprintf(label, "Point Light %d", i);
+                        if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.pointLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "x", -10.0f, &game->lightSources.pointLights[i].position.x, 10.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "y", -10.0f, &game->lightSources.pointLights[i].position.y, 10.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "z", -10.0f, &game->lightSources.pointLights[i].position.z, 10.0f, 0.1f, 0.1f);
+                            game->pointLightObjects[i] = makeObject(&game->meshes[0], game->lightSources.pointLights[i].position, 0.05, IDENTITY_M4x4);
+                            nk_group_end(ctx);
                         }
-                        nk_tree_pop(ctx);
                     }
+                    nk_tree_pop(ctx);
                 }
                 nk_tree_pop(ctx);
             }
 
-            if (nk_tree_push(ctx, NK_TREE_NODE, "Scene", NK_MAXIMIZED)) {
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Camera", NK_MINIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
-                nk_labelf(ctx, NK_TEXT_LEFT, "Camera: (%.1f, %.1f, %.1f)", game->camera.translation.x, game->camera.translation.y, game->camera.translation.z);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Camera: (%.1f, %.1f, %.1f)", game->camera.position.x, game->camera.position.y, game->camera.position.z);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Direction: (%.1f, %.1f, %.1f)", game->camera.direction.x, game->camera.direction.y, game->camera.direction.z);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Up: (%.1f, %.1f, %.1f)", game->camera.up.x, game->camera.up.y, game->camera.up.z);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "FOV: %.1f", game->camera.fov);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Aspect ratio: %.1f", game->camera.aspectRatio);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Near plane: %.1f", game->camera.nearPlane);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Far plane: %.1f", game->camera.farPlane);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Movement speed: %.1f", game->camera.movementSpeed);
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_labelf(ctx, NK_TEXT_LEFT, "Turning speed: %.1f", game->camera.turningSpeed);
+                nk_tree_pop(ctx);
+            }
+
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Scene", NK_MAXIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_label(ctx, "What to draw", NK_TEXT_LEFT);
                 nk_layout_row_dynamic(ctx, row_size, 3);
@@ -372,11 +406,7 @@ void updateDebugUI(game_state_t *game) {
                 nk_checkbox_label(ctx, "3D Obj", &draw3DObjects);
                 game->draw3DObjects = draw3DObjects;
 
-                nk_bool draw2DObjects = game->draw2DObjects;
-                nk_checkbox_label(ctx, "2D Obj", &draw2DObjects);
-                game->draw2DObjects = draw2DObjects;
-
-                nk_bool drawLights = game->drawLights; 
+                nk_bool drawLights = game->drawLights;
                 nk_checkbox_label(ctx, "Lights", &drawLights);
                 game->drawLights = drawLights;
 
@@ -384,25 +414,41 @@ void updateDebugUI(game_state_t *game) {
             }
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Render Options", NK_MAXIMIZED)) {
-                nk_layout_row_dynamic(ctx, row_size, 2);
+                nk_layout_row_dynamic(ctx, row_size, 3);
+                nk_bool isBasic = game->shaderType == BASIC_SHADER;
+                if (nk_radio_label(ctx, "Basic", &isBasic)) {
+                    game->shaderType = BASIC_SHADER; 
+                };
 
-                nk_bool drawWire = game->renderOptions & DRAW_WIREFRAME;
-                nk_checkbox_label(ctx, "Wireframe", &drawWire);
-                game->renderOptions = drawWire ? game->renderOptions | DRAW_WIREFRAME : game->renderOptions & ~DRAW_WIREFRAME;
+                nk_bool isGouraud = game->shaderType == GOURAUD_SHADER;
+                if (nk_radio_label(ctx, "Gouraud", &isGouraud)) {
+                    game->shaderType = GOURAUD_SHADER;
+                };
 
-                nk_bool drawFilled = game->renderOptions & DRAW_FILLED;
-                nk_checkbox_label(ctx, "Filled", &drawFilled);
-                game->renderOptions = drawFilled ? game->renderOptions | DRAW_FILLED : game->renderOptions & ~DRAW_FILLED;
+                nk_bool isPhong = game->shaderType == PHONG_SHADER;
+                if (nk_radio_label(ctx, "Phong", &isPhong)) {
+                    game->shaderType = PHONG_SHADER;
+                };
 
-                nk_layout_row_dynamic(ctx, row_size, 2);
-
+                nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_bool isBackfaceCulling = game->renderOptions & BACKFACE_CULLING;
                 nk_checkbox_label(ctx, "Backface culling", &isBackfaceCulling);
                 game->renderOptions = isBackfaceCulling ? game->renderOptions | BACKFACE_CULLING : game->renderOptions & ~BACKFACE_CULLING;
 
-                nk_bool isBilinearFiltering = game->renderOptions & BILINEAR_FILTERING;
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_bool isFustrumCulling = game->renderOptions & FUSTRUM_CULLING;
+                nk_checkbox_label(ctx, "Fustrum culling", &isFustrumCulling);
+                game->renderOptions = isFustrumCulling ? game->renderOptions | FUSTRUM_CULLING : game->renderOptions & ~FUSTRUM_CULLING;
+
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_bool isBilinearFiltering = game->bilinearFiltering;
                 nk_checkbox_label(ctx, "Bilinear filtering", &isBilinearFiltering);
-                game->renderOptions = isBilinearFiltering ? game->renderOptions | BILINEAR_FILTERING : game->renderOptions & ~BILINEAR_FILTERING;
+                game->bilinearFiltering = isBilinearFiltering;
+
+                nk_layout_row_dynamic(ctx, row_size, 1);
+                nk_bool isFlatShading = game->renderOptions & FLAT_SHADING;
+                nk_checkbox_label(ctx, "Flat shading", &isFlatShading);
+                game->renderOptions = isFlatShading ? game->renderOptions | FLAT_SHADING : game->renderOptions & ~FLAT_SHADING;
 
                 nk_tree_pop(ctx);
             }
@@ -436,69 +482,101 @@ void updateDebugUI(game_state_t *game) {
 #endif // DEBUGUI
 
 void updateCameraPosition(game_state_t* game) {
-    camera_t *camera = &game->camera;
     const uint8_t* keys = game->keys;
-    camera_t newCamera;
-    vec3_t localTranslation = {0};
-    vec3_t newTranslation = camera->translation;
-    mat4x4_t newRotation = camera->rotation;
+    camera_t *camera = &game->camera;
+
+    // TODO: Store this in the camera struct
+    vec3_t cameraRight = crossProduct(camera->up, camera->direction);
+    
     float elapsedTime = game->elapsedTime / 1000.0f;
     float movementSpeed = camera->movementSpeed * elapsedTime;
     float turningSpeed = camera->turningSpeed * elapsedTime;
+    vec3_t newCameraPosition = camera->position;
+    vec3_t newCameraDirection = camera->direction;
+    vec3_t newCameraUp = camera->up;
     
 
     if (keys[SDL_SCANCODE_A]) {
-        localTranslation.x = -movementSpeed;
-    }
-    
-    if (keys[SDL_SCANCODE_D]) {
-        localTranslation.x = movementSpeed;
+        // Translate left       
+        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, cameraRight));
     }
 
-    if (keys[SDL_SCANCODE_PAGEDOWN]) {
-        localTranslation.y = -movementSpeed;
-    }
-    
-    if (keys[SDL_SCANCODE_PAGEUP]) {
-        localTranslation.y = movementSpeed;
+    if (keys[SDL_SCANCODE_D]) {
+        // Translate right
+        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, cameraRight));
     }
 
     if (keys[SDL_SCANCODE_S]) {
-        localTranslation.z = -movementSpeed;
+        // Translate back
+        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, newCameraDirection));
     }
-    
+
     if (keys[SDL_SCANCODE_W]) {
-        localTranslation.z = movementSpeed;
+        // Translate forward
+        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, newCameraDirection));
+    }
+
+    if (keys[SDL_SCANCODE_PAGEDOWN]) {
+        // Translate down
+        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, newCameraUp));
+    }
+
+    if (keys[SDL_SCANCODE_PAGEUP]) {
+        // Translate up
+        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, newCameraUp));
     }
 
     if (keys[SDL_SCANCODE_RIGHT]) {
-        newRotation = mulMM4(rotationY(-turningSpeed), newRotation);
+        // Rotate right around up axis using quaternion
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, newCameraUp);
+        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
+        cameraRight = crossProduct(newCameraUp, newCameraDirection);
     }
 
     if (keys[SDL_SCANCODE_LEFT]) {
-        newRotation = mulMM4(rotationY(turningSpeed), newRotation);
+        // Rotate left around up axis
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, newCameraUp);
+        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
+        cameraRight = crossProduct(newCameraUp, newCameraDirection);
     }
 
     if (keys[SDL_SCANCODE_UP]) {
-        newRotation = mulMM4(rotationX(turningSpeed), newRotation);
+        // Rotate up around right axis
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, cameraRight);
+        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
+        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
+
     }
 
     if (keys[SDL_SCANCODE_DOWN]) {
-        newRotation = mulMM4(rotationX(-turningSpeed), newRotation);
+        // Rotate down around right axis
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, cameraRight);
+        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
+        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
     }
 
-    vec3_t globalTranslation = mulMV3(camera->rotation, localTranslation);
-    newTranslation.x += globalTranslation.x;
-    newTranslation.y += globalTranslation.y;
-    newTranslation.z += globalTranslation.z;
+    if (keys[SDL_SCANCODE_Q]) {
+        // Rotate left around direction axis
+        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, newCameraDirection);
+        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
+        cameraRight = crossProduct(newCameraUp, newCameraDirection);
+    }
 
-    free(camera->planes);
-    *camera  = makeCamera(
-        newTranslation,
-        newRotation,
-        camera->viewportWidth,
-        camera->viewportHeight,
-        camera->viewportDistance,
+    if (keys[SDL_SCANCODE_E]) {
+        // Rotate right around direction axis
+        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, newCameraDirection);
+        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
+        cameraRight = crossProduct(newCameraUp, newCameraDirection);
+    }
+
+    game->camera = makeCamera(
+        newCameraPosition,
+        newCameraDirection,
+        newCameraUp,
+        camera->fov,
+        camera->aspectRatio,
+        camera->nearPlane,
+        camera->farPlane,
         camera->movementSpeed,
         camera->turningSpeed
     );
@@ -508,6 +586,7 @@ object3D_t rotateObjectY(object3D_t object, float degrees) {
     return makeObject(object.mesh, object.translation, object.scale, mulMM4(rotationY(degrees), object.rotation));
 }
 
+// TODO: Use quaternions for rotation
 void animateObjects(game_state_t* game) {
     float degrees = game->rotationSpeed * (game->elapsedTime / 1000.0f);
     game->objects[0] = rotateObjectY(game->objects[0], fmod(degrees, 360.0f));
@@ -521,27 +600,51 @@ void update(game_state_t* game) {
 
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
-        drawObject(&game->objects[i], game->lightSources, game->camera, game->canvas, game->renderOptions);
+        object3D_t object = game->objects[i];
+        if (game->shaderType == BASIC_SHADER) {
+            basic_uniform_t uniformData = {
+                .modelviewprojection = mulMM4(game->camera.viewProjMatrix, object.transform),
+            };
+            drawObject(&object, &uniformData, game->camera, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
+        } else if (game->shaderType == GOURAUD_SHADER) {
+            gourard_uniform_t uniformData = {
+                .modelMatrix = object.transform,
+                .modelInvRotationMatrixTransposed = transposeM4(inverseM4(object.rotation)),
+                .viewProjectionMatrix = game->camera.viewProjMatrix,
+                .lightSources = game->lightSources,
+                .bilinearFiltering = game->bilinearFiltering
+            };
+            drawObject(&object, &uniformData, game->camera, game->canvas, gourardVertexShader, gourardFragmentShader, game->renderOptions);
+        } else if (game->shaderType == PHONG_SHADER) {
+            phong_uniform_t uniformData = {
+                .modelMatrix = object.transform,
+                .modelInvRotationMatrixTransposed = transposeM4(inverseM4(object.rotation)),
+                .viewProjectionMatrix = game->camera.viewProjMatrix,
+                .lightSources = game->lightSources,
+                .bilinearFiltering = game->bilinearFiltering
+            };
+            drawObject(&object, &uniformData, game->camera, game->canvas, phongVertexShader, phongFragmentShader, game->renderOptions);
+        }
     }
 }
 
-// TODO: This is a huge hack, we should have a proper way to solve shading in this case
 void drawLights(game_state_t* game) {
+    // Use basic shader to draw lights
     for (int i = 0; i < game->lightSources.numPointLights; i++) {
-        uint16_t renderOptionsBackup = game->renderOptions;
-        game->renderOptions &= ~SHADED;
-        drawObject(&game->pointLightObjects[i], game->lightSources, game->camera, game->canvas, game->renderOptions);
-        game->renderOptions = renderOptionsBackup;
+        basic_uniform_t uniformData = {
+            .modelviewprojection = mulMM4(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
+        };
+        drawObject(&game->pointLightObjects[i], &uniformData, game->camera, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
     }
 }
 
-void render(int p0x, int p0y, float p0invz, int p1x, int p1y, float p1invz, int p2x, int p2y, float p2invz, game_state_t* game) {
+void render(game_state_t* game) {
     DEBUG_PRINT("INFO: Rendering scene\n");
     canvas_t canvas = game->canvas;
 
     // Init depthBuffer
     for (int i = 0; i < canvas.width * canvas.height; i++) {
-        canvas.depthBuffer[i] = 0.0;
+        canvas.depthBuffer[i] = FLT_MAX;
     }
 
     DEBUG_PRINT("INFO: Drawing background\n");
@@ -561,35 +664,6 @@ void render(int p0x, int p0y, float p0invz, int p1x, int p1y, float p1invz, int 
         drawLights(game);
     }
     
-    // Draw lines
-    if (game->draw2DObjects) {
-        DEBUG_PRINT("INFO: Drawing 2D Objects\n");
-        if (game->renderOptions & DRAW_WIREFRAME) {
-            DEBUG_PRINT("INFO: Drawing wireframe triangle\n");
-            drawTriangleWireframe(p0x, p1x, p2x,
-                                  p0y, p1y, p2y,
-                                  COLOR_GREEN, game->canvas);
-        }
-        
-        if (game->renderOptions & DRAW_FILLED) {
-            DEBUG_PRINT("INFO: Drawing triangle\n");
-            
-            int area = edgeCross(p0x, p0y, p1x, p1y, p2x, p2y);
-            drawTriangleFilled(p0x, p1x, p2x,
-                               p0y, p1y, p2y,
-                               p0invz, p1invz, p2invz,
-                               1.0, 1.0, 1.0,
-                               (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0},
-                               (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0}, (vec3_t) {0, 0, 0},
-                               COLOR_RED, COLOR_GREEN, COLOR_BLUE,
-                               0.0,
-                               NULL, 0, 0,
-                               IDENTITY_M4x4,
-                               area,
-                               game->lightSources, game->camera, game->canvas, game->renderOptions);
-        }
-    }
-    
     DEBUG_PRINT("INFO: Update backbuffer\n");
     SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH);
     SDL_RenderCopy(game->renderer, game->texture, NULL, NULL);
@@ -605,7 +679,6 @@ void renderDebugUI(game_state_t* game) {
 #endif // DEBUGUI 
 
 void destroy(game_state_t* game) {
-    free(game->camera.planes);
     free(game->canvas.frameBuffer);
     free(game->canvas.depthBuffer);
 
@@ -630,18 +703,6 @@ void destroy(game_state_t* game) {
 
 int main(int argc, char* argv[])
 {
-    DEBUG_PRINT("INFO: Initializing game objects\n");
-    // TODO: Store 2D objects in game state
-    int p0x = 541;
-    int p0y = 199;
-    float p0invz = 1.0f / 0.01f;
-    int p1x = 613;
-    int p1y = 279;
-    float p1invz = 1.0f / 0.01f;
-    int p2x = 453;
-    int p2y = 399;
-    float p2invz = 1.0f / 0.01f;
-    
     game_state_t* game = init();
 
     while (game->running) {
@@ -652,7 +713,7 @@ int main(int argc, char* argv[])
         #endif // DEBUGUI
 
         update(game);
-        render(p0x, p0y, p0invz, p1x, p1y, p1invz, p2x, p2y, p2invz, game);
+        render(game);
         
         #ifdef DEBUGUI
         renderDebugUI(game);

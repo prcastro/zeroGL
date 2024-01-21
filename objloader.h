@@ -209,7 +209,9 @@ static inline mesh_t* loadObjFile(const char* filename, bool flipTexturesVertica
             for (int i = 0; i < num_materials; i++) {
                 if (strcmp(material_name, materials[i].name) == 0) {
                     DEBUG_PRINT("DEBUG: Using material %s\n", materials[i].name);
-                    DEBUG_PRINT("DEBUG: Color %d %d %d\n", materials[i].diffuseColor.r, materials[i].diffuseColor.g, materials[i].diffuseColor.b);
+                    uint8_t r, g, b;
+                    colorFromUint32(materials[i].diffuseColor, &r, &g, &b);
+                    DEBUG_PRINT("DEBUG: Color %d %d %d\n", r, g, b);
                     currentMaterial = i;
                 }
             }
