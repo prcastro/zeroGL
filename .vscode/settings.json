@@ -3,7 +3,7 @@
         "sdl.h": "c",
         "nuklear_sdl_renderer.h": "c",
         "nuklear.h": "c",
-        "simplerenderer.h": "c",
+        "zerogl.h": "c",
         "upng.h": "c",
         "objloader.h": "c"
     }

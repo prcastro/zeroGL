@@ -1,11 +1,7 @@
 # zeroGL
-Software (CPU) graphics library capable of drawing 3D objects with programmable shaders
+A zero-dependencies, single-header graphics library
 
 <img src="assets/rasterizer.gif" width="500">
-
-## Getting started
-
-To run the demo, download the latest .zip file from the releases page, uncompress it and run
 
 ## Features
 
@@ -17,6 +13,10 @@ To run the demo, download the latest .zip file from the releases page, uncompres
 * Camera and backface culling
 * z-Buffering
 * Load OBJ/MTL files (in separate library)
+
+## Getting started
+
+To run the demo, download the latest .zip file from the releases page, uncompress it and run
 
 ## Building the project
 

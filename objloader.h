@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "simplerenderer.h"
+#include "zerogl.h"
 #include "external/upng/upng.h"
 
 static inline uint32_t* loadTexture(char* filename, int* textureWidth, int* textureHeight) {

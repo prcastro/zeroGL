@@ -1,4 +1,4 @@
-// #define SR_DEBUG
+// #define ZGL_DEBUG
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
 
@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "simplerenderer.h"
+#include "zerogl.h"
 #include "objloader.h"
 
 #define WIDTH 1066

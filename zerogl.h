@@ -1,5 +1,5 @@
-#ifndef SIMPLERENDERER_H
-#define SIMPLERENDERER_H
+#ifndef ZEROGL_H
+#define ZEROGL_H
 
 #include <assert.h>
 #include <math.h>
@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#ifdef SR_DEBUG
+#ifdef ZGL_DEBUG
 #define DEBUG_PRINT(...) printf(__VA_ARGS__)
 #else
 #define DEBUG_PRINT(...) do {} while (0)
@@ -1116,4 +1116,4 @@ static inline uint32_t phongFragmentShader(const shader_context_t* input, void* 
     return mulScalarColor(lighting, unshadedColor);
 }
 
-#endif // SIMPLERENDERER_H
+#endif // ZEROGL_H
