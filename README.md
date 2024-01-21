@@ -1,4 +1,4 @@
-# simple-rasterizer
+# zeroGL
 Software (CPU) 3D Rasterizer capable of drawing 3D objects with programmable shaders
 
 <img src="assets/rasterizer.gif" width="500">
