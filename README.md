@@ -1,5 +1,5 @@
 # simple-rasterizer
-Software (CPU) 3D Rasterizer capable of drawing 3D objects with lighting
+Software (CPU) 3D Rasterizer capable of drawing 3D objects with programmable shaders
 
 <img src="assets/rasterizer.gif" width="500">
 
@@ -9,15 +9,14 @@ To run the demo, download the latest .zip file from the releases page, uncompres
 
 ## Features
 
-* Simple C code
-* Load OBJ/MTL files
+* Single-header library written in C with no external dependencies
+* Programmable shaders
 * Perspective-correct texture support
 * Point/Ambient/Directional lighting
 * Materials with specular and diffuse properties
-* Camera controls
 * Camera and backface culling
-* z-Buffering 
-* GUI with controls for lighting, movement etc
+* z-Buffering
+* Load OBJ/MTL files (in separate library)
 
 ## Building the project
 
@@ -63,6 +62,6 @@ Open `main.c` on the editor and then click on `Run C/C++ File` on the top right 
 ## Current limitations
 
 * No alpha compositing
-* Diffuse colors on MTL files are used for as ambient colors as well
+* Diffuse colors on MTL files are used for as specular colors as well
 * No multi-threading/SIMD
 * Support only a subset of the OBJ specification
