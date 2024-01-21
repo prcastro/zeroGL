@@ -91,7 +91,7 @@ game_state_t* init() {
 
     DEBUG_PRINT("INFO: Loading meshes and objects\n");
     int numObjects = 1;
-    int numMeshes = 5;
+    int numMeshes = 6;
     mesh_t* meshes = (mesh_t*) malloc(numMeshes * sizeof(mesh_t));
     object3D_t *objects = (object3D_t*) malloc(numObjects * sizeof(object3D_t));
     if (meshes == NULL || objects == NULL) {
@@ -103,6 +103,7 @@ game_state_t* init() {
     meshes[1] = *loadObjFile("assets/snake/snake.obj", true);
     meshes[2] = *loadObjFile("assets/engineer/engineer.obj", false);
     meshes[3] = *loadObjFile("assets/cube.obj", false);
+    meshes[4] = *loadObjFile("assets/sphere.obj", false);
 
     // Define a debug mesh
     vec3_t* vertices = (vec3_t*) malloc(3 * sizeof(vec3_t));
@@ -118,7 +119,7 @@ game_state_t* init() {
     vertices[2] = (vec3_t) {0, 1, 0};
     triangles[0] = (triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
     materials[0] = (material_t) {"RedMaterial", COLOR_RED, COLOR_RED, 0.0f, 0, 0, NULL};
-    meshes[4] = (mesh_t) {
+    meshes[5] = (mesh_t) {
         .name = "Debug",
         .numVertices = 3,
         .numTriangles = 1,
@@ -132,6 +133,7 @@ game_state_t* init() {
     objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
     // objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
     // objects[0] = makeObject(&meshes[4], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = makeObject(&meshes[5], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -306,24 +308,6 @@ void updateDebugUI(game_state_t *game) {
             }
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Lights", NK_MINIMIZED)) {
-                nk_layout_row_dynamic(ctx, row_size, 1);
-
-                nk_layout_row_dynamic(ctx, row_size, 3);
-                nk_bool isBasic = game->shaderType == BASIC_SHADER;
-                if (nk_radio_label(ctx, "Basic", &isBasic)) {
-                    game->shaderType = BASIC_SHADER; 
-                };
-
-                nk_bool isGouraud = game->shaderType == GOURAUD_SHADER;
-                if (nk_radio_label(ctx, "Gouraud", &isGouraud)) {
-                    game->shaderType = GOURAUD_SHADER;
-                };
-
-                nk_bool isPhong = game->shaderType == PHONG_SHADER;
-                if (nk_radio_label(ctx, "Phong", &isPhong)) {
-                    game->shaderType = PHONG_SHADER;
-                };
-
                 nk_layout_row_dynamic(ctx, row_size, 2);
 
                 nk_bool isDiffuse = game->renderOptions & DIFFUSE_LIGHTING;
@@ -391,7 +375,7 @@ void updateDebugUI(game_state_t *game) {
                 nk_tree_pop(ctx);
             }
 
-            if (nk_tree_push(ctx, NK_TREE_NODE, "Camera", NK_MAXIMIZED)) {
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Camera", NK_MINIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_labelf(ctx, NK_TEXT_LEFT, "Camera: (%.1f, %.1f, %.1f)", game->camera.position.x, game->camera.position.y, game->camera.position.z);
                 nk_layout_row_dynamic(ctx, row_size, 1);
@@ -430,6 +414,22 @@ void updateDebugUI(game_state_t *game) {
             }
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Render Options", NK_MAXIMIZED)) {
+                nk_layout_row_dynamic(ctx, row_size, 3);
+                nk_bool isBasic = game->shaderType == BASIC_SHADER;
+                if (nk_radio_label(ctx, "Basic", &isBasic)) {
+                    game->shaderType = BASIC_SHADER; 
+                };
+
+                nk_bool isGouraud = game->shaderType == GOURAUD_SHADER;
+                if (nk_radio_label(ctx, "Gouraud", &isGouraud)) {
+                    game->shaderType = GOURAUD_SHADER;
+                };
+
+                nk_bool isPhong = game->shaderType == PHONG_SHADER;
+                if (nk_radio_label(ctx, "Phong", &isPhong)) {
+                    game->shaderType = PHONG_SHADER;
+                };
+
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_bool isBackfaceCulling = game->renderOptions & BACKFACE_CULLING;
                 nk_checkbox_label(ctx, "Backface culling", &isBackfaceCulling);
@@ -600,21 +600,30 @@ void update(game_state_t* game) {
 
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
-        if (game->shaderType == GOURAUD_SHADER) {
+        object3D_t object = game->objects[i];
+        if (game->shaderType == BASIC_SHADER) {
+            basic_uniform_t uniformData = {
+                .modelviewprojection = mulMM4(game->camera.viewProjMatrix, object.transform),
+            };
+            drawObject(&object, &uniformData, game->camera, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
+        } else if (game->shaderType == GOURAUD_SHADER) {
             gourard_uniform_t uniformData = {
-                .modelMatrix = game->objects[i].transform,
+                .modelMatrix = object.transform,
+                .modelInvRotationMatrixTransposed = transposeM4(inverseM4(object.rotation)),
                 .viewProjectionMatrix = game->camera.viewProjMatrix,
                 .lightSources = game->lightSources,
                 .bilinearFiltering = game->bilinearFiltering
             };
-            drawObject(&game->objects[i], &uniformData, game->camera, game->canvas, gourardVertexShader, gourardFragmentShader, game->renderOptions);
-        } else if (game->shaderType == BASIC_SHADER) {
-            basic_uniform_t uniformData = {
-                .modelviewprojection = mulMM4(game->camera.viewProjMatrix, game->objects[i].transform),
-            };
-            drawObject(&game->objects[i], &uniformData, game->camera, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
+            drawObject(&object, &uniformData, game->camera, game->canvas, gourardVertexShader, gourardFragmentShader, game->renderOptions);
         } else if (game->shaderType == PHONG_SHADER) {
-            printf("ERROR: Phong shader not implemented\n");
+            phong_uniform_t uniformData = {
+                .modelMatrix = object.transform,
+                .modelInvRotationMatrixTransposed = transposeM4(inverseM4(object.rotation)),
+                .viewProjectionMatrix = game->camera.viewProjMatrix,
+                .lightSources = game->lightSources,
+                .bilinearFiltering = game->bilinearFiltering
+            };
+            drawObject(&object, &uniformData, game->camera, game->canvas, phongVertexShader, phongFragmentShader, game->renderOptions);
         }
     }
 }

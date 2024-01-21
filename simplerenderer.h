@@ -129,6 +129,162 @@ static inline mat4x4_t mulMM4(mat4x4_t m1, mat4x4_t m2) {
     return result;
 }
 
+static inline mat4x4_t transposeM4(mat4x4_t m) {
+    mat4x4_t result = {0};
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            result.data[i][j] = m.data[j][i];
+        }
+    }
+    return result;
+}
+
+static inline float determinant(float a, float b, float c, float d, float e, float f, float g, float h, float i) {
+    return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+}
+
+static inline mat4x4_t inverseM4(mat4x4_t matrix) {
+    float m[16];
+    for (int i = 0; i < 16; i++) {
+        m[i] = matrix.data[i/4][i%4];
+    }
+
+    float invOut[16];
+    float inv[16], det;
+
+    inv[0] = m[5]  * m[10] * m[15] - 
+             m[5]  * m[11] * m[14] - 
+             m[9]  * m[6]  * m[15] + 
+             m[9]  * m[7]  * m[14] +
+             m[13] * m[6]  * m[11] - 
+             m[13] * m[7]  * m[10];
+
+    inv[4] = -m[4]  * m[10] * m[15] + 
+              m[4]  * m[11] * m[14] + 
+              m[8]  * m[6]  * m[15] - 
+              m[8]  * m[7]  * m[14] - 
+              m[12] * m[6]  * m[11] + 
+              m[12] * m[7]  * m[10];
+
+    inv[8] = m[4]  * m[9] * m[15] - 
+             m[4]  * m[11] * m[13] - 
+             m[8]  * m[5] * m[15] + 
+             m[8]  * m[7] * m[13] + 
+             m[12] * m[5] * m[11] - 
+             m[12] * m[7] * m[9];
+
+    inv[12] = -m[4]  * m[9] * m[14] + 
+               m[4]  * m[10] * m[13] +
+               m[8]  * m[5] * m[14] - 
+               m[8]  * m[6] * m[13] - 
+               m[12] * m[5] * m[10] + 
+               m[12] * m[6] * m[9];
+
+    inv[1] = -m[1]  * m[10] * m[15] + 
+              m[1]  * m[11] * m[14] + 
+              m[9]  * m[2] * m[15] - 
+              m[9]  * m[3] * m[14] - 
+              m[13] * m[2] * m[11] + 
+              m[13] * m[3] * m[10];
+
+    inv[5] = m[0]  * m[10] * m[15] - 
+             m[0]  * m[11] * m[14] - 
+             m[8]  * m[2] * m[15] + 
+             m[8]  * m[3] * m[14] + 
+             m[12] * m[2] * m[11] - 
+             m[12] * m[3] * m[10];
+
+    inv[9] = -m[0]  * m[9] * m[15] + 
+              m[0]  * m[11] * m[13] + 
+              m[8]  * m[1] * m[15] - 
+              m[8]  * m[3] * m[13] - 
+              m[12] * m[1] * m[11] + 
+              m[12] * m[3] * m[9];
+
+    inv[13] = m[0]  * m[9] * m[14] - 
+              m[0]  * m[10] * m[13] - 
+              m[8]  * m[1] * m[14] + 
+              m[8]  * m[2] * m[13] + 
+              m[12] * m[1] * m[10] - 
+              m[12] * m[2] * m[9];
+
+    inv[2] = m[1]  * m[6] * m[15] - 
+             m[1]  * m[7] * m[14] - 
+             m[5]  * m[2] * m[15] + 
+             m[5]  * m[3] * m[14] + 
+             m[13] * m[2] * m[7] - 
+             m[13] * m[3] * m[6];
+
+    inv[6] = -m[0]  * m[6] * m[15] + 
+              m[0]  * m[7] * m[14] + 
+              m[4]  * m[2] * m[15] - 
+              m[4]  * m[3] * m[14] - 
+              m[12] * m[2] * m[7] + 
+              m[12] * m[3] * m[6];
+
+    inv[10] = m[0]  * m[5] * m[15] - 
+              m[0]  * m[7] * m[13] - 
+              m[4]  * m[1] * m[15] + 
+              m[4]  * m[3] * m[13] + 
+              m[12] * m[1] * m[7] - 
+              m[12] * m[3] * m[5];
+
+    inv[14] = -m[0]  * m[5] * m[14] + 
+               m[0]  * m[6] * m[13] + 
+               m[4]  * m[1] * m[14] - 
+               m[4]  * m[2] * m[13] - 
+               m[12] * m[1] * m[6] + 
+               m[12] * m[2] * m[5];
+
+    inv[3] = -m[1] * m[6] * m[11] + 
+              m[1] * m[7] * m[10] + 
+              m[5] * m[2] * m[11] - 
+              m[5] * m[3] * m[10] - 
+              m[9] * m[2] * m[7] + 
+              m[9] * m[3] * m[6];
+
+    inv[7] = m[0] * m[6] * m[11] - 
+             m[0] * m[7] * m[10] - 
+             m[4] * m[2] * m[11] + 
+             m[4] * m[3] * m[10] + 
+             m[8] * m[2] * m[7] - 
+             m[8] * m[3] * m[6];
+
+    inv[11] = -m[0] * m[5] * m[11] + 
+               m[0] * m[7] * m[9] + 
+               m[4] * m[1] * m[11] - 
+               m[4] * m[3] * m[9] - 
+               m[8] * m[1] * m[7] + 
+               m[8] * m[3] * m[5];
+
+    inv[15] = m[0] * m[5] * m[10] - 
+              m[0] * m[6] * m[9] - 
+              m[4] * m[1] * m[10] + 
+              m[4] * m[2] * m[9] + 
+              m[8] * m[1] * m[6] - 
+              m[8] * m[2] * m[5];
+
+    det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+
+    if (det == 0)
+        return IDENTITY_M4x4;
+
+    det = 1.0 / det;
+
+    for (int i = 0; i < 16; i++)
+        invOut[i] = inv[i] * det;
+    
+    mat4x4_t invMatrix;
+    for (int i = 0; i < 4; i++) {
+        invMatrix.data[i][0] = invOut[i*4];
+        invMatrix.data[i][1] = invOut[i*4+1];
+        invMatrix.data[i][2] = invOut[i*4+2];
+        invMatrix.data[i][3] = invOut[i*4+3];
+    }
+
+    return invMatrix;
+}
+
 static inline mat4x4_t translationToMatrix(vec3_t vector) {
     return (mat4x4_t) {{
         {1, 0, 0, vector.x},
@@ -629,11 +785,25 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
         }
         
         // Get material data
-        material_t material = mesh->materials[triangle.materialIndex];
-        float diffR, diffG, diffB;
-        colorToFloats(material.diffuseColor, &diffR, &diffG, &diffB);
-        float specR, specG, specB;
-        colorToFloats(material.specularColor, &specR, &specG, &specB);
+        float diffR = 1.0f;
+        float diffG = 1.0f;
+        float diffB = 1.0f;
+        float specR = 1.0f;
+        float specG = 1.0f;
+        float specB = 1.0f;
+        float specularExponent = 1.0f;
+        int textureWidth, textureHeight = 0;
+        uint32_t* texture = NULL;
+        if (mesh->numMaterials != 0) {
+            material_t material = mesh->materials[triangle.materialIndex];
+            colorToFloats(material.diffuseColor, &diffR, &diffG, &diffB);
+            colorToFloats(material.specularColor, &specR, &specG, &specB);
+            specularExponent = material.specularExponent;
+            textureWidth = material.textureWidth;
+            textureHeight = material.textureHeight;
+            texture = material.texture;
+        }
+        
 
         for (int v = 0; v < 3; v++) {
             vertex_input_t inputVertex = {
@@ -642,7 +812,7 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
                 .textureCoord = textureCoords[v],
                 .diffuseColor = {diffR, diffG, diffB},
                 .specularColor = {specR, specG, specB},
-                .specularExponent = material.specularExponent
+                .specularExponent = specularExponent
             };
 
             // Vertex shader (local space -> clip space and compute attributes)
@@ -753,7 +923,7 @@ void drawObject(object3D_t* object, void *uniformData, camera_t camera, canvas_t
                             }
                         }
 
-                        uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, material.textureWidth, material.textureHeight, material.texture);
+                        uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, textureWidth, textureHeight, texture);
                         drawPixel(x, y, z, color, canvas); // TODO: Avoid scissor test in drawPixel
                     }
                 }
@@ -797,10 +967,11 @@ static inline uint32_t basicFragmentShader(const shader_context_t* input, void* 
 /* Gouraud shading */
 // Compute the lighting at each vertex
 typedef struct {
-  mat4x4_t modelMatrix;
-  mat4x4_t viewProjectionMatrix;
-  light_sources_t lightSources;
-  int bilinearFiltering;
+    mat4x4_t modelMatrix;
+    mat4x4_t modelInvRotationMatrixTransposed;
+    mat4x4_t viewProjectionMatrix;
+    light_sources_t lightSources;
+    int bilinearFiltering;
 } gourard_uniform_t;
 
 static inline shader_context_t gourardVertexShader(void* inputVertex, void* uniformData) {
@@ -813,11 +984,12 @@ static inline shader_context_t gourardVertexShader(void* inputVertex, void* unif
     
     // Set other vertex attributes
     result.numAttributes = 13;
-    vec3_t worldSpaceNormal = mulMV3(defaultUniformData->modelMatrix, inputVertexData->normal); // Local to world space
+
+    vec3_t worldSpaceNormal = mulMV3(defaultUniformData->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
     float invMagNormal = 1.0f / magnitude(worldSpaceNormal);
     result.attributes[0] = worldSpaceNormal.x;
     result.attributes[1] = worldSpaceNormal.y;
-    result.attributes[2] = worldSpaceNormal.z; 
+    result.attributes[2] = worldSpaceNormal.z;
     result.attributes[3] = inputVertexData->textureCoord.x;   // u
     result.attributes[4] = inputVertexData->textureCoord.y;   // v
     result.attributes[5] = inputVertexData->diffuseColor.x;   // R
@@ -831,34 +1003,117 @@ static inline shader_context_t gourardVertexShader(void* inputVertex, void* unif
     return result;
 }
 
-// TODO: Deal with fragments without textures
 static inline uint32_t gourardFragmentShader(const shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
     gourard_uniform_t* uniform = (gourard_uniform_t*) uniformData;
-    float u = input->attributes[3];
-    float v = input->attributes[4];
-    
-    float tex_u = MIN(fabs(u * textureWidth), textureWidth - 1);
-    float tex_v = MIN(fabs(v * textureHeight), textureHeight - 1);
-    int floor_u = floor(tex_u);
-    int floor_v = floor(tex_v);
+
     uint32_t unshadedColor;
-    if (uniform->bilinearFiltering) {
-        // Bilinear filtering
-        float ratio_u = tex_u - floor_u;
-        float ratio_v = tex_v - floor_v;
-        int next_u = MIN(floor_u + 1, textureWidth - 1);
-        int next_v = MIN(floor_v + 1, textureHeight - 1);
-        uint32_t color00 = texture[floor_v * textureWidth + floor_u];
-        uint32_t color10 = texture[floor_v * textureWidth + next_u];
-        uint32_t color01 = texture[next_v * textureWidth + floor_u];
-        uint32_t color11 = texture[next_v * textureWidth + next_u];
-        uint32_t color0 = sumColors(mulScalarColor(1.0f - ratio_u, color00), mulScalarColor(ratio_u, color10));
-        uint32_t color1 = sumColors(mulScalarColor(1.0f - ratio_u, color01), mulScalarColor(ratio_u, color11));
-        unshadedColor = sumColors(mulScalarColor(1.0f - ratio_v, color0), mulScalarColor(ratio_v, color1));
+    if (textureHeight == 0 || textureWidth == 0) {
+        unshadedColor = colorFromFloats(input->attributes[5], input->attributes[6], input->attributes[7]);
     } else {
-        unshadedColor = texture[floor_v * textureWidth + floor_u];
+        float u = input->attributes[3];
+        float v = input->attributes[4];
+        float tex_u = MIN(fabs(u * textureWidth), textureWidth - 1);
+        float tex_v = MIN(fabs(v * textureHeight), textureHeight - 1);
+        int floor_u = floor(tex_u);
+        int floor_v = floor(tex_v);
+        
+        if (uniform->bilinearFiltering) {
+            // Bilinear filtering
+            float ratio_u = tex_u - floor_u;
+            float ratio_v = tex_v - floor_v;
+            int next_u = MIN(floor_u + 1, textureWidth - 1);
+            int next_v = MIN(floor_v + 1, textureHeight - 1);
+            uint32_t color00 = texture[floor_v * textureWidth + floor_u];
+            uint32_t color10 = texture[floor_v * textureWidth + next_u];
+            uint32_t color01 = texture[next_v * textureWidth + floor_u];
+            uint32_t color11 = texture[next_v * textureWidth + next_u];
+            uint32_t color0 = sumColors(mulScalarColor(1.0f - ratio_u, color00), mulScalarColor(ratio_u, color10));
+            uint32_t color1 = sumColors(mulScalarColor(1.0f - ratio_u, color01), mulScalarColor(ratio_u, color11));
+            unshadedColor = sumColors(mulScalarColor(1.0f - ratio_v, color0), mulScalarColor(ratio_v, color1));
+        } else {
+            unshadedColor = texture[floor_v * textureWidth + floor_u];
+        }
     }
     return mulScalarColor(input->attributes[12], unshadedColor);
+}
+
+
+/* Phong shading */
+// Compute the lighting at each fragment
+typedef struct {
+    mat4x4_t modelMatrix;
+    mat4x4_t modelInvRotationMatrixTransposed;
+    mat4x4_t viewProjectionMatrix;
+    light_sources_t lightSources;
+    int bilinearFiltering;
+} phong_uniform_t;
+
+static inline shader_context_t phongVertexShader(void* inputVertex, void* uniformData) {
+    vertex_input_t* inputVertexData = (vertex_input_t*) inputVertex;
+    shader_context_t result = {0};
+    phong_uniform_t* uniform = (phong_uniform_t*) uniformData;
+    vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
+    vec4_t worldSpaceVertex = mulMV4(uniform->modelMatrix, inputVertex4); // Local to world space
+    result.position = mulMV4(uniform->viewProjectionMatrix, worldSpaceVertex); // World to clip space
+    
+    // Set other vertex attributes
+    result.numAttributes = 15;
+    vec3_t worldSpaceNormal = mulMV3(uniform->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
+    result.attributes[0] = worldSpaceNormal.x;
+    result.attributes[1] = worldSpaceNormal.y;
+    result.attributes[2] = worldSpaceNormal.z;
+    result.attributes[3] = worldSpaceVertex.x;
+    result.attributes[4] = worldSpaceVertex.y;
+    result.attributes[5] = worldSpaceVertex.z;
+    result.attributes[6] = inputVertexData->textureCoord.x;   // u
+    result.attributes[7] = inputVertexData->textureCoord.y;   // v
+    result.attributes[8] = inputVertexData->diffuseColor.x;   // R
+    result.attributes[9] = inputVertexData->diffuseColor.y;   // G
+    result.attributes[10] = inputVertexData->diffuseColor.z;   // B
+    result.attributes[11] = inputVertexData->specularColor.x;  // R
+    result.attributes[12] = inputVertexData->specularColor.y;  // G
+    result.attributes[13] = inputVertexData->specularColor.z; // B
+    result.attributes[14] = inputVertexData->specularExponent;
+    return result;
+}
+
+static inline uint32_t phongFragmentShader(const shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+    phong_uniform_t* uniform = (phong_uniform_t*) uniformData;
+
+    vec3_t normal = {input->attributes[0], input->attributes[1], input->attributes[2]};
+    vec3_t position = {input->attributes[3], input->attributes[4], input->attributes[5]};
+    float specularExponent = input->attributes[14];
+    float invMagNormal = 1.0f / magnitude(normal);
+    float lighting = computeLighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, DIFFUSE_LIGHTING | SPECULAR_LIGHTING);
+    
+    uint32_t unshadedColor;
+    if (textureHeight == 0 || textureWidth == 0) {
+        unshadedColor = colorFromFloats(input->attributes[8], input->attributes[9], input->attributes[10]);
+    } else {
+        float u = input->attributes[6];
+        float v = input->attributes[7];
+        float tex_u = MIN(fabs(u * textureWidth), textureWidth - 1);
+        float tex_v = MIN(fabs(v * textureHeight), textureHeight - 1);
+        int floor_u = floor(tex_u);
+        int floor_v = floor(tex_v);
+        
+        if (uniform->bilinearFiltering) {
+            float ratio_u = tex_u - floor_u;
+            float ratio_v = tex_v - floor_v;
+            int next_u = MIN(floor_u + 1, textureWidth - 1);
+            int next_v = MIN(floor_v + 1, textureHeight - 1);
+            uint32_t color00 = texture[floor_v * textureWidth + floor_u];
+            uint32_t color10 = texture[floor_v * textureWidth + next_u];
+            uint32_t color01 = texture[next_v * textureWidth + floor_u];
+            uint32_t color11 = texture[next_v * textureWidth + next_u];
+            uint32_t color0 = sumColors(mulScalarColor(1.0f - ratio_u, color00), mulScalarColor(ratio_u, color10));
+            uint32_t color1 = sumColors(mulScalarColor(1.0f - ratio_u, color01), mulScalarColor(ratio_u, color11));
+            unshadedColor = sumColors(mulScalarColor(1.0f - ratio_v, color0), mulScalarColor(ratio_v, color1));
+        } else {
+            unshadedColor = texture[floor_v * textureWidth + floor_u];
+        }
+    }
+    return mulScalarColor(lighting, unshadedColor);
 }
 
 #endif // SIMPLERENDERER_H
