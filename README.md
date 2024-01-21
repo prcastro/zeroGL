@@ -1,5 +1,5 @@
 # zeroGL
-A zero-dependencies, single-header graphics library
+A zero-dependencies, single-header 3D graphics library
 
 <img src="assets/rasterizer.gif" width="500">
 
