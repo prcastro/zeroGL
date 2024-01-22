@@ -6,6 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>zeroGL</title>
     <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+    <style>
+:root {
+    --width-card-wide: 1000px;
+}
+    </style>
 </head>
 <body>
   <header>
@@ -53,7 +58,7 @@
       <pre><code>
 #include "zerogl.h"
 
-// Use the STB image library to write the result image to a file
+// Use the stb_image library (not included on zeroGL) to write the result image to a file
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -108,6 +113,39 @@ vec3_t v = {1.0f, 2.0f, 3.0f};
           <h3>Colors</h3>
           <p>Colors are represented as a <code>uint32_t</code> in the form of <code>0xAARRGGBB</code>, where <code>AA</code> is the alpha channel, <code>RR</code> is the red channel, <code>GG</code> is the green channel and <code>BB</code> is the blue channel.</p>
         </div>
+        <div id="objects">
+          <h3>3D Objects</h3>
+          <p>You can define 3D objects using <code>mesh_t</code> and <code>object3D_t</code> type</p>
+        </div>
+        <div id="camera">
+          <h3>Camera</h3>
+          <p>You can define a camera using <code>camera_t</code> type</p>
+        </div>
+        <div id="drawing">
+          <h3>Drawing</h3>
+          <p>To draw, you need to create a <code>canvas_t</code> type and pass it to the drawing functions</p>
+          <pre><code>
+canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
+          </code></pre>
+          <p>You can draw primitives such as lines, triangles and 3D objects using the following functions</p>
+          <pre><code>
+drawPixel(int x, int y, uint32_t color, canvas_t canvas)
+fillCanvas(uint32_t color, canvas_t canvas)
+drawLine(int x0, int x1, int y0, int y1, uint32_t color, canvas_t canvas)
+drawTriangleWireframe(int x0, int x1, int x2, int y0, int y1, int y2, uint32_t color, canvas_t canvas)
+drawObject(object3D_t* obj, void *uniform, camera_t cam, canvas_t c,
+           vertexShader_t vs, fragmentShader_t fs, uint16_t renderOpt)
+          </code></pre>
+        </div>
+        <div id="shaders">
+          <h3>Shaders</h3>
+          <p>You can customize <code>drawObject</code> behavior by passing custom shaders. Shaders are written in pure C code. You can define vertex and fragment shaders following the type:</p>
+          <pre><code>
+shader_context_t vertexShader_t(void* inputVertex, void* uniformData);
+uint32_t fragmentShader_t(shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
+          </code></pre>
+          <p><strong>Vertex shaders</strong> receive a pointer to the vertex data and a pointer to the uniform data. They must return a <code>shader_context_t</code> type, which is a struct containing the transformed vertex data.</p>
+          <p><strong>Fragment shaders</strong> receive a pointer to the shader context (containing the interpolated data from the vertexes of each triangle), a pointer to the uniform data, the texture width and height and a pointer to the texture data. They must return a <code>uint32_t</code> type, which is the color of the pixel.</p>
       </article>
     </section>
   </main>
