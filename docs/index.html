@@ -81,18 +81,33 @@
       <header><nav>
         API Documentation (WIP)
         <ul>
-          <li><a href="#">Settings</a></li>
-          <li><a href="#">Vectors</a></li>
+          <li><a href="#settings">Settings</a></li>
+          <li><a href="#vectors">Vectors</a></li>
           <li><a href="#colors">Colors</a></li>
-          <li><a href="#">3D Objects</a></li>
-          <li><a href="#">Camera</a></li>
-          <li><a href="#">Drawing</a></li>
-          <li><a href="#">Shaders</a></li>
+          <li><a href="#objects">3D Objects</a></li>
+          <li><a href="#camera">Camera</a></li>
+          <li><a href="#drawing">Drawing</a></li>
+          <li><a href="#shaders">Shaders</a></li>
         </ul>
       </nav></header>
-      <article id="colors">
-        <h3>Colors</h3>
-        <p>Colors are represented as a <code>uint32_t</code> in the form of <code>0xAARRGGBB</code>, where <code>AA</code> is the alpha channel, <code>RR</code> is the red channel, <code>GG</code> is the green channel and <code>BB</code> is the blue channel.</p>
+      <article>
+        <div id="settings">
+          <h3>Settings</h3>
+          <p>You can <code>#define ZGL_DEBUG</code> to enable debug logs on the console. Also, you can define the following variables to customize the program behavior</p>
+          <pre><code>
+            #define MAX_VERTEX_ATTRIBUTES 100
+          </code></pre>
+        </div>
+        <div id="vectors">
+          <h3>Vectors</h3>
+          <p>Vectors are represented by two types. The first is <code>vec3_t</code>, having an x, y and z attributes of type <code>float</code></p>
+          <pre><code>
+            vec3_t v = {1.0f, 2.0f, 3.0f};
+          </code></pre>
+        <div id="colors">
+          <h3>Colors</h3>
+          <p>Colors are represented as a <code>uint32_t</code> in the form of <code>0xAARRGGBB</code>, where <code>AA</code> is the alpha channel, <code>RR</code> is the red channel, <code>GG</code> is the green channel and <code>BB</code> is the blue channel.</p>
+        </div>
       </article>
     </section>
   </main>
