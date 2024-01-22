@@ -694,6 +694,12 @@ static inline int edgeCross(int ax, int ay, int bx, int by, int px, int py) {
   return abx * apy - aby * apx;
 }
 
+static inline void fillCanvas(uint32_t color, canvas_t canvas) {
+    for (int i = 0; i < canvas.width * canvas.height; i++) {
+        canvas.frameBuffer[i] = color;
+    }
+}
+
 static inline void drawPixel(int i, int j, float z, uint32_t color, canvas_t canvas) {
     if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
         int position = j * canvas.width + i;

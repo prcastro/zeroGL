@@ -648,9 +648,7 @@ void render(game_state_t* game) {
     }
 
     DEBUG_PRINT("INFO: Drawing background\n");
-    for (int i = 0; i < canvas.width * canvas.height; i++) {
-        game->canvas.frameBuffer[i] = game->backgroundColor;
-    }
+    fillCanvas(game->backgroundColor, canvas);
 
     // Draw 3D Objects
     if (game->draw3DObjects) {

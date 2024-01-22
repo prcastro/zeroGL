@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="zeroGL: A zero-dependencies, single-header 3D graphics library">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>zeroGL</title>
+    <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <div>zero<font color="#8ACDD7">G</font><font color="#FF90BC">L</font></div>
+      <ul>
+        <li><a href="#">GitHub</a></li>
+        <li><a href="#docs">Docs</a></li>
+      </ul>
+    </nav>
+    <h1>zero<font color="#8ACDD7">G</font><font color="#FF90BC">L</font></h1>
+    <p>A zero-dependencies, single-header 3D graphics library</p>
+    </br></br>
+    <a><i>Demo</i></a>
+    <a><b>Download</b></a>
+    <p>
+      <sup>PRO TIP</sup>
+      Download and add this to you C file:
+      <br>
+      <code>#include "zerogl.h"</code>
+    </p>
+  </header>
+  <main>
+    <hr>
+    <section>
+      <header>
+          <h2>Features</h2>
+      </header>
+      <aside>
+          <h3>Programmable shaders</h3>
+          <p>Unleash your creativity by manipulating geometric data with vertex shaders or create stunning visual effects with fragment shaders.</p>
+      </aside>
+      <aside>
+          <h3>Minimalistic</h3>
+          <p>Import a single header file and you're ready to go. No dependencies, no hassle. Written in portable C code.</p>
+      </aside>
+      <aside>
+          <h3>Powerful</h3>
+          <p>Support for z-Buffering, textures, lighting and materials with specular and diffuse properties</p>
+      </aside>
+    </section>
+    <hr>
+    <section>
+      <header><h2>Getting Started</h2></header>
+      <pre><code>
+        #include "zerogl.h"
+        
+        // Use the STB image library to write the result image to a file
+        #define STB_IMAGE_WRITE_IMPLEMENTATION
+        #include "stb_image_write.h"
+        
+        #define WIDTH 900
+        #define HEIGHT 600
+        uint32_t pixels[WIDTH*HEIGHT];
+        
+        int main(void) {
+            canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
+
+            fillCanvas(uint32_t color, canvas_t canvas)
+            drawLine(0, 0, WIDTH, HEIGHT, COLOR_RED, &canvas);
+        
+            const char *file_path = "image.png";
+            if (!stbi_write_png(file_path, WIDTH, HEIGHT, 4, pixels, sizeof(uint32_t)*WIDTH)) {
+                fprintf(stderr, "ERROR: could not write %s\n", file_path);
+                return 1;
+            }
+            return 0;
+        }
+      </code></pre>
+    </section>
+    <hr>
+    <section id="docs">
+      <header><nav>
+        API Documentation
+        <ul>
+          <li><a href="#">Settings</a></li>
+          <li><a href="#">Vectors</a></li>
+          <li><a href="#colors">Colors</a></li>
+          <li><a href="#">3D Objects</a></li>
+          <li><a href="#">Camera</a></li>
+          <li><a href="#">Drawing</a></li>
+          <li><a href="#">Shaders</a></li>
+        </ul>
+      </nav></header>
+      <article id="colors">
+        <h3>Colors</h3>
+        <p>Colors are represented as a <code>uint32_t</code> in the form of <code>0xAARRGGBB</code>, where <code>AA</code> is the alpha channel, <code>RR</code> is the red channel, <code>GG</code> is the green channel and <code>BB</code> is the blue channel.</p>
+      </article>
+    </section>
+  </main>
+
+</body>
+</html>
