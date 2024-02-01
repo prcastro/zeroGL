@@ -723,14 +723,6 @@ static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t colo
     }
 }
 
-static inline void zgl_render_triangle(int x0, int x1, int x2,
-                                       int y0, int y1, int y2,
-                                       uint32_t color, zgl_canvas_t canvas) {
-    zgl_render_line(x0, x1, y0, y1, color, canvas);
-    zgl_render_line(x1, x2, y1, y2, color, canvas);
-    zgl_render_line(x2, x0, y2, y0, color, canvas);
-}
-
 static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_canvas_t canvas) {
     int x1 = x - r;
     int x2 = x + r;
@@ -765,6 +757,108 @@ typedef struct {
 typedef zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* uniformData);
 // TODO: Should we pass the texture as a parameter as we're doing now? What happens when we have multiple textures?
 typedef uint32_t zgl_fragment_shader_t(zgl_shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
+
+
+static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
+                                           int y0, int y1, int y2,
+                                           float z0, float z1, float z2,
+                                           float invw0, float invw1, float invw2,
+                                           int area, int textureWidth, int textureHeight, uint32_t* texture,
+                                           zgl_shader_context_t vertexShaderOutput[3],
+                                           zgl_fragment_shader_t fragmentShader, void* uniformData,
+                                           zgl_canvas_t canvas, uint16_t renderOptions) {
+    int x_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(x0, x1), x2), 0);
+    int x_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(x0, x1), x2), canvas.width - 1);
+    int y_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(y0, y1), y2), 0);
+    int y_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(y0, y1), y2), canvas.height - 1);
+
+    int delta_w0_col = (y1 - y2);
+    int delta_w1_col = (y2 - y0);
+    int delta_w2_col = (y0 - y1);
+    int delta_w0_row = (x2 - x1);
+    int delta_w1_row = (x0 - x2);
+    int delta_w2_row = (x1 - x0);
+
+    int w0_row = zgl__edge_cross(x1, y1, x2, y2, x_min, y_min);
+    int w1_row = zgl__edge_cross(x2, y2, x0, y0, x_min, y_min);
+    int w2_row = zgl__edge_cross(x0, y0, x1, y1, x_min, y_min);
+
+    float invArea = 1.0f / area;
+
+    for (int y = y_min; y <= y_max; y++) {
+        int was_inside = 0;
+        int w0 = w0_row;
+        int w1 = w1_row;
+        int w2 = w2_row;
+        for (int x = x_min; x <= x_max; x++) {
+            // Perspective correct baricentric coordinates
+            // TODO: Maybe I can avoid dividing by sum here?
+            float alpha = w0 * invArea * invw0;
+            float beta  = w1 * invArea * invw1;
+            float gamma = w2 * invArea * invw2;
+            float sum = alpha + beta + gamma;
+            alpha /= sum;
+            beta  /= sum;
+            gamma /= sum;
+
+            // Check if the fragment is inside the triangle
+            int is_inside = alpha >= 0 && beta >= 0 && gamma >= 0;
+            if (is_inside) {
+                was_inside = 1;
+
+                // Interpolate z
+                float z = alpha * z0 + beta * z1 + gamma * z2;
+
+                // Depth test
+                if (z < canvas.depthBuffer[y * canvas.width + x]) {
+                    // Compute fragment input attributes from the outputs of the vertex shader
+                    zgl_shader_context_t fragmentShaderInput = {0};
+                    if (renderOptions & ZGL_FLAT_SHADING) {
+                        fragmentShaderInput.position = vertexShaderOutput[0].position;
+                        fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
+                        for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
+                            fragmentShaderInput.attributes[i] = vertexShaderOutput[0].attributes[i];
+                        }
+                    } else {
+                        // Interpolate clip position
+                        fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
+                                                            beta  * vertexShaderOutput[1].position.x +
+                                                            gamma * vertexShaderOutput[2].position.x;
+                        fragmentShaderInput.position.y = alpha * vertexShaderOutput[0].position.y +
+                                                            beta  * vertexShaderOutput[1].position.y +
+                                                            gamma * vertexShaderOutput[2].position.y;
+                        fragmentShaderInput.position.z = alpha * vertexShaderOutput[0].position.z +
+                                                            beta  * vertexShaderOutput[1].position.z +
+                                                            gamma * vertexShaderOutput[2].position.z;                        
+                        fragmentShaderInput.position.w = 1.0f; // w is always one, because we already did the perspective divide
+
+                        // Interpolate other attributes
+                        fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
+                        for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
+                            fragmentShaderInput.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
+                                                                beta  * vertexShaderOutput[1].attributes[i] +
+                                                                gamma * vertexShaderOutput[2].attributes[i];
+                        }
+                    }
+
+                    uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, textureWidth, textureHeight, texture);
+                    zgl_render_pixel(x, y, z, color, canvas); // TODO: Avoid scissor test in zgl_render_pixel
+                }
+            }
+
+            if (!is_inside && was_inside) {
+                break;
+            }
+
+            w0 += delta_w0_col;
+            w1 += delta_w1_col;
+            w2 += delta_w2_col;
+        }
+        w0_row += delta_w0_row;
+        w1_row += delta_w1_row;
+        w2_row += delta_w2_row;
+    }
+}
 
 // TODO: Pass texture as a canvas_t
 static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_canvas_t canvas,
@@ -872,97 +966,12 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
         }
 
         // Rasterization
-        int x_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(xs[0], xs[1]), xs[2]), 0);
-        int x_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(xs[0], xs[1]), xs[2]), canvas.width - 1);
-        int y_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(ys[0], ys[1]), ys[2]), 0);
-        int y_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(ys[0], ys[1]), ys[2]), canvas.height - 1);
-
-        int delta_w0_col = (ys[1] - ys[2]);
-        int delta_w1_col = (ys[2] - ys[0]);
-        int delta_w2_col = (ys[0] - ys[1]);
-        int delta_w0_row = (xs[2] - xs[1]);
-        int delta_w1_row = (xs[0] - xs[2]);
-        int delta_w2_row = (xs[1] - xs[0]);
-
-        int w0_row = zgl__edge_cross(xs[1], ys[1], xs[2], ys[2], x_min, y_min);
-        int w1_row = zgl__edge_cross(xs[2], ys[2], xs[0], ys[0], x_min, y_min);
-        int w2_row = zgl__edge_cross(xs[0], ys[0], xs[1], ys[1], x_min, y_min);
-
-        float invArea = 1.0f / area;
-
-        for (int y = y_min; y <= y_max; y++) {
-            int was_inside = 0;
-            int w0 = w0_row;
-            int w1 = w1_row;
-            int w2 = w2_row;
-            for (int x = x_min; x <= x_max; x++) {
-                // Perspective correct baricentric coordinates
-                // TODO: Maybe I can avoid dividing by sum here?
-                float alpha = w0 * invArea * invws[0];
-                float beta  = w1 * invArea * invws[1];
-                float gamma = w2 * invArea * invws[2];
-                float sum = alpha + beta + gamma;
-                alpha /= sum;
-                beta  /= sum;
-                gamma /= sum;
-
-                // Check if the fragment is inside the triangle
-                int is_inside = alpha >= 0 && beta >= 0 && gamma >= 0;
-                if (is_inside) {
-                    was_inside = 1;
-
-                    // Interpolate z
-                    float z = alpha * zs[0] + beta * zs[1] + gamma * zs[2];
-
-                    // Depth test
-                    if (z < canvas.depthBuffer[y * canvas.width + x]) {
-                        // Compute fragment input attributes from the outputs of the vertex shader
-                        zgl_shader_context_t fragmentShaderInput = {0};
-                        if (renderOptions & ZGL_FLAT_SHADING) {
-                            fragmentShaderInput.position = vertexShaderOutput[0].position;
-                            fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
-                            for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
-                                fragmentShaderInput.attributes[i] = vertexShaderOutput[0].attributes[i];
-                            }
-                        } else {
-                            // Interpolate clip position
-                            fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
-                                                             beta  * vertexShaderOutput[1].position.x +
-                                                             gamma * vertexShaderOutput[2].position.x;
-                            fragmentShaderInput.position.y = alpha * vertexShaderOutput[0].position.y +
-                                                             beta  * vertexShaderOutput[1].position.y +
-                                                             gamma * vertexShaderOutput[2].position.y;
-                            fragmentShaderInput.position.z = alpha * vertexShaderOutput[0].position.z +
-                                                             beta  * vertexShaderOutput[1].position.z +
-                                                             gamma * vertexShaderOutput[2].position.z;                        
-                            fragmentShaderInput.position.w = 1.0f; // w is always one, because we already did the perspective divide
-
-                            // Interpolate other attributes
-                            fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
-                            for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
-                                fragmentShaderInput.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
-                                                                    beta  * vertexShaderOutput[1].attributes[i] +
-                                                                    gamma * vertexShaderOutput[2].attributes[i];
-                            }
-                        }
-
-                        uint32_t color = fragmentShader(&fragmentShaderInput, uniformData, textureWidth, textureHeight, texture);
-                        zgl_render_pixel(x, y, z, color, canvas); // TODO: Avoid scissor test in zgl_render_pixel
-                    }
-                }
-
-                if (!is_inside && was_inside) {
-                    break;
-                }
-
-                w0 += delta_w0_col;
-                w1 += delta_w1_col;
-                w2 += delta_w2_col;
-            }
-            w0_row += delta_w0_row;
-            w1_row += delta_w1_row;
-            w2_row += delta_w2_row;
-        }
+        zgl__rasterize_triangle(xs[0], xs[1], xs[2],
+                                ys[0], ys[1], ys[2],
+                                zs[0], zs[1], zs[2],
+                                invws[0], invws[1], invws[2],
+                                area, textureWidth, textureHeight, texture,
+                                vertexShaderOutput, fragmentShader, uniformData, canvas, renderOptions);
     }
 }
 
@@ -985,6 +994,28 @@ static inline zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, vo
 
 static inline uint32_t zgl_basic_fragment_shader(const zgl_shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
     return ZGL_COLOR_WHITE;
+}
+
+/* Colored Shading */
+typedef struct {
+    zgl_mat4x4_t modelviewprojection;
+} zgl_colored_uniform_t;
+
+static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, void* uniformData) {
+    zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
+    zgl_shader_context_t result = {0};
+    zgl_colored_uniform_t* basicUniformData = (zgl_colored_uniform_t*) uniformData;
+    zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
+    result.position = zgl_mul_mat_v4(basicUniformData->modelviewprojection, inputVertex4);
+    result.numAttributes = 3;
+    result.attributes[0] = inputVertexData->diffuseColor.x;
+    result.attributes[1] = inputVertexData->diffuseColor.y;
+    result.attributes[2] = inputVertexData->diffuseColor.z;
+    return result;
+}
+
+static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture) {
+    return zgl_color_from_floats(input->attributes[0], input->attributes[1], input->attributes[2]);
 }
 
 /* Gouraud shading */
@@ -1138,5 +1169,42 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     }
     return zgl_mul_scalar_color(lighting, unshadedColor);
 }
+
+static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
+                                       int x1, int y1, uint32_t color1,
+                                       int x2, int y2, uint32_t color2,
+                                       zgl_canvas_t canvas, uint16_t renderOptions) {
+    int area = zgl__edge_cross(x0, y0, x1, y1, x2, y2);
+    float r, g, b;
+
+    zgl_shader_context_t shaderContext0 = {0};
+    shaderContext0.position = (zgl_vec4_t) {x0, y0, 0, 1};
+    shaderContext0.numAttributes = 3;
+    zgl_color_to_floats(color0, &r, &g, &b);
+    shaderContext0.attributes[0] = r;
+    shaderContext0.attributes[1] = g;
+    shaderContext0.attributes[2] = b;
+
+    zgl_shader_context_t shaderContext1 = {0};
+    shaderContext1.position = (zgl_vec4_t) {x1, y1, 0, 1};
+    shaderContext1.numAttributes = 3;
+    zgl_color_to_floats(color1, &r, &g, &b);
+    shaderContext1.attributes[0] = r;
+    shaderContext1.attributes[1] = g;
+    shaderContext1.attributes[2] = b;
+
+    zgl_shader_context_t shaderContext2 = {0};
+    shaderContext2.position = (zgl_vec4_t) {x2, y2, 0, 1};
+    shaderContext2.numAttributes = 3;
+    zgl_color_to_floats(color2, &r, &g, &b);
+    shaderContext2.attributes[0] = r;
+    shaderContext2.attributes[1] = g;
+    shaderContext2.attributes[2] = b;
+
+    zgl_shader_context_t shaderContexts[3] = {shaderContext0, shaderContext1, shaderContext2};
+    zgl__rasterize_triangle(x0, x1, x2, y0, y1, y2, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+                            area, 0, 0, NULL, shaderContexts, zgl_colored_fragment_shader, NULL, canvas, renderOptions);
+}
+
 
 #endif // ZEROGL_H

@@ -40,14 +40,17 @@
           <h2>Features</h2>
       </header>
       <aside>
+          <img alt="Programmable shaders" src="./img/shaders.png" height="150">
           <h3>Programmable shaders</h3>
           <p>Unleash your creativity by manipulating geometric data with vertex shaders or create stunning visual effects with fragment shaders.</p>
       </aside>
       <aside>
+          <img alt="Minimalistic" src="./img/minimalist.png" height="150">
           <h3>Minimalistic</h3>
           <p>Import a single header file and you're ready to go. No dependencies, no hassle. Written in portable C code.</p>
       </aside>
       <aside>
+          <img alt="Powerful" src="./img/powerful.webp" height="150">
           <h3>Powerful</h3>
           <p>Support for z-Buffering, textures, lighting and materials with specular and diffuse properties</p>
       </aside>
@@ -58,11 +61,11 @@
       <pre><code>
 #include "zerogl.h"
 
-// Use the stb_image library (not included on zeroGL) to write the result image to a file
+// Use the stb_image library (not included with zeroGL) to write the result image to a file
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#define WIDTH 900
+#define WIDTH 1066
 #define HEIGHT 600
 uint32_t pixels[WIDTH*HEIGHT];
 
@@ -70,7 +73,10 @@ int main(void) {
     zgl_canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
 
     zgl_render_fill(ZGL_COLOR_BLACK, canvas)
-    drawLine(0, 0, WIDTH, HEIGHT, ZGL_COLOR_RED, &canvas);
+    zgl_render_triangle(400, 400, ZGL_COLOR_RED,
+                        700, 400, ZGL_COLOR_GREEN,
+                        700, 100, ZGL_COLOR_BLUE,
+                        canvas, 0);
 
     const char *file_path = "image.png";
     if (!stbi_write_png(file_path, WIDTH, HEIGHT, 4, pixels, sizeof(uint32_t)*WIDTH)) {
@@ -80,6 +86,7 @@ int main(void) {
     return 0;
 }
       </code></pre>
+    <img src="./img/shaders.png" width="700">
     </section>
     <hr>
     <section id="docs">
@@ -147,10 +154,13 @@ zgl_canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
 void zgl_render_pixel(int x, int y, uint32_t color, zgl_canvas_t canvas)
 void zgl_render_fill(uint32_t color, zgl_canvas_t canvas)
 void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas)
-void zgl_render_triangle(int x0, int x1, int x2, int y0, int y1, int y2, uint32_t color, zgl_canvas_t canvas)
 void zgl_render_circle(int x, int y, int radius, uint32_t color, zgl_canvas_t canvas)
+void zgl_render_triangle(int x0, int y0, uint32_t color0,
+                         int x1, int y1, uint32_t color1,
+                         int x2, int y2, uint32_t color2,
+                         zgl_canvas_t canvas, uint16_t renderOptions)
 void zgl_render_object3D(zgl_object3D_t* obj, void *uniform, zgl_camera_t cam, zgl_canvas_t c,
-                         zgl_vertex_shader_t vs, zgl_fragment_shader_t fs, uint16_t renderOpt)
+                         zgl_vertex_shader_t vs, zgl_fragment_shader_t fs, uint16_t renderOptions)
           </code></pre>
         </div>
         <div id="shaders">
