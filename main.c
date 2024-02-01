@@ -53,7 +53,7 @@ typedef struct game_state_t {
     SDL_Window*   window;
     SDL_Renderer* renderer;
     SDL_Texture*  texture;
-    canvas_t      canvas;
+    zgl_canvas_t  canvas;
     uint32_t      backgroundColor;
     uint16_t      renderOptions;
     int           drawLights;
@@ -63,12 +63,12 @@ typedef struct game_state_t {
     
     // Game objects
     int              numMeshes;
-    mesh_t*          meshes;
+    zgl_mesh_t*          meshes;
     int              numObjects;
-    object3D_t*      objects;
-    light_sources_t  lightSources;
-    object3D_t*      pointLightObjects;
-    camera_t         camera;
+    zgl_object3D_t*      objects;
+    zgl_light_sources_t  lightSources;
+    zgl_object3D_t*      pointLightObjects;
+    zgl_camera_t         camera;
     float            rotationSpeed;
     const uint8_t*   keys;
 
@@ -81,19 +81,19 @@ typedef struct game_state_t {
 } game_state_t;
 
 game_state_t* init() {
-    DEBUG_PRINT("INFO: Initializing game objects\n");
+    ZGL_DEBUG_PRINT("INFO: Initializing game objects\n");
 
-    DEBUG_PRINT("INFO: Initializing SDL\n");
+    ZGL_DEBUG_PRINT("INFO: Initializing SDL\n");
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         fprintf(stderr, "ERROR: error initializing SDL: %s\n", SDL_GetError());
         exit(-1);
     }
 
-    DEBUG_PRINT("INFO: Loading meshes and objects\n");
+    ZGL_DEBUG_PRINT("INFO: Loading meshes and objects\n");
     int numObjects = 1;
     int numMeshes = 6;
-    mesh_t* meshes = (mesh_t*) malloc(numMeshes * sizeof(mesh_t));
-    object3D_t *objects = (object3D_t*) malloc(numObjects * sizeof(object3D_t));
+    zgl_mesh_t* meshes = (zgl_mesh_t*) malloc(numMeshes * sizeof(zgl_mesh_t));
+    zgl_object3D_t *objects = (zgl_object3D_t*) malloc(numObjects * sizeof(zgl_object3D_t));
     if (meshes == NULL || objects == NULL) {
         fprintf(stderr, "ERROR: 3D objects memory couldn't be allocated.\n");
         exit(-1);
@@ -106,20 +106,20 @@ game_state_t* init() {
     meshes[4] = *loadObjFile("assets/sphere.obj", false);
 
     // Define a debug mesh
-    vec3_t* vertices = (vec3_t*) malloc(3 * sizeof(vec3_t));
-    triangle_t* triangles = (triangle_t*) malloc(1 * sizeof(triangle_t));
-    material_t* materials = (material_t*) malloc(1 * sizeof(material_t));
+    zgl_vec3_t* vertices = (zgl_vec3_t*) malloc(3 * sizeof(zgl_vec3_t));
+    zgl_triangle_t* triangles = (zgl_triangle_t*) malloc(1 * sizeof(zgl_triangle_t));
+    zgl_material_t* materials = (zgl_material_t*) malloc(1 * sizeof(zgl_material_t));
     if (vertices == NULL || triangles == NULL || materials == NULL) {
         fprintf(stderr, "ERROR: Debug mesh memory couldn't be allocated.\n");
         exit(-1);
     }
 
-    vertices[0] = (vec3_t) {0, 0, 0};
-    vertices[1] = (vec3_t) {1, 0, 0};
-    vertices[2] = (vec3_t) {0, 1, 0};
-    triangles[0] = (triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
-    materials[0] = (material_t) {"RedMaterial", COLOR_RED, COLOR_RED, 0.0f, 0, 0, NULL};
-    meshes[5] = (mesh_t) {
+    vertices[0] = (zgl_vec3_t) {0, 0, 0};
+    vertices[1] = (zgl_vec3_t) {1, 0, 0};
+    vertices[2] = (zgl_vec3_t) {0, 1, 0};
+    triangles[0] = (zgl_triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
+    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, 0, 0, NULL};
+    meshes[5] = (zgl_mesh_t) {
         .name = "Debug",
         .numVertices = 3,
         .numTriangles = 1,
@@ -130,31 +130,31 @@ game_state_t* init() {
     };
 
 
-    objects[0] = makeObject(&meshes[2], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    // objects[0] = makeObject(&meshes[3], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    // objects[0] = makeObject(&meshes[4], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    // objects[0] = makeObject(&meshes[5], (vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
-    DEBUG_PRINT("INFO: Loading lights\n");
+    ZGL_DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
     int numDirLights = 1;
     int numPointLights = 1;
-    ambient_light_t* ambientLights = (ambient_light_t*) malloc(numAmbientLights * sizeof(ambient_light_t));
-    dir_light_t* directionalLights = (dir_light_t*) malloc(numDirLights * sizeof(dir_light_t));
-    point_light_t* pointLights = (point_light_t*) malloc(numPointLights * sizeof(point_light_t));
-    object3D_t *pointLightObjects = (object3D_t*) malloc(numPointLights * sizeof(object3D_t));
+    zgl_ambient_light_t* ambientLights = (zgl_ambient_light_t*) malloc(numAmbientLights * sizeof(zgl_ambient_light_t));
+    zgl_dir_light_t* directionalLights = (zgl_dir_light_t*) malloc(numDirLights * sizeof(zgl_dir_light_t));
+    zgl_point_light_t* pointLights = (zgl_point_light_t*) malloc(numPointLights * sizeof(zgl_point_light_t));
+    zgl_object3D_t *pointLightObjects = (zgl_object3D_t*) malloc(numPointLights * sizeof(zgl_object3D_t));
     if (pointLights == NULL || directionalLights == NULL || ambientLights == NULL || pointLightObjects == NULL) {
         fprintf(stderr, "ERROR: Lights memory couldn't be allocated.\n");
         exit(-1);
     }
 
-    ambientLights[0] = (ambient_light_t) {0.4};
-    directionalLights[0] = (dir_light_t) {0.0, {0.0, -1.0, 1.0}};
-    pointLights[0] = (point_light_t) {0.9, {-0.5, 1.5, -2.0}};
+    ambientLights[0] = (zgl_ambient_light_t) {0.4};
+    directionalLights[0] = (zgl_dir_light_t) {0.0, {0.0, -1.0, 1.0}};
+    pointLights[0] = (zgl_point_light_t) {0.9, {-0.5, 1.5, -2.0}};
 
-    pointLightObjects[0] = makeObject(&meshes[0], pointLights[0].position, 0.05, IDENTITY_M4x4);
+    pointLightObjects[0] = zgl_object(&meshes[0], pointLights[0].position, 0.05, IDENTITY_M4x4);
 
-    DEBUG_PRINT("INFO: Initializing game state\n");
+    ZGL_DEBUG_PRINT("INFO: Initializing game state\n");
     uint32_t *frameBuffer = (uint32_t*) malloc(WIDTH * HEIGHT * sizeof(uint32_t));
     float *depthBuffer = (float*) malloc(WIDTH * HEIGHT * sizeof(float));
     game_state_t* game = (game_state_t*) malloc(sizeof(game_state_t));
@@ -163,7 +163,7 @@ game_state_t* init() {
         exit(-1);
     }
 
-    canvas_t canvas = {
+    zgl_canvas_t canvas = {
         .width = WIDTH,
         .height = HEIGHT,
         .hasDepthBuffer = 1,
@@ -178,19 +178,19 @@ game_state_t* init() {
     game->renderer = SDL_CreateRenderer(game->window, -1, 0);
     game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     game->canvas = canvas;
-    game->backgroundColor = COLOR_BLACK;
+    game->backgroundColor = ZGL_COLOR_BLACK;
     game->drawLights    = 1;
     game->draw3DObjects = 1;
     game->bilinearFiltering = 0;
     game->shaderType = GOURAUD_SHADER;
-    game->renderOptions = DIFFUSE_LIGHTING | SPECULAR_LIGHTING | BACKFACE_CULLING | FUSTRUM_CULLING;
+    game->renderOptions = ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING | ZGL_BACKFACE_CULLING | ZGL_FUSTRUM_CULLING;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
     game->objects = objects;
 
     // Lights
-    game->lightSources = (light_sources_t) {
+    game->lightSources = (zgl_light_sources_t) {
         .ambientLights = ambientLights,
         .numAmbientLights = numAmbientLights,
         .directionalLights = directionalLights,
@@ -201,10 +201,10 @@ game_state_t* init() {
     
     game->pointLightObjects = pointLightObjects;
 
-    game->camera = makeCamera(
-        (vec3_t) {0, 0, -5}, // position
-        (vec3_t) {0, 0, 1}, // direction
-        (vec3_t) {0, 1, 0}, // up
+    game->camera = zgl_camera(
+        (zgl_vec3_t) {0, 0, -5}, // position
+        (zgl_vec3_t) {0, 0, 1}, // direction
+        (zgl_vec3_t) {0, 1, 0}, // up
         53.0f, // fov
         VIEWPORT_WIDTH / VIEWPORT_HEIGHT, // aspect ratio
         VIEWPORT_DISTANCE, // near plane
@@ -217,7 +217,7 @@ game_state_t* init() {
     game->keys = SDL_GetKeyboardState(NULL);
 
     #ifdef DEBUGUI
-    DEBUG_PRINT("INFO:  Initializing Dear ImGui\n");
+    ZGL_DEBUG_PRINT("INFO:  Initializing Dear ImGui\n");
     struct nk_context *ctx = nk_sdl_init(game->window, game->renderer);
     struct nk_font_atlas *atlas;
     struct nk_font_config config = nk_font_config(0);
@@ -235,7 +235,7 @@ game_state_t* init() {
 }
 
 void handleEvents(game_state_t* game) {
-    DEBUG_PRINT("INFO: Handle events\n");
+    ZGL_DEBUG_PRINT("INFO: Handle events\n");
 
     #ifdef DEBUGUI
     nk_input_begin(game->nuklearContext);
@@ -248,7 +248,7 @@ void handleEvents(game_state_t* game) {
         switch (game->event.type) {
         case SDL_QUIT:
             // handling of close button
-            DEBUG_PRINT("INFO: Quitting application\n");
+            ZGL_DEBUG_PRINT("INFO: Quitting application\n");
             game->running = 0;
             break;
         }
@@ -274,7 +274,7 @@ void updateDebugUI(game_state_t *game) {
 
 
     if (game->showGUI) {
-        DEBUG_PRINT("INFO: Updating GUI\n");
+        ZGL_DEBUG_PRINT("INFO: Updating GUI\n");
         int row_size = 12;
         struct nk_context *ctx = game->nuklearContext;
         if (nk_begin(ctx, "Settings", nk_rect(0, 0, 220, HEIGHT),
@@ -310,13 +310,13 @@ void updateDebugUI(game_state_t *game) {
             if (nk_tree_push(ctx, NK_TREE_NODE, "Lights", NK_MINIMIZED)) {
                 nk_layout_row_dynamic(ctx, row_size, 2);
 
-                nk_bool isDiffuse = game->renderOptions & DIFFUSE_LIGHTING;
+                nk_bool isDiffuse = game->renderOptions & ZGL_DIFFUSE_LIGHTING;
                 nk_checkbox_label(ctx, "Difuse", &isDiffuse);
-                game->renderOptions = isDiffuse ? game->renderOptions | DIFFUSE_LIGHTING : game->renderOptions & ~DIFFUSE_LIGHTING;
+                game->renderOptions = isDiffuse ? game->renderOptions | ZGL_DIFFUSE_LIGHTING : game->renderOptions & ~ZGL_DIFFUSE_LIGHTING;
 
-                nk_bool isSpecular = game->renderOptions & SPECULAR_LIGHTING;
+                nk_bool isSpecular = game->renderOptions & ZGL_SPECULAR_LIGHTING;
                 nk_checkbox_label(ctx, "Specular", &isSpecular);
-                game->renderOptions = isSpecular ? game->renderOptions | SPECULAR_LIGHTING : game->renderOptions & ~SPECULAR_LIGHTING;
+                game->renderOptions = isSpecular ? game->renderOptions | ZGL_SPECULAR_LIGHTING : game->renderOptions & ~ZGL_SPECULAR_LIGHTING;
 
                 if (nk_tree_push(ctx, NK_TREE_NODE, "Ambient", NK_MAXIMIZED)) {
                     for (int i = 0; i < game->lightSources.numAmbientLights; i++) {
@@ -366,7 +366,7 @@ void updateDebugUI(game_state_t *game) {
                             nk_property_float(ctx, "y", -10.0f, &game->lightSources.pointLights[i].position.y, 10.0f, 0.1f, 0.1f);
                             nk_layout_row_dynamic(ctx, row_size, 1);
                             nk_property_float(ctx, "z", -10.0f, &game->lightSources.pointLights[i].position.z, 10.0f, 0.1f, 0.1f);
-                            game->pointLightObjects[i] = makeObject(&game->meshes[0], game->lightSources.pointLights[i].position, 0.05, IDENTITY_M4x4);
+                            game->pointLightObjects[i] = zgl_object(&game->meshes[0], game->lightSources.pointLights[i].position, 0.05, IDENTITY_M4x4);
                             nk_group_end(ctx);
                         }
                     }
@@ -431,14 +431,14 @@ void updateDebugUI(game_state_t *game) {
                 };
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
-                nk_bool isBackfaceCulling = game->renderOptions & BACKFACE_CULLING;
+                nk_bool isBackfaceCulling = game->renderOptions & ZGL_BACKFACE_CULLING;
                 nk_checkbox_label(ctx, "Backface culling", &isBackfaceCulling);
-                game->renderOptions = isBackfaceCulling ? game->renderOptions | BACKFACE_CULLING : game->renderOptions & ~BACKFACE_CULLING;
+                game->renderOptions = isBackfaceCulling ? game->renderOptions | ZGL_BACKFACE_CULLING : game->renderOptions & ~ZGL_BACKFACE_CULLING;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
-                nk_bool isFustrumCulling = game->renderOptions & FUSTRUM_CULLING;
+                nk_bool isFustrumCulling = game->renderOptions & ZGL_FUSTRUM_CULLING;
                 nk_checkbox_label(ctx, "Fustrum culling", &isFustrumCulling);
-                game->renderOptions = isFustrumCulling ? game->renderOptions | FUSTRUM_CULLING : game->renderOptions & ~FUSTRUM_CULLING;
+                game->renderOptions = isFustrumCulling ? game->renderOptions | ZGL_FUSTRUM_CULLING : game->renderOptions & ~ZGL_FUSTRUM_CULLING;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_bool isBilinearFiltering = game->bilinearFiltering;
@@ -446,9 +446,9 @@ void updateDebugUI(game_state_t *game) {
                 game->bilinearFiltering = isBilinearFiltering;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
-                nk_bool isFlatShading = game->renderOptions & FLAT_SHADING;
+                nk_bool isFlatShading = game->renderOptions & ZGL_FLAT_SHADING;
                 nk_checkbox_label(ctx, "Flat shading", &isFlatShading);
-                game->renderOptions = isFlatShading ? game->renderOptions | FLAT_SHADING : game->renderOptions & ~FLAT_SHADING;
+                game->renderOptions = isFlatShading ? game->renderOptions | ZGL_FLAT_SHADING : game->renderOptions & ~ZGL_FLAT_SHADING;
 
                 nk_tree_pop(ctx);
             }
@@ -458,10 +458,10 @@ void updateDebugUI(game_state_t *game) {
                 nk_label(ctx, "Color", NK_TEXT_LEFT);
                 nk_layout_row_dynamic(ctx, row_size * 10, 1);
                 uint8_t r, g, b;
-                colorFromUint32(game->backgroundColor, &r, &g, &b);
+                zgl_color_components(game->backgroundColor, &r, &g, &b);
                 struct nk_colorf nkBackgroundColor = nk_color_cf(nk_rgb(r, g, b));
                 nk_color_pick(ctx, &nkBackgroundColor, NK_RGBA);
-                game->backgroundColor = colorFromFloats(nkBackgroundColor.r, nkBackgroundColor.g, nkBackgroundColor.b);
+                game->backgroundColor = zgl_color_from_floats(nkBackgroundColor.r, nkBackgroundColor.g, nkBackgroundColor.b);
                 nk_tree_pop(ctx);
             }
 
@@ -483,93 +483,93 @@ void updateDebugUI(game_state_t *game) {
 
 void updateCameraPosition(game_state_t* game) {
     const uint8_t* keys = game->keys;
-    camera_t *camera = &game->camera;
+    zgl_camera_t *camera = &game->camera;
 
     // TODO: Store this in the camera struct
-    vec3_t cameraRight = crossProduct(camera->up, camera->direction);
+    zgl_vec3_t cameraRight = zgl_cross(camera->up, camera->direction);
     
     float elapsedTime = game->elapsedTime / 1000.0f;
     float movementSpeed = camera->movementSpeed * elapsedTime;
     float turningSpeed = camera->turningSpeed * elapsedTime;
-    vec3_t newCameraPosition = camera->position;
-    vec3_t newCameraDirection = camera->direction;
-    vec3_t newCameraUp = camera->up;
+    zgl_vec3_t newCameraPosition = camera->position;
+    zgl_vec3_t newCameraDirection = camera->direction;
+    zgl_vec3_t newCameraUp = camera->up;
     
 
     if (keys[SDL_SCANCODE_A]) {
         // Translate left       
-        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, cameraRight));
+        newCameraPosition = zgl_add(newCameraPosition, zgl_mul_scalar(-movementSpeed, cameraRight));
     }
 
     if (keys[SDL_SCANCODE_D]) {
         // Translate right
-        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, cameraRight));
+        newCameraPosition = zgl_add(newCameraPosition, zgl_mul_scalar(movementSpeed, cameraRight));
     }
 
     if (keys[SDL_SCANCODE_S]) {
         // Translate back
-        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, newCameraDirection));
+        newCameraPosition = zgl_add(newCameraPosition, zgl_mul_scalar(-movementSpeed, newCameraDirection));
     }
 
     if (keys[SDL_SCANCODE_W]) {
         // Translate forward
-        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, newCameraDirection));
+        newCameraPosition = zgl_add(newCameraPosition, zgl_mul_scalar(movementSpeed, newCameraDirection));
     }
 
     if (keys[SDL_SCANCODE_PAGEDOWN]) {
         // Translate down
-        newCameraPosition = add(newCameraPosition, mulScalarV3(-movementSpeed, newCameraUp));
+        newCameraPosition = zgl_add(newCameraPosition, zgl_mul_scalar(-movementSpeed, newCameraUp));
     }
 
     if (keys[SDL_SCANCODE_PAGEUP]) {
         // Translate up
-        newCameraPosition = add(newCameraPosition, mulScalarV3(movementSpeed, newCameraUp));
+        newCameraPosition = zgl_add(newCameraPosition, zgl_mul_scalar(movementSpeed, newCameraUp));
     }
 
     if (keys[SDL_SCANCODE_RIGHT]) {
         // Rotate right around up axis using quaternion
-        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, newCameraUp);
-        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
-        cameraRight = crossProduct(newCameraUp, newCameraDirection);
+        zgl_quaternion_t rotation = zgl_quaternion(turningSpeed, newCameraUp);
+        newCameraDirection = zgl_rotate(newCameraDirection, rotation);
+        cameraRight = zgl_cross(newCameraUp, newCameraDirection);
     }
 
     if (keys[SDL_SCANCODE_LEFT]) {
         // Rotate left around up axis
-        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, newCameraUp);
-        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
-        cameraRight = crossProduct(newCameraUp, newCameraDirection);
+        zgl_quaternion_t rotation = zgl_quaternion(-turningSpeed, newCameraUp);
+        newCameraDirection = zgl_rotate(newCameraDirection, rotation);
+        cameraRight = zgl_cross(newCameraUp, newCameraDirection);
     }
 
     if (keys[SDL_SCANCODE_UP]) {
         // Rotate up around right axis
-        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, cameraRight);
-        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
-        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
+        zgl_quaternion_t rotation = zgl_quaternion(-turningSpeed, cameraRight);
+        newCameraDirection = zgl_rotate(newCameraDirection, rotation);
+        newCameraUp = zgl_rotate(newCameraUp, rotation);
 
     }
 
     if (keys[SDL_SCANCODE_DOWN]) {
         // Rotate down around right axis
-        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, cameraRight);
-        newCameraDirection = rotateVectorByQuaternion(newCameraDirection, rotation);
-        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
+        zgl_quaternion_t rotation = zgl_quaternion(turningSpeed, cameraRight);
+        newCameraDirection = zgl_rotate(newCameraDirection, rotation);
+        newCameraUp = zgl_rotate(newCameraUp, rotation);
     }
 
     if (keys[SDL_SCANCODE_Q]) {
         // Rotate left around direction axis
-        quaternion_t rotation = quaternionFromAngleAxis(turningSpeed, newCameraDirection);
-        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
-        cameraRight = crossProduct(newCameraUp, newCameraDirection);
+        zgl_quaternion_t rotation = zgl_quaternion(turningSpeed, newCameraDirection);
+        newCameraUp = zgl_rotate(newCameraUp, rotation);
+        cameraRight = zgl_cross(newCameraUp, newCameraDirection);
     }
 
     if (keys[SDL_SCANCODE_E]) {
         // Rotate right around direction axis
-        quaternion_t rotation = quaternionFromAngleAxis(-turningSpeed, newCameraDirection);
-        newCameraUp = rotateVectorByQuaternion(newCameraUp, rotation);
-        cameraRight = crossProduct(newCameraUp, newCameraDirection);
+        zgl_quaternion_t rotation = zgl_quaternion(-turningSpeed, newCameraDirection);
+        newCameraUp = zgl_rotate(newCameraUp, rotation);
+        cameraRight = zgl_cross(newCameraUp, newCameraDirection);
     }
 
-    game->camera = makeCamera(
+    game->camera = zgl_camera(
         newCameraPosition,
         newCameraDirection,
         newCameraUp,
@@ -582,8 +582,8 @@ void updateCameraPosition(game_state_t* game) {
     );
 }
 
-object3D_t rotateObjectY(object3D_t object, float degrees) {
-    return makeObject(object.mesh, object.translation, object.scale, mulMM4(rotationY(degrees), object.rotation));
+zgl_object3D_t rotateObjectY(zgl_object3D_t object, float degrees) {
+    return zgl_object(object.mesh, object.translation, object.scale, zgl_mul_mat(zgl_roty_mat(degrees), object.rotation));
 }
 
 // TODO: Use quaternions for rotation
@@ -593,37 +593,37 @@ void animateObjects(game_state_t* game) {
 }
 
 void update(game_state_t* game) {
-    DEBUG_PRINT("INFO: Update game state\n");
+    ZGL_DEBUG_PRINT("INFO: Update game state\n");
     updateCameraPosition(game);
     animateObjects(game);
 }
 
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
-        object3D_t object = game->objects[i];
+        zgl_object3D_t object = game->objects[i];
         if (game->shaderType == BASIC_SHADER) {
-            basic_uniform_t uniformData = {
-                .modelviewprojection = mulMM4(game->camera.viewProjMatrix, object.transform),
+            zgl_basic_uniform_t uniformData = {
+                .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
             };
-            drawObject(&object, &uniformData, game->camera, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
+            zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
         } else if (game->shaderType == GOURAUD_SHADER) {
-            gourard_uniform_t uniformData = {
+            zgl_gourard_uniform_t uniformData = {
                 .modelMatrix = object.transform,
-                .modelInvRotationMatrixTransposed = transposeM4(inverseM4(object.rotation)),
+                .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                 .viewProjectionMatrix = game->camera.viewProjMatrix,
                 .lightSources = game->lightSources,
                 .bilinearFiltering = game->bilinearFiltering
             };
-            drawObject(&object, &uniformData, game->camera, game->canvas, gourardVertexShader, gourardFragmentShader, game->renderOptions);
+            zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_gourard_vertex_shader, zgl_gourard_fragment_shader, game->renderOptions);
         } else if (game->shaderType == PHONG_SHADER) {
-            phong_uniform_t uniformData = {
+            zgl_phong_uniform_t uniformData = {
                 .modelMatrix = object.transform,
-                .modelInvRotationMatrixTransposed = transposeM4(inverseM4(object.rotation)),
+                .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                 .viewProjectionMatrix = game->camera.viewProjMatrix,
                 .lightSources = game->lightSources,
                 .bilinearFiltering = game->bilinearFiltering
             };
-            drawObject(&object, &uniformData, game->camera, game->canvas, phongVertexShader, phongFragmentShader, game->renderOptions);
+            zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_phong_vertex_shader, zgl_phong_fragment_shader, game->renderOptions);
         }
     }
 }
@@ -631,38 +631,38 @@ void drawObjects(game_state_t* game) {
 void drawLights(game_state_t* game) {
     // Use basic shader to draw lights
     for (int i = 0; i < game->lightSources.numPointLights; i++) {
-        basic_uniform_t uniformData = {
-            .modelviewprojection = mulMM4(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
+        zgl_basic_uniform_t uniformData = {
+            .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
         };
-        drawObject(&game->pointLightObjects[i], &uniformData, game->camera, game->canvas, basicVertexShader, basicFragmentShader, game->renderOptions);
+        zgl_render_object3D(&game->pointLightObjects[i], &uniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
     }
 }
 
 void render(game_state_t* game) {
-    DEBUG_PRINT("INFO: Rendering scene\n");
-    canvas_t canvas = game->canvas;
+    ZGL_DEBUG_PRINT("INFO: Rendering scene\n");
+    zgl_canvas_t canvas = game->canvas;
 
     // Init depthBuffer
     for (int i = 0; i < canvas.width * canvas.height; i++) {
         canvas.depthBuffer[i] = FLT_MAX;
     }
 
-    DEBUG_PRINT("INFO: Drawing background\n");
-    fillCanvas(game->backgroundColor, canvas);
+    ZGL_DEBUG_PRINT("INFO: Drawing background\n");
+    zgl_render_fill(game->backgroundColor, canvas);
 
     // Draw 3D Objects
     if (game->draw3DObjects) {
-        DEBUG_PRINT("INFO: Drawing 3D Objects\n");
+        ZGL_DEBUG_PRINT("INFO: Drawing 3D Objects\n");
         drawObjects(game);
     }
 
     // Draw lights
     if (game->drawLights) {
-        DEBUG_PRINT("INFO: Drawing lights\n");
+        ZGL_DEBUG_PRINT("INFO: Drawing lights\n");
         drawLights(game);
     }
     
-    DEBUG_PRINT("INFO: Update backbuffer\n");
+    ZGL_DEBUG_PRINT("INFO: Update backbuffer\n");
     SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH);
     SDL_RenderCopy(game->renderer, game->texture, NULL, NULL);
 }
@@ -670,7 +670,7 @@ void render(game_state_t* game) {
 #ifdef DEBUGUI
 void renderDebugUI(game_state_t* game) {
     if (game->showGUI) {
-        DEBUG_PRINT("INFO: Rendering GUI\n");
+        ZGL_DEBUG_PRINT("INFO: Rendering GUI\n");
         nk_sdl_render(NK_ANTI_ALIASING_ON);
     }
 }
@@ -718,15 +718,15 @@ int main(int argc, char* argv[])
         #endif // DEBUGUI
 
         // Present frame and compute FPS
-        DEBUG_PRINT("INFO: Present frame\n");
+        ZGL_DEBUG_PRINT("INFO: Present frame\n");
         SDL_RenderPresent(game->renderer);
         uint64_t currentTime = SDL_GetPerformanceCounter();
         game->elapsedTime = 1000.0 * (currentTime - game->lastTime) / SDL_GetPerformanceFrequency();
-        DEBUG_PRINT("INFO: Frame rendered in %.00lf ms (%.0f FPS)\n", game->elapsedTime, floor(1000.0f / game->elapsedTime));
+        ZGL_DEBUG_PRINT("INFO: Frame rendered in %.00lf ms (%.0f FPS)\n", game->elapsedTime, floor(1000.0f / game->elapsedTime));
         game->lastTime = currentTime;
     }
 
-    DEBUG_PRINT("INFO: Closing\n");
+    ZGL_DEBUG_PRINT("INFO: Closing\n");
     destroy(game);
     return 0;
 }
