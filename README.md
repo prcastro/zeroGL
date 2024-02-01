@@ -1,7 +1,7 @@
 # zeroGL
 A zero-dependencies, single-header 3D graphics library
 
-<img src="assets/rasterizer.gif" width="500">
+<img src="./docs/img/rasterizer.gif" width="500">
 
 ## Features
 
