@@ -67,10 +67,10 @@
 uint32_t pixels[WIDTH*HEIGHT];
 
 int main(void) {
-    canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
+    zgl_canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
 
-    fillCanvas(uint32_t color, canvas_t canvas)
-    drawLine(0, 0, WIDTH, HEIGHT, COLOR_RED, &canvas);
+    zgl_render_fill(ZGL_COLOR_BLACK, canvas)
+    drawLine(0, 0, WIDTH, HEIGHT, ZGL_COLOR_RED, &canvas);
 
     const char *file_path = "image.png";
     if (!stbi_write_png(file_path, WIDTH, HEIGHT, 4, pixels, sizeof(uint32_t)*WIDTH)) {
@@ -101,14 +101,14 @@ int main(void) {
           <p>You can <code>#define ZGL_DEBUG</code> to enable debug logs on the console. Also, you can define the following variables to customize the program behavior</p>
           <pre><code>
 // Maximum number of vertex attributes passed between the vertex and fragment shaders
-#define MAX_VERTEX_ATTRIBUTES 100
+#define ZGLMAX_VERTEX_SHADER_ATTRIBUTES 100
           </code></pre>
         </div>
         <div id="vectors">
           <h3>Vectors</h3>
           <p>Vectors are represented by two types. The first is <code>vec3_t</code>, having an x, y and z attributes of type <code>float</code></p>
           <pre><code>
-vec3_t v = {1.0f, 2.0f, 3.0f};
+zgl_vec3_t v = {1.0f, 2.0f, 3.0f};
           </code></pre>
         <div id="colors">
           <h3>Colors</h3>
@@ -116,49 +116,50 @@ vec3_t v = {1.0f, 2.0f, 3.0f};
         </div>
         <p>You can manipulate colors by using the following functions:</p>
         <pre><code>
-uint32_t colorToUint32(uint8_t r, uint8_t g, uint8_t b)
-void     colorFromUint32(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b)
-uint32_t mulScalarColor(double x, uint32_t color)
-uint32_t sumColors(uint32_t c0, uint32_t c1)
-uint32_t colorFromFloats(float r, float g, float b)
-void     colorToFloats(uint32_t color, float* r, float* g, float* b)
+uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b)
+void     zgl_color_components(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b)
+uint32_t zgl_mul_scalar_color(double x, uint32_t color)
+uint32_t zgl_add_colors(uint32_t c0, uint32_t c1)
+uint32_t zgl_color_from_floats(float r, float g, float b)
+void     zgl_color_to_floats(uint32_t color, float* r, float* g, float* b)
         </code></pre>
         <div id="objects">
           <h3>3D Objects</h3>
-          <p>You can define 3D objects using <code>mesh_t</code> and <code>object3D_t</code> type</p>
+          <p>You can define 3D objects using <code>zgl_mesh_t</code> and <code>zgl_object3D_t</code> type</p>
         </div>
         <div id="camera">
           <h3>Camera</h3>
-          <p>You can define a camera using <code>camera_t</code> type. Create one using:</p>
+          <p>You can define a camera using <code>zgl_camera_t</code> type. Create one using:</p>
           <pre><code>
-camera_t makeCamera(vec3_t position, vec3_t direction, vec3_t up,
-                    float fov, float aspectRatio, float near, float far,
-                    float movementSpeed, float turningSpeed)
+zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction, zgl_vec3_t up,
+                        float fov, float aspectRatio, float near, float far,
+                        float movementSpeed, float turningSpeed)
           </code></pre>
         </div>
         <div id="drawing">
           <h3>Drawing</h3>
-          <p>To draw, you need to create a <code>canvas_t</code> type and pass it to the drawing functions</p>
+          <p>To draw, you need to create a <code>zgl_canvas_t</code> type and pass it to the drawing functions</p>
           <pre><code>
-canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
+zgl_canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
           </code></pre>
           <p>You can draw primitives such as lines, triangles and 3D objects using the following functions</p>
           <pre><code>
-void drawPixel(int x, int y, uint32_t color, canvas_t canvas)
-void fillCanvas(uint32_t color, canvas_t canvas)
-void drawLine(int x0, int x1, int y0, int y1, uint32_t color, canvas_t canvas)
-void drawTriangleWireframe(int x0, int x1, int x2, int y0, int y1, int y2, uint32_t color, canvas_t canvas)
-void drawObject(object3D_t* obj, void *uniform, camera_t cam, canvas_t c,
-           vertexShader_t vs, fragmentShader_t fs, uint16_t renderOpt)
+void zgl_render_pixel(int x, int y, uint32_t color, zgl_canvas_t canvas)
+void zgl_render_fill(uint32_t color, zgl_canvas_t canvas)
+void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas)
+void zgl_render_triangle(int x0, int x1, int x2, int y0, int y1, int y2, uint32_t color, zgl_canvas_t canvas)
+void zgl_render_circle(int x, int y, int radius, uint32_t color, zgl_canvas_t canvas)
+void zgl_render_object3D(zgl_object3D_t* obj, void *uniform, zgl_camera_t cam, zgl_canvas_t c,
+                         zgl_vertex_shader_t vs, zgl_fragment_shader_t fs, uint16_t renderOpt)
           </code></pre>
         </div>
         <div id="shaders">
           <h3>Shaders</h3>
-          <p>You can customize <code>drawObject</code> behavior by passing custom shaders. Shaders are written in pure C code. You can define vertex and fragment shaders following the type:</p>
+          <p>You can customize <code>zgl_render_object3D</code> behavior by passing custom shaders. Shaders are written in pure C code. You can define vertex and fragment shaders following the type:</p>
           <pre><code>
-shader_context_t vertexShader_t(void* inputVertex, void* uniformData);
-uint32_t         fragmentShader_t(shader_context_t* input, void* uniformData,
-                                  int textureWidth, int textureHeight, uint32_t* texture);
+zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* uniformData);
+uint32_t             zgl_fragment_shader_t(zgl_shader_context_t* input, void* uniformData,
+                                           int textureWidth, int textureHeight, uint32_t* texture);
           </code></pre>
           <p><strong>Vertex shaders</strong> receive a pointer to the vertex data and a pointer to the uniform data. They must return a <code>shader_context_t</code> type, which is a struct containing the transformed vertex data.</p>
           <p><strong>Fragment shaders</strong> receive a pointer to the shader context (containing the interpolated data from the vertexes of each triangle), a pointer to the uniform data, the texture width and height and a pointer to the texture data. They must return a <code>uint32_t</code> type, which is the color of the pixel.</p>
