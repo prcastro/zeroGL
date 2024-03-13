@@ -152,116 +152,116 @@ static inline zgl_mat4x4_t zgl_inverse(zgl_mat4x4_t matrix) {
     float invOut[16];
     float inv[16], det;
 
-    inv[0] = m[5]  * m[10] * m[15] - 
-             m[5]  * m[11] * m[14] - 
-             m[9]  * m[6]  * m[15] + 
+    inv[0] = m[5]  * m[10] * m[15] -
+             m[5]  * m[11] * m[14] -
+             m[9]  * m[6]  * m[15] +
              m[9]  * m[7]  * m[14] +
-             m[13] * m[6]  * m[11] - 
+             m[13] * m[6]  * m[11] -
              m[13] * m[7]  * m[10];
 
-    inv[4] = -m[4]  * m[10] * m[15] + 
-              m[4]  * m[11] * m[14] + 
-              m[8]  * m[6]  * m[15] - 
-              m[8]  * m[7]  * m[14] - 
-              m[12] * m[6]  * m[11] + 
+    inv[4] = -m[4]  * m[10] * m[15] +
+              m[4]  * m[11] * m[14] +
+              m[8]  * m[6]  * m[15] -
+              m[8]  * m[7]  * m[14] -
+              m[12] * m[6]  * m[11] +
               m[12] * m[7]  * m[10];
 
-    inv[8] = m[4]  * m[9] * m[15] - 
-             m[4]  * m[11] * m[13] - 
-             m[8]  * m[5] * m[15] + 
-             m[8]  * m[7] * m[13] + 
-             m[12] * m[5] * m[11] - 
+    inv[8] = m[4]  * m[9] * m[15] -
+             m[4]  * m[11] * m[13] -
+             m[8]  * m[5] * m[15] +
+             m[8]  * m[7] * m[13] +
+             m[12] * m[5] * m[11] -
              m[12] * m[7] * m[9];
 
-    inv[12] = -m[4]  * m[9] * m[14] + 
+    inv[12] = -m[4]  * m[9] * m[14] +
                m[4]  * m[10] * m[13] +
-               m[8]  * m[5] * m[14] - 
-               m[8]  * m[6] * m[13] - 
-               m[12] * m[5] * m[10] + 
+               m[8]  * m[5] * m[14] -
+               m[8]  * m[6] * m[13] -
+               m[12] * m[5] * m[10] +
                m[12] * m[6] * m[9];
 
-    inv[1] = -m[1]  * m[10] * m[15] + 
-              m[1]  * m[11] * m[14] + 
-              m[9]  * m[2] * m[15] - 
-              m[9]  * m[3] * m[14] - 
-              m[13] * m[2] * m[11] + 
+    inv[1] = -m[1]  * m[10] * m[15] +
+              m[1]  * m[11] * m[14] +
+              m[9]  * m[2] * m[15] -
+              m[9]  * m[3] * m[14] -
+              m[13] * m[2] * m[11] +
               m[13] * m[3] * m[10];
 
-    inv[5] = m[0]  * m[10] * m[15] - 
-             m[0]  * m[11] * m[14] - 
-             m[8]  * m[2] * m[15] + 
-             m[8]  * m[3] * m[14] + 
-             m[12] * m[2] * m[11] - 
+    inv[5] = m[0]  * m[10] * m[15] -
+             m[0]  * m[11] * m[14] -
+             m[8]  * m[2] * m[15] +
+             m[8]  * m[3] * m[14] +
+             m[12] * m[2] * m[11] -
              m[12] * m[3] * m[10];
 
-    inv[9] = -m[0]  * m[9] * m[15] + 
-              m[0]  * m[11] * m[13] + 
-              m[8]  * m[1] * m[15] - 
-              m[8]  * m[3] * m[13] - 
-              m[12] * m[1] * m[11] + 
+    inv[9] = -m[0]  * m[9] * m[15] +
+              m[0]  * m[11] * m[13] +
+              m[8]  * m[1] * m[15] -
+              m[8]  * m[3] * m[13] -
+              m[12] * m[1] * m[11] +
               m[12] * m[3] * m[9];
 
-    inv[13] = m[0]  * m[9] * m[14] - 
-              m[0]  * m[10] * m[13] - 
-              m[8]  * m[1] * m[14] + 
-              m[8]  * m[2] * m[13] + 
-              m[12] * m[1] * m[10] - 
+    inv[13] = m[0]  * m[9] * m[14] -
+              m[0]  * m[10] * m[13] -
+              m[8]  * m[1] * m[14] +
+              m[8]  * m[2] * m[13] +
+              m[12] * m[1] * m[10] -
               m[12] * m[2] * m[9];
 
-    inv[2] = m[1]  * m[6] * m[15] - 
-             m[1]  * m[7] * m[14] - 
-             m[5]  * m[2] * m[15] + 
-             m[5]  * m[3] * m[14] + 
-             m[13] * m[2] * m[7] - 
+    inv[2] = m[1]  * m[6] * m[15] -
+             m[1]  * m[7] * m[14] -
+             m[5]  * m[2] * m[15] +
+             m[5]  * m[3] * m[14] +
+             m[13] * m[2] * m[7] -
              m[13] * m[3] * m[6];
 
-    inv[6] = -m[0]  * m[6] * m[15] + 
-              m[0]  * m[7] * m[14] + 
-              m[4]  * m[2] * m[15] - 
-              m[4]  * m[3] * m[14] - 
-              m[12] * m[2] * m[7] + 
+    inv[6] = -m[0]  * m[6] * m[15] +
+              m[0]  * m[7] * m[14] +
+              m[4]  * m[2] * m[15] -
+              m[4]  * m[3] * m[14] -
+              m[12] * m[2] * m[7] +
               m[12] * m[3] * m[6];
 
-    inv[10] = m[0]  * m[5] * m[15] - 
-              m[0]  * m[7] * m[13] - 
-              m[4]  * m[1] * m[15] + 
-              m[4]  * m[3] * m[13] + 
-              m[12] * m[1] * m[7] - 
+    inv[10] = m[0]  * m[5] * m[15] -
+              m[0]  * m[7] * m[13] -
+              m[4]  * m[1] * m[15] +
+              m[4]  * m[3] * m[13] +
+              m[12] * m[1] * m[7] -
               m[12] * m[3] * m[5];
 
-    inv[14] = -m[0]  * m[5] * m[14] + 
-               m[0]  * m[6] * m[13] + 
-               m[4]  * m[1] * m[14] - 
-               m[4]  * m[2] * m[13] - 
-               m[12] * m[1] * m[6] + 
+    inv[14] = -m[0]  * m[5] * m[14] +
+               m[0]  * m[6] * m[13] +
+               m[4]  * m[1] * m[14] -
+               m[4]  * m[2] * m[13] -
+               m[12] * m[1] * m[6] +
                m[12] * m[2] * m[5];
 
-    inv[3] = -m[1] * m[6] * m[11] + 
-              m[1] * m[7] * m[10] + 
-              m[5] * m[2] * m[11] - 
-              m[5] * m[3] * m[10] - 
-              m[9] * m[2] * m[7] + 
+    inv[3] = -m[1] * m[6] * m[11] +
+              m[1] * m[7] * m[10] +
+              m[5] * m[2] * m[11] -
+              m[5] * m[3] * m[10] -
+              m[9] * m[2] * m[7] +
               m[9] * m[3] * m[6];
 
-    inv[7] = m[0] * m[6] * m[11] - 
-             m[0] * m[7] * m[10] - 
-             m[4] * m[2] * m[11] + 
-             m[4] * m[3] * m[10] + 
-             m[8] * m[2] * m[7] - 
+    inv[7] = m[0] * m[6] * m[11] -
+             m[0] * m[7] * m[10] -
+             m[4] * m[2] * m[11] +
+             m[4] * m[3] * m[10] +
+             m[8] * m[2] * m[7] -
              m[8] * m[3] * m[6];
 
-    inv[11] = -m[0] * m[5] * m[11] + 
-               m[0] * m[7] * m[9] + 
-               m[4] * m[1] * m[11] - 
-               m[4] * m[3] * m[9] - 
-               m[8] * m[1] * m[7] + 
+    inv[11] = -m[0] * m[5] * m[11] +
+               m[0] * m[7] * m[9] +
+               m[4] * m[1] * m[11] -
+               m[4] * m[3] * m[9] -
+               m[8] * m[1] * m[7] +
                m[8] * m[3] * m[5];
 
-    inv[15] = m[0] * m[5] * m[10] - 
-              m[0] * m[6] * m[9] - 
-              m[4] * m[1] * m[10] + 
-              m[4] * m[2] * m[9] + 
-              m[8] * m[1] * m[6] - 
+    inv[15] = m[0] * m[5] * m[10] -
+              m[0] * m[6] * m[9] -
+              m[4] * m[1] * m[10] +
+              m[4] * m[2] * m[9] +
+              m[8] * m[1] * m[6] -
               m[8] * m[2] * m[5];
 
     det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
@@ -273,7 +273,7 @@ static inline zgl_mat4x4_t zgl_inverse(zgl_mat4x4_t matrix) {
 
     for (int i = 0; i < 16; i++)
         invOut[i] = inv[i] * det;
-    
+
     zgl_mat4x4_t invMatrix;
     for (int i = 0; i < 4; i++) {
         invMatrix.data[i][0] = invOut[i*4];
@@ -382,7 +382,7 @@ static const uint32_t ZGL_COLOR_PURPLE = 0x00FF00FF;
 static const uint32_t ZGL_COLOR_CYAN   = 0x0000FFFF;
 
 static inline uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b) {
-    return 0x00000000 | (r << 16) | (g << 8) |  b;    
+    return 0x00000000 | (r << 16) | (g << 8) |  b;
 }
 
 static inline void zgl_color_components(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b) {
@@ -529,7 +529,7 @@ static inline float zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float i
     float diffuseIntensity  = 0.0;
     float specularIntensity = 0.0;
     float ambientIntensity  = 0.0;
-    
+
     // Directional lights
     for (int i = 0; i < numDirectionalLights; i++) {
         zgl_vec3_t lightDirection = directionalLights[i].direction;
@@ -602,7 +602,7 @@ static inline zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction,
     up = zgl_normalize(up);
     zgl_vec3_t right = zgl_normalize(zgl_cross(up, direction));
     zgl_vec3_t correctedUp = zgl_cross(direction, right);
-    
+
     zgl_mat4x4_t rotationMatrix = (zgl_mat4x4_t) {{
         {right.x,       right.y,       right.z,       0},
         {correctedUp.x, correctedUp.y, correctedUp.z, 0},
@@ -712,7 +712,7 @@ static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t colo
     int delta_x = (x1 - x0);
     int delta_y = (y1 - y0);
     int longest_side_length = (abs(delta_x) >= abs(delta_y)) ? abs(delta_x) : abs(delta_y);
-    float x_inc = delta_x / (float)longest_side_length; 
+    float x_inc = delta_x / (float)longest_side_length;
     float y_inc = delta_y / (float)longest_side_length;
     float current_x = x0;
     float current_y = y0;
@@ -756,8 +756,7 @@ typedef struct {
 
 typedef zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* uniformData);
 // TODO: Should we pass the texture as a parameter as we're doing now? What happens when we have multiple textures?
-typedef uint32_t zgl_fragment_shader_t(zgl_shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
-
+typedef uint32_t zgl_fragment_shader_t(const zgl_shader_context_t* input, void* uniformData, int textureWidth, int textureHeight, uint32_t* texture);
 
 static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                                            int y0, int y1, int y2,
@@ -829,7 +828,7 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                                                             gamma * vertexShaderOutput[2].position.y;
                         fragmentShaderInput.position.z = alpha * vertexShaderOutput[0].position.z +
                                                             beta  * vertexShaderOutput[1].position.z +
-                                                            gamma * vertexShaderOutput[2].position.z;                        
+                                                            gamma * vertexShaderOutput[2].position.z;
                         fragmentShaderInput.position.w = 1.0f; // w is always one, because we already did the perspective divide
 
                         // Interpolate other attributes
@@ -900,7 +899,7 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
             textureCoords[1] = mesh->textureCoords[triangle.t1];
             textureCoords[2] = mesh->textureCoords[triangle.t2];
         }
-        
+
         // Get material data
         float diffR = 1.0f;
         float diffG = 1.0f;
@@ -920,7 +919,6 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
             textureHeight = material.textureHeight;
             texture = material.texture;
         }
-        
 
         for (int v = 0; v < 3; v++) {
             zgl_vertex_input_t inputVertex = {
@@ -959,8 +957,8 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
         }
 
         if ((renderOptions & ZGL_FUSTRUM_CULLING) && !zgl__tri_in_fustrum(vertexShaderOutput[0].position,
-                                                                       vertexShaderOutput[1].position,
-                                                                       vertexShaderOutput[2].position)) {
+                                                                          vertexShaderOutput[1].position,
+                                                                          vertexShaderOutput[2].position)) {
             ZGL_DEBUG_PRINT("DEBUG: Culled triangle using fustrum culling\n");
             continue;
         }
@@ -1032,10 +1030,10 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
     zgl_shader_context_t result = {0};
     zgl_gourard_uniform_t* defaultUniformData = (zgl_gourard_uniform_t*) uniformData;
-    zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
+    zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
     result.position = zgl_mul_mat_v4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
-    
+
     // Set other vertex attributes
     result.numAttributes = 13;
 
@@ -1070,7 +1068,7 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
         float tex_v = ZGL__MIN(fabs(v * textureHeight), textureHeight - 1);
         int floor_u = floor(tex_u);
         int floor_v = floor(tex_v);
-        
+
         if (uniform->bilinearFiltering) {
             // Bilinear filtering
             float ratio_u = tex_u - floor_u;
@@ -1091,7 +1089,6 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
     return zgl_mul_scalar_color(input->attributes[12], unshadedColor);
 }
 
-
 /* Phong shading */
 // Compute the lighting at each fragment
 typedef struct {
@@ -1106,10 +1103,10 @@ static inline zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, vo
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
     zgl_shader_context_t result = {0};
     zgl_phong_uniform_t* uniform = (zgl_phong_uniform_t*) uniformData;
-    zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};    
+    zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(uniform->modelMatrix, inputVertex4); // Local to world space
     result.position = zgl_mul_mat_v4(uniform->viewProjectionMatrix, worldSpaceVertex); // World to clip space
-    
+
     // Set other vertex attributes
     result.numAttributes = 15;
     zgl_vec3_t worldSpaceNormal = zgl_mul_mat_v3(uniform->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
@@ -1139,7 +1136,7 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     float specularExponent = input->attributes[14];
     float invMagNormal = 1.0f / zgl_magnitude(normal);
     float lighting = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
-    
+
     uint32_t unshadedColor;
     if (textureHeight == 0 || textureWidth == 0) {
         unshadedColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
@@ -1150,7 +1147,7 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
         float tex_v = ZGL__MIN(fabs(v * textureHeight), textureHeight - 1);
         int floor_u = floor(tex_u);
         int floor_v = floor(tex_v);
-        
+
         if (uniform->bilinearFiltering) {
             float ratio_u = tex_u - floor_u;
             float ratio_v = tex_v - floor_v;
@@ -1205,6 +1202,5 @@ static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
     zgl__rasterize_triangle(x0, x1, x2, y0, y1, y2, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
                             area, 0, 0, NULL, shaderContexts, zgl_colored_fragment_shader, NULL, canvas, renderOptions);
 }
-
 
 #endif // ZEROGL_H
