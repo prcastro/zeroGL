@@ -29,7 +29,7 @@ The project comes with a distribution for sdl2 under `external/` . On other syst
 > zig build-exe main.c external\upng\upng.c -O ReleaseFast --library c -I.\external\sdl2\include -Lexternal\sdl2\lib\x64 -lSDL2 -lSDL2main -femit-bin=target\main.exe
 ```
 
-**macOS** (replace `/usr/local/lib` with the path you found with `sdl2-config --libs`):
+**linux, macOS** (replace `/usr/local/lib` with the path you found with `sdl2-config --libs`):
 ```console
 $ zig build-exe main.c external/upng/upng.c -O ReleaseFast --library c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -femit-bin=target/main
 ```
@@ -53,6 +53,14 @@ Install Visual Studio Community 2022 (the C/C++ compilers may suffice), then run
 ```
 
 Change the `vcvarsall.bat` path according to your VS installation.
+
+### Linux
+
+On Linux sytems where SDL2 is installed, the exemple main program can also be built by running (again, replace `/usr/local/lib` with the path you found with `sdl2-config --libs`):
+
+```console
+gcc main.c external/upng/upng.c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -l:libm.so.6 -o target/main
+```
 
 #### VS Code
 If you're using Visual Studio Code, then you can install Visual Studio Community 2022 (the C/C++ compilers may suffice) and also install the C/C++ extensions from Microsoft.
