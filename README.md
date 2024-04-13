@@ -59,7 +59,7 @@ Change the `vcvarsall.bat` path according to your VS installation.
 On Linux sytems where SDL2 is installed, the exemple main program can also be built by running (again, replace `/usr/local/lib` with the path you found with `sdl2-config --libs`):
 
 ```console
-gcc main.c external/upng/upng.c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -l:libm.so.6 -o target/main
+gcc main.c external/upng/upng.c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -lm -o target/main
 ```
 
 #### VS Code
