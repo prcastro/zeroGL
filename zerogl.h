@@ -87,6 +87,10 @@ static inline zgl_vec3_t zgl_add(zgl_vec3_t a, zgl_vec3_t b) {
     return (zgl_vec3_t) {a.x + b.x, a.y + b.y, a.z + b.z};
 }
 
+static inline zgl_vec3_t zgl_add_three_vec3(zgl_vec3_t a, zgl_vec3_t b, zgl_vec3_t c) {
+    return (zgl_vec3_t) {a.x + b.x + c.x, a.y + b.y + c.y, a.z + b.z + c.z};
+}
+
 static inline zgl_vec4_t zgl_add_v4(zgl_vec4_t a, zgl_vec4_t b) {
     return (zgl_vec4_t) {a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};
 }
@@ -401,6 +405,12 @@ static inline uint32_t zgl_mul_scalar_color(double x, uint32_t color) {
     return zgl_color(zgl__clamp(x * r, 255.0), zgl__clamp(x * g, 255.0), zgl__clamp(x * b, 255.0));
 }
 
+static inline uint32_t zgl_mul_vec3_color(zgl_vec3_t v, uint32_t color) {
+    uint8_t r, g, b;
+    zgl_color_components(color, &r, &g, &b);
+    return zgl_color(zgl__clamp(v.x * r, 255.0), zgl__clamp(v.y * g, 255.0), zgl__clamp(v.z * b, 255.0));
+}
+
 static inline uint32_t zgl_add_colors(uint32_t c0, uint32_t c1) {
     uint8_t r0, g0, b0;
     uint8_t r1, g1, b1;
@@ -494,16 +504,16 @@ static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices,
 /* LIGHTING */
 
 typedef struct {
-    float intensity;
+    zgl_vec3_t intensity;
 } zgl_ambient_light_t;
 
 typedef struct {
-    float      intensity;
+    zgl_vec3_t intensity;
     zgl_vec3_t direction;
 } zgl_dir_light_t;
 
 typedef struct {
-    float      intensity;
+    zgl_vec3_t intensity;
     zgl_vec3_t position;
 } zgl_point_light_t;
 
@@ -517,7 +527,7 @@ typedef struct {
 } zgl_light_sources_t;
 
 // TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
-static inline float zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
+static inline zgl_vec3_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
                    zgl_light_sources_t lightSources, uint8_t renderOptions) {
     int numDirectionalLights = lightSources.numDirectionalLights;
     zgl_dir_light_t* directionalLights = lightSources.directionalLights;
@@ -526,9 +536,9 @@ static inline float zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float i
     int numAmbientLights = lightSources.numAmbientLights;
     zgl_ambient_light_t* ambientLights = lightSources.ambientLights;
 
-    float diffuseIntensity  = 0.0;
-    float specularIntensity = 0.0;
-    float ambientIntensity  = 0.0;
+    zgl_vec3_t diffuseIntensity  = {0.0, 0.0, 0.0};
+    zgl_vec3_t specularIntensity = {0.0, 0.0, 0.0};
+    zgl_vec3_t ambientIntensity  = {0.0, 0.0, 0.0};
 
     // Directional lights
     for (int i = 0; i < numDirectionalLights; i++) {
@@ -537,13 +547,17 @@ static inline float zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float i
         float invMagnitudeLightDirection = 1.0f / magnitudeLightDirection;
         if (renderOptions & ZGL_DIFFUSE_LIGHTING) {
             float cos_alpha = -zgl_dot(lightDirection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
-            diffuseIntensity += ZGL__MAX(cos_alpha, 0.0f) * directionalLights[i].intensity;
+            diffuseIntensity.x += ZGL__MAX(cos_alpha, 0.0f) * directionalLights[i].intensity.x;
+            diffuseIntensity.y += ZGL__MAX(cos_alpha, 0.0f) * directionalLights[i].intensity.y;
+            diffuseIntensity.z += ZGL__MAX(cos_alpha, 0.0f) * directionalLights[i].intensity.z;
         }
 
         if (renderOptions & ZGL_SPECULAR_LIGHTING) {
             zgl_vec3_t reflection = zgl_sub(zgl_mul_scalar(2 * -zgl_dot(lightDirection, normal), normal), lightDirection);
             float cos_beta = -zgl_dot(reflection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
-            specularIntensity += pow(ZGL__MAX(cos_beta, 0.0f), specularExponent) * directionalLights[i].intensity;
+            specularIntensity.x += pow(ZGL__MAX(cos_beta, 0.0f), specularExponent) * directionalLights[i].intensity.x;
+            specularIntensity.y += pow(ZGL__MAX(cos_beta, 0.0f), specularExponent) * directionalLights[i].intensity.y;
+            specularIntensity.z += pow(ZGL__MAX(cos_beta, 0.0f), specularExponent) * directionalLights[i].intensity.z;
         }
     }
 
@@ -553,23 +567,30 @@ static inline float zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float i
         float invMagnitudeLightDirection = 1.0f / zgl_magnitude(lightDirection);
         if (renderOptions & ZGL_DIFFUSE_LIGHTING) {
             float cos_alpha = zgl_dot(lightDirection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
-            diffuseIntensity += ZGL__MAX(cos_alpha, 0) * pointLights[i].intensity;
+            diffuseIntensity.x += ZGL__MAX(cos_alpha, 0) * pointLights[i].intensity.x;
+            diffuseIntensity.y += ZGL__MAX(cos_alpha, 0) * pointLights[i].intensity.y;
+            diffuseIntensity.z += ZGL__MAX(cos_alpha, 0) * pointLights[i].intensity.z;
         }
 
         if (renderOptions & ZGL_SPECULAR_LIGHTING) {
             zgl_vec3_t reflection = zgl_sub(zgl_mul_scalar(2 * zgl_dot(lightDirection, normal), normal), lightDirection);
             float cos_beta = zgl_dot(reflection, normal) * invMagnitudeLightDirection * invMagnitudeNormal;
-            specularIntensity += pow(ZGL__MAX(cos_beta, 0), specularExponent) * pointLights[i].intensity;
+            specularIntensity.x += pow(ZGL__MAX(cos_beta, 0), specularExponent) * pointLights[i].intensity.x;
+            specularIntensity.y += pow(ZGL__MAX(cos_beta, 0), specularExponent) * pointLights[i].intensity.y;
+            specularIntensity.z += pow(ZGL__MAX(cos_beta, 0), specularExponent) * pointLights[i].intensity.z;
         }
     }
 
     // Ambient light
     for (int i = 0; i < numAmbientLights; i++) {
-        ambientIntensity += ambientLights[i].intensity;
+        ambientIntensity.x += ambientLights[i].intensity.x;
+        ambientIntensity.y += ambientLights[i].intensity.y;
+        ambientIntensity.z += ambientLights[i].intensity.z;
     }
 
-    return (diffuseIntensity + specularIntensity + ambientIntensity);
+    return zgl_add_three_vec3(diffuseIntensity, specularIntensity, ambientIntensity);
 }
+
 
 /* 3D CAMERA */
 
@@ -1035,7 +1056,7 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
     result.position = zgl_mul_mat_v4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
 
     // Set other vertex attributes
-    result.numAttributes = 13;
+    result.numAttributes = 15;
 
     zgl_vec3_t worldSpaceNormal = zgl_mul_mat_v3(defaultUniformData->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
     float invMagNormal = 1.0f / zgl_magnitude(worldSpaceNormal);
@@ -1051,7 +1072,11 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
     result.attributes[9] = inputVertexData->specularColor.y;  // G
     result.attributes[10] = inputVertexData->specularColor.z; // B
     result.attributes[11] = inputVertexData->specularExponent;
-    result.attributes[12] = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    
+    zgl_vec3_t light_intensity = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    result.attributes[12] = light_intensity.x;
+    result.attributes[13] = light_intensity.y;
+    result.attributes[14] = light_intensity.z;
     return result;
 }
 
@@ -1086,8 +1111,11 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
             unshadedColor = texture[floor_v * textureWidth + floor_u];
         }
     }
-    return zgl_mul_scalar_color(input->attributes[12], unshadedColor);
+
+    zgl_vec3_t light_intensity = {input->attributes[12], input->attributes[13], input->attributes[14]};
+    return zgl_mul_vec3_color(light_intensity, unshadedColor);
 }
+
 
 /* Phong shading */
 // Compute the lighting at each fragment
@@ -1116,14 +1144,14 @@ static inline zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, vo
     result.attributes[3] = worldSpaceVertex.x;
     result.attributes[4] = worldSpaceVertex.y;
     result.attributes[5] = worldSpaceVertex.z;
-    result.attributes[6] = inputVertexData->textureCoord.x;   // u
-    result.attributes[7] = inputVertexData->textureCoord.y;   // v
-    result.attributes[8] = inputVertexData->diffuseColor.x;   // R
-    result.attributes[9] = inputVertexData->diffuseColor.y;   // G
+    result.attributes[6] = inputVertexData->textureCoord.x;    // u
+    result.attributes[7] = inputVertexData->textureCoord.y;    // v
+    result.attributes[8] = inputVertexData->diffuseColor.x;    // R
+    result.attributes[9] = inputVertexData->diffuseColor.y;    // G
     result.attributes[10] = inputVertexData->diffuseColor.z;   // B
     result.attributes[11] = inputVertexData->specularColor.x;  // R
     result.attributes[12] = inputVertexData->specularColor.y;  // G
-    result.attributes[13] = inputVertexData->specularColor.z; // B
+    result.attributes[13] = inputVertexData->specularColor.z;  // B
     result.attributes[14] = inputVertexData->specularExponent;
     return result;
 }
@@ -1135,7 +1163,7 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     zgl_vec3_t position = {input->attributes[3], input->attributes[4], input->attributes[5]};
     float specularExponent = input->attributes[14];
     float invMagNormal = 1.0f / zgl_magnitude(normal);
-    float lighting = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    zgl_vec3_t lighting = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
 
     uint32_t unshadedColor;
     if (textureHeight == 0 || textureWidth == 0) {
@@ -1164,7 +1192,7 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
             unshadedColor = texture[floor_v * textureWidth + floor_u];
         }
     }
-    return zgl_mul_scalar_color(lighting, unshadedColor);
+    return zgl_mul_vec3_color(lighting, unshadedColor);
 }
 
 static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,

@@ -148,9 +148,11 @@ game_state_t* init() {
         exit(-1);
     }
 
-    ambientLights[0] = (zgl_ambient_light_t) {0.4};
-    directionalLights[0] = (zgl_dir_light_t) {0.0, {0.0, -1.0, 1.0}};
-    pointLights[0] = (zgl_point_light_t) {0.9, {-0.5, 1.5, -2.0}};
+    ambientLights[0] = (zgl_ambient_light_t) {
+        .intensity = {0.4, 0.4, 0.4}
+    };
+    directionalLights[0] = (zgl_dir_light_t) {{0.0, 0.0, 0.0}, {0.0, -1.0, 1.0}};
+    pointLights[0] = (zgl_point_light_t) {{0.9, 0.9, 0.9}, {-0.5, 1.5, -2.0}};
 
     pointLightObjects[0] = zgl_object(&meshes[0], pointLights[0].position, 0.05, IDENTITY_M4x4);
 
@@ -320,12 +322,16 @@ void updateDebugUI(game_state_t *game) {
 
                 if (nk_tree_push(ctx, NK_TREE_NODE, "Ambient", NK_MAXIMIZED)) {
                     for (int i = 0; i < game->lightSources.numAmbientLights; i++) {
-                        nk_layout_row_dynamic(ctx, row_size * 4, 1);
+                        nk_layout_row_dynamic(ctx, row_size * 7, 1);
                         char label[100];
                         sprintf(label, "Ambient Light %d", i);
                         if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
                             nk_layout_row_dynamic(ctx, row_size, 1);
-                            nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.ambientLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                            nk_property_float(ctx, "Intensity R", 0.0f, &game->lightSources.ambientLights[i].intensity.x, 3.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity G", 0.0f, &game->lightSources.ambientLights[i].intensity.y, 3.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity B", 0.0f, &game->lightSources.ambientLights[i].intensity.z, 3.0f, 0.1f, 0.1f);
                             nk_group_end(ctx);
                         }
                     }
@@ -334,12 +340,16 @@ void updateDebugUI(game_state_t *game) {
 
                 if (nk_tree_push(ctx, NK_TREE_NODE, "Directional", NK_MAXIMIZED)) {
                     for (int i = 0; i < game->lightSources.numDirectionalLights; i++) {
-                        nk_layout_row_dynamic(ctx, row_size * 8, 1);
+                        nk_layout_row_dynamic(ctx, row_size * 11, 1);
                         char label[100];
                         sprintf(label, "Directional Light %d", i);
                         if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
                             nk_layout_row_dynamic(ctx, row_size, 1);
-                            nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.directionalLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                            nk_property_float(ctx, "Intensity R", 0.0f, &game->lightSources.directionalLights[i].intensity.x, 3.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity G", 0.0f, &game->lightSources.directionalLights[i].intensity.y, 3.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity B", 0.0f, &game->lightSources.directionalLights[i].intensity.z, 3.0f, 0.1f, 0.1f);
                             nk_layout_row_dynamic(ctx, row_size, 1);
                             nk_property_float(ctx, "x", -1.0f, &game->lightSources.directionalLights[i].direction.x, 1.0f, 0.1f, 0.1f);
                             nk_layout_row_dynamic(ctx, row_size, 1);
@@ -354,12 +364,16 @@ void updateDebugUI(game_state_t *game) {
 
                 if (nk_tree_push(ctx, NK_TREE_NODE, "Point", NK_MAXIMIZED)) {
                     for (int i = 0; i < game->lightSources.numPointLights; i++) {
-                        nk_layout_row_dynamic(ctx, row_size * 8, 1);
+                        nk_layout_row_dynamic(ctx, row_size * 11, 1);
                         char label[100];
                         sprintf(label, "Point Light %d", i);
                         if (nk_group_begin(ctx, label, NK_WINDOW_TITLE|NK_WINDOW_BORDER|NK_WINDOW_NO_SCROLLBAR)) {
                             nk_layout_row_dynamic(ctx, row_size, 1);
-                            nk_property_float(ctx, "Intensity", 0.0f, &game->lightSources.pointLights[i].intensity, 3.0f, 0.1f, 0.1f);
+                            nk_property_float(ctx, "Intensity R", 0.0f, &game->lightSources.pointLights[i].intensity.x, 3.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity G", 0.0f, &game->lightSources.pointLights[i].intensity.y, 3.0f, 0.1f, 0.1f);
+                            nk_layout_row_dynamic(ctx, row_size, 1);
+                            nk_property_float(ctx, "Intensity B", 0.0f, &game->lightSources.pointLights[i].intensity.z, 3.0f, 0.1f, 0.1f);
                             nk_layout_row_dynamic(ctx, row_size, 1);
                             nk_property_float(ctx, "x", -10.0f, &game->lightSources.pointLights[i].position.x, 10.0f, 0.1f, 0.1f);
                             nk_layout_row_dynamic(ctx, row_size, 1);
