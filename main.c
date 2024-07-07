@@ -621,21 +621,47 @@ void drawObjects(game_state_t* game) {
             };
             zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
         } else if (game->shaderType == GOURAUD_SHADER) {
+            zgl_texture_t* textures = malloc(object.mesh->numMaterials * sizeof(zgl_texture_t));
+            for (int j = 0; j < object.mesh->numMaterials; j++) {
+                zgl_material_t material = object.mesh->materials[j];
+                zgl_texture_t texture = {
+                    .hasTexture = (material.textureHeight != 0) && (material.textureWidth != 0),
+                    .width = material.textureWidth,
+                    .height = material.textureHeight,
+                    .data = material.texture
+                };
+                textures[j] = texture;
+            }
             zgl_gourard_uniform_t uniformData = {
                 .modelMatrix = object.transform,
                 .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                 .viewProjectionMatrix = game->camera.viewProjMatrix,
                 .lightSources = game->lightSources,
-                .bilinearFiltering = game->bilinearFiltering
+                .bilinearFiltering = game->bilinearFiltering,
+                .textures = textures
             };
             zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_gourard_vertex_shader, zgl_gourard_fragment_shader, game->renderOptions);
         } else if (game->shaderType == PHONG_SHADER) {
+            // TODO: This is duplicated here and in the gouraud shader
+            zgl_texture_t* textures = malloc(object.mesh->numMaterials * sizeof(zgl_texture_t));
+            for (int j = 0; j < object.mesh->numMaterials; j++) {
+                zgl_material_t material = object.mesh->materials[j];
+                zgl_texture_t texture = {
+                    .hasTexture = (material.textureHeight != 0) && (material.textureWidth != 0),
+                    .width = material.textureWidth,
+                    .height = material.textureHeight,
+                    .data = material.texture
+                };
+                textures[j] = texture;
+            }
+
             zgl_phong_uniform_t uniformData = {
                 .modelMatrix = object.transform,
                 .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                 .viewProjectionMatrix = game->camera.viewProjMatrix,
                 .lightSources = game->lightSources,
-                .bilinearFiltering = game->bilinearFiltering
+                .bilinearFiltering = game->bilinearFiltering,
+                .textures = textures
             };
             zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_phong_vertex_shader, zgl_phong_fragment_shader, game->renderOptions);
         }
