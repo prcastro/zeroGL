@@ -71,8 +71,9 @@ uint32_t pixels[WIDTH*HEIGHT];
 
 int main(void) {
     zgl_canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
+    zgl_clear_depth_buffer(canvas);
+    zgl_render_fill(ZGL_COLOR_BLACK, canvas);
 
-    zgl_render_fill(ZGL_COLOR_BLACK, canvas)
     zgl_render_triangle(400, 400, ZGL_COLOR_RED,
                         700, 400, ZGL_COLOR_GREEN,
                         700, 100, ZGL_COLOR_BLUE,
@@ -151,6 +152,7 @@ zgl_canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
           </code></pre>
           <p>You can draw primitives such as lines, triangles and 3D objects using the following functions</p>
           <pre><code>
+void zgl_render_clear(zgl_canvas_t canvas)
 void zgl_render_pixel(int x, int y, uint32_t color, zgl_canvas_t canvas)
 void zgl_render_fill(uint32_t color, zgl_canvas_t canvas)
 void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas)

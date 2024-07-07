@@ -656,10 +656,7 @@ void render(game_state_t* game) {
     ZGL_DEBUG_PRINT("INFO: Rendering scene\n");
     zgl_canvas_t canvas = game->canvas;
 
-    // Init depthBuffer
-    for (int i = 0; i < canvas.width * canvas.height; i++) {
-        canvas.depthBuffer[i] = FLT_MAX;
-    }
+    zgl_clear_depth_buffer(canvas);
 
     ZGL_DEBUG_PRINT("INFO: Drawing background\n");
     zgl_render_fill(game->backgroundColor, canvas);
