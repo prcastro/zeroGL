@@ -1010,6 +1010,7 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
 
 /* Basic shading */
 // Draw with a single color, no lighting or textures
+
 typedef struct {
     zgl_mat4x4_t modelviewprojection;
 } zgl_basic_uniform_t;
@@ -1028,6 +1029,8 @@ static inline uint32_t zgl_basic_fragment_shader(const zgl_shader_context_t* inp
 }
 
 /* Colored Shading */
+// Draw with the color of the vertex, no lighting or textures
+
 typedef struct {
     zgl_mat4x4_t modelviewprojection;
 } zgl_colored_uniform_t;
@@ -1050,6 +1053,7 @@ static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* i
 }
 
 /* Gouraud shading */
+// Compute the lighting at each vertex and interpolate the values at each fragment
 
 typedef struct {
     int hasTexture;
@@ -1149,6 +1153,7 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
 
 /* Phong shading */
 // Compute the lighting at each fragment
+
 typedef struct {
     zgl_mat4x4_t        modelMatrix;
     zgl_mat4x4_t        modelInvRotationMatrixTransposed;

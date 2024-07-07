@@ -170,11 +170,10 @@ void zgl_render_object3D(zgl_object3D_t* obj, void *uniform, zgl_camera_t cam, z
           <p>You can customize <code>zgl_render_object3D</code> behavior by passing custom shaders. Shaders are written in pure C code. You can define vertex and fragment shaders following the type:</p>
           <pre><code>
 zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* uniformData);
-uint32_t             zgl_fragment_shader_t(zgl_shader_context_t* input, void* uniformData,
-                                           int textureWidth, int textureHeight, uint32_t* texture);
+uint32_t             zgl_fragment_shader_t(zgl_shader_context_t* input, void* uniformData);
           </code></pre>
           <p><strong>Vertex shaders</strong> receive a pointer to the vertex data and a pointer to the uniform data. They must return a <code>shader_context_t</code> type, which is a struct containing the transformed vertex data.</p>
-          <p><strong>Fragment shaders</strong> receive a pointer to the shader context (containing the interpolated data from the vertexes of each triangle), a pointer to the uniform data, the texture width and height and a pointer to the texture data. They must return a <code>uint32_t</code> type, which is the color of the pixel.</p>
+          <p><strong>Fragment shaders</strong> receive a pointer to the shader context (containing the interpolated data from the vertexes of each triangle), a pointer to the uniform data. They must return a <code>uint32_t</code> type, which is the color of the pixel.</p>
       </article>
     </section>
   </main>
