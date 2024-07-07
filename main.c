@@ -119,7 +119,7 @@ game_state_t* init() {
     vertices[1] = (zgl_vec3_t) {1, 0, 0};
     vertices[2] = (zgl_vec3_t) {0, 1, 0};
     triangles[0] = (zgl_triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
-    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, 0, 0, NULL};
+    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_canvas_t) {NULL, 0, 0, 0, NULL}};
     meshes[5] = (zgl_mesh_t) {
         .name = "Debug",
         .numVertices = 3,
