@@ -560,7 +560,6 @@ void updateCameraPosition(game_state_t* game) {
         zgl_quaternion_t rotation = zgl_quaternion(-turningSpeed, cameraRight);
         newCameraDirection = zgl_rotate(newCameraDirection, rotation);
         newCameraUp = zgl_rotate(newCameraUp, rotation);
-
     }
 
     if (keys[SDL_SCANCODE_DOWN]) {
@@ -624,12 +623,7 @@ void drawObjects(game_state_t* game) {
         } else {
             zgl_canvas_t* textures = malloc(object.mesh->numMaterials * sizeof(zgl_canvas_t));
             for (int j = 0; j < object.mesh->numMaterials; j++) {
-                zgl_material_t material = object.mesh->materials[j];
-                zgl_canvas_t texture = {
-                    .width = material.textureWidth,
-                    .height = material.textureHeight,
-                    .frameBuffer = material.texture
-                };
+                zgl_canvas_t texture = object.mesh->materials[j].diffuseTexture;
                 textures[j] = texture;
             }
 

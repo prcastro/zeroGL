@@ -9,9 +9,10 @@
 #include "zerogl.h"
 #include "external/upng/upng.h"
 
-static inline uint32_t* loadTexture(char* filename, int* textureWidth, int* textureHeight) {
+static inline zgl_canvas_t loadTexture(char* filename) {
     ZGL_DEBUG_PRINT("DEBUG: Loading texture %s\n", filename);
-    uint32_t* texture = NULL;
+    zgl_canvas_t texture = {0};
+    texture.frameBuffer = NULL;
 
     upng_t* upng = upng_new_from_file(filename);
     if (upng  == NULL) {
@@ -22,23 +23,23 @@ static inline uint32_t* loadTexture(char* filename, int* textureWidth, int* text
     upng_decode(upng);
     uint32_t  a, r, g, b;
     if (upng_get_error(upng) == UPNG_EOK) {
-        *textureWidth = upng_get_width(upng);
-        *textureHeight = upng_get_height(upng);
+        texture.width = upng_get_width(upng);
+        texture.height = upng_get_height(upng);
 
         ZGL_DEBUG_PRINT("DEBUG: Texture size %d x %d\n", *textureWidth, *textureHeight);
         uint32_t* buffer = (uint32_t*) upng_get_buffer(upng);
-        texture = (uint32_t*) malloc((*textureWidth) * (*textureHeight) * sizeof(uint32_t));
-        if (texture == NULL) {
+        texture.frameBuffer = (uint32_t*) malloc(texture.width * texture.height * sizeof(uint32_t));
+        if (texture.frameBuffer == NULL) {
             fprintf(stderr, "ERROR: Texture memory allocation failed.\n");
             exit(-1);
         }
-        for (int i = 0; i < (*textureWidth) * (*textureHeight); i++) {
+        for (int i = 0; i < texture.width * texture.height; i++) {
             uint32_t pixel = buffer[i];
             a = (pixel & 0xFF000000) >> 24;
             b = (pixel & 0x00FF0000) >> 16;
             g = (pixel & 0x0000FF00) >> 8;
             r = (pixel & 0x000000FF);
-            texture[i]  = (a << 24) | (r << 16) | (g << 8) |  b;
+            texture.frameBuffer[i]  = (a << 24) | (r << 16) | (g << 8) |  b;
         }   
     } else {
         fprintf(stderr, "ERROR: Couldn't decode texture file\n");
@@ -93,9 +94,7 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             sscanf(line, "newmtl %s\n", name);
             materials[*numMaterials - 1].name = name;
             
-            materials[*numMaterials - 1].texture = NULL;
-            materials[*numMaterials - 1].textureWidth = 0;
-            materials[*numMaterials - 1].textureHeight = 0;
+            materials[*numMaterials - 1].diffuseTexture = (zgl_canvas_t) {NULL, 0, 0,};
         }
 
         if (line[0] == 'K' && line[1] == 'd') {
@@ -119,7 +118,7 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             char* path = getPath(filename);
             strcat(path, textureFilename);
             ZGL_DEBUG_PRINT("DEBUG: Loading texture %s\n", textureFilename);
-            materials[*numMaterials - 1].texture = loadTexture(path, &materials[*numMaterials - 1].textureWidth, &materials[*numMaterials - 1].textureHeight);
+            materials[*numMaterials - 1].diffuseTexture = loadTexture(path);
         }
     }
 

@@ -433,6 +433,14 @@ static inline void zgl_color_to_floats(uint32_t color, float* r, float* g, float
 /* 3D OBJECTS */
 
 typedef struct {
+    uint32_t* frameBuffer;
+    int       width;
+    int       height;
+    int       hasDepthBuffer;
+    float*    depthBuffer;
+} zgl_canvas_t;
+
+typedef struct {
   int     v0, v1, v2;
   int     t0, t1, t2;
   int     n0, n1, n2;
@@ -440,13 +448,11 @@ typedef struct {
 } zgl_triangle_t;
 
 typedef struct {
-    char*     name;
-    uint32_t  diffuseColor;
-    uint32_t  specularColor;
-    float     specularExponent;
-    int       textureWidth;
-    int       textureHeight;
-    uint32_t* texture;
+    char*        name;
+    uint32_t     diffuseColor;
+    uint32_t     specularColor;
+    float        specularExponent;
+    zgl_canvas_t diffuseTexture;
 } zgl_material_t;
 
 typedef struct {
@@ -697,14 +703,6 @@ static inline int zgl__tri_in_fustrum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v
 }
 
 /* DRAWING */
-
-typedef struct {
-    uint32_t* frameBuffer;
-    int       width;
-    int       height;
-    int       hasDepthBuffer;
-    float*    depthBuffer;
-} zgl_canvas_t;
 
 static inline int zgl__edge_cross(int ax, int ay, int bx, int by, int px, int py) {
   int abx = bx - ax;
