@@ -25,7 +25,6 @@
 #define ZGL_BACKFACE_CULLING (1 << 2)
 #define ZGL_FUSTRUM_CULLING (1 << 3)
 #define ZGL_BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
-#define ZGL_FLAT_SHADING (1 << 5)
 
 #define ZGL__MIN(a,b) (((a)<(b))?(a):(b))
 #define ZGL__MAX(a,b) (((a)>(b))?(a):(b))
@@ -794,7 +793,7 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                                            int area,
                                            zgl_shader_context_t vertexShaderOutput[3],
                                            zgl_fragment_shader_t fragmentShader, void* uniformData,
-                                           zgl_canvas_t canvas, uint16_t renderOptions) {
+                                           zgl_canvas_t canvas) {
     int x_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(x0, x1), x2), 0);
     int x_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(x0, x1), x2), canvas.width - 1);
     int y_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(y0, y1), y2), 0);
@@ -841,39 +840,31 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                 if (z < canvas.depthBuffer[y * canvas.width + x]) {
                     // Compute fragment input attributes from the outputs of the vertex shader
                     zgl_shader_context_t fragmentShaderInput = {0};
-                    // TODO: We should have a flat vertex and fragment shader that uses flat attributes 
-                    if (renderOptions & ZGL_FLAT_SHADING) {
-                        fragmentShaderInput.position = vertexShaderOutput[0].position;
-                        fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
-                        for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
-                            fragmentShaderInput.attributes[i] = vertexShaderOutput[0].attributes[i];
-                        }
-                    } else {
-                        // Interpolate clip position
-                        fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
-                                                            beta  * vertexShaderOutput[1].position.x +
-                                                            gamma * vertexShaderOutput[2].position.x;
-                        fragmentShaderInput.position.y = alpha * vertexShaderOutput[0].position.y +
-                                                            beta  * vertexShaderOutput[1].position.y +
-                                                            gamma * vertexShaderOutput[2].position.y;
-                        fragmentShaderInput.position.z = alpha * vertexShaderOutput[0].position.z +
-                                                            beta  * vertexShaderOutput[1].position.z +
-                                                            gamma * vertexShaderOutput[2].position.z;
-                        fragmentShaderInput.position.w = 1.0f; // w is always one, because we already did the perspective divide
+                    
+                    // Interpolate clip position
+                    fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
+                                                        beta  * vertexShaderOutput[1].position.x +
+                                                        gamma * vertexShaderOutput[2].position.x;
+                    fragmentShaderInput.position.y = alpha * vertexShaderOutput[0].position.y +
+                                                        beta  * vertexShaderOutput[1].position.y +
+                                                        gamma * vertexShaderOutput[2].position.y;
+                    fragmentShaderInput.position.z = alpha * vertexShaderOutput[0].position.z +
+                                                        beta  * vertexShaderOutput[1].position.z +
+                                                        gamma * vertexShaderOutput[2].position.z;
+                    fragmentShaderInput.position.w = 1.0f; // w is always one, because we already did the perspective divide
 
-                        // Interpolate other attributes
-                        fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
-                        for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
-                            fragmentShaderInput.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
-                                                                beta  * vertexShaderOutput[1].attributes[i] +
-                                                                gamma * vertexShaderOutput[2].attributes[i];
-                        }
+                    // Interpolate other attributes
+                    fragmentShaderInput.numAttributes = vertexShaderOutput[0].numAttributes;
+                    for (int i = 0; i < fragmentShaderInput.numAttributes; i++) {
+                        fragmentShaderInput.attributes[i] = alpha * vertexShaderOutput[0].attributes[i] +
+                                                            beta  * vertexShaderOutput[1].attributes[i] +
+                                                            gamma * vertexShaderOutput[2].attributes[i];
+                    }
 
-                        // Set flat attributes using the values of the first vertex
-                        fragmentShaderInput.numFlatAttributes = vertexShaderOutput[0].numFlatAttributes;
-                        for (int i = 0; i < fragmentShaderInput.numFlatAttributes; i++) {
-                            fragmentShaderInput.flatAttributes[i] = vertexShaderOutput[0].flatAttributes[i];
-                        }
+                    // Set flat attributes using the values of the first vertex
+                    fragmentShaderInput.numFlatAttributes = vertexShaderOutput[0].numFlatAttributes;
+                    for (int i = 0; i < fragmentShaderInput.numFlatAttributes; i++) {
+                        fragmentShaderInput.flatAttributes[i] = vertexShaderOutput[0].flatAttributes[i];
                     }
 
                     uint32_t color = fragmentShader(&fragmentShaderInput, uniformData);
@@ -1000,8 +991,7 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
                                 ys[0], ys[1], ys[2],
                                 zs[0], zs[1], zs[2],
                                 invws[0], invws[1], invws[2],
-                                area,
-                                vertexShaderOutput, fragmentShader, uniformData, canvas, renderOptions);
+                                area, vertexShaderOutput, fragmentShader, uniformData, canvas);
     }
 }
 
@@ -1051,15 +1041,109 @@ static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* i
     return zgl_color_from_floats(input->attributes[0], input->attributes[1], input->attributes[2]);
 }
 
-/* Gouraud shading */
-// Compute the lighting at each vertex and interpolate the values at each fragment
+/* Flat shading */
+// Compute the lighting at one vertex and use it for the whole triangle
 
+// TODO: This should probably be a canvas_t
 typedef struct {
     int hasTexture;
     int width;
     int height;
     uint32_t* data;
 } zgl_texture_t;
+
+typedef struct {
+    zgl_mat4x4_t        modelMatrix;
+    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
+    zgl_mat4x4_t        viewProjectionMatrix;
+    zgl_light_sources_t lightSources;
+    int                 bilinearFiltering;
+    zgl_texture_t*      textures;
+} zgl_flat_uniform_t;
+
+static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, void* uniformData) {
+    zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
+    zgl_shader_context_t result = {0};
+    zgl_flat_uniform_t* defaultUniformData = (zgl_flat_uniform_t*) uniformData;
+    zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
+    zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
+    result.position = zgl_mul_mat_v4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
+
+
+    result.numAttributes = 2;
+    result.attributes[0] = inputVertexData->textureCoord.x;   // u
+    result.attributes[1] = inputVertexData->textureCoord.y;   // v
+
+    // Set other vertex attributes
+    result.numFlatAttributes = 14;
+
+    zgl_vec3_t worldSpaceNormal = zgl_mul_mat_v3(defaultUniformData->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
+    float invMagNormal = 1.0f / zgl_magnitude(worldSpaceNormal);
+    result.flatAttributes[0] = worldSpaceNormal.x;
+    result.flatAttributes[1] = worldSpaceNormal.y;
+    result.flatAttributes[2] = worldSpaceNormal.z;
+    result.flatAttributes[3] = inputVertexData->diffuseColor.x;   // R
+    result.flatAttributes[4] = inputVertexData->diffuseColor.y;   // G
+    result.flatAttributes[5] = inputVertexData->diffuseColor.z;   // B
+    result.flatAttributes[6] = inputVertexData->specularColor.x;  // R
+    result.flatAttributes[7] = inputVertexData->specularColor.y;  // G
+    result.flatAttributes[8] = inputVertexData->specularColor.z; // B
+    result.flatAttributes[9] = inputVertexData->specularExponent;
+
+    zgl_vec3_t light_intensity = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    result.flatAttributes[10] = light_intensity.x;
+    result.flatAttributes[11] = light_intensity.y;
+    result.flatAttributes[12] = light_intensity.z;
+    
+    result.flatAttributes[13] = inputVertexData->materialIndex;
+    return result;
+}
+
+static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
+    zgl_flat_uniform_t* uniform = (zgl_flat_uniform_t*) uniformData;
+
+    uint32_t unshadedColor;
+    int textureIndex = input->flatAttributes[13];
+
+    if (!uniform->textures[textureIndex].hasTexture) {
+        unshadedColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
+    } else {
+        int textureWidth = uniform->textures[textureIndex].width;
+        int textureHeight = uniform->textures[textureIndex].height;
+        uint32_t* texture = uniform->textures[textureIndex].data;
+
+        float u = input->attributes[0];
+        float v = input->attributes[1];
+        float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
+        float tex_v = ZGL__MIN(fabs(v * textureHeight), textureHeight - 1);
+        int floor_u = floor(tex_u);
+        int floor_v = floor(tex_v);
+
+        if (uniform->bilinearFiltering) {
+            // Bilinear filtering
+            float ratio_u = tex_u - floor_u;
+            float ratio_v = tex_v - floor_v;
+            int next_u = ZGL__MIN(floor_u + 1, textureWidth - 1);
+            int next_v = ZGL__MIN(floor_v + 1, textureHeight - 1);
+            uint32_t color00 = texture[floor_v * textureWidth + floor_u];
+            uint32_t color10 = texture[floor_v * textureWidth + next_u];
+            uint32_t color01 = texture[next_v * textureWidth + floor_u];
+            uint32_t color11 = texture[next_v * textureWidth + next_u];
+            uint32_t color0 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color00), zgl_mul_scalar_color(ratio_u, color10));
+            uint32_t color1 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color01), zgl_mul_scalar_color(ratio_u, color11));
+            unshadedColor = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_v, color0), zgl_mul_scalar_color(ratio_v, color1));
+        } else {
+            unshadedColor = texture[floor_v * textureWidth + floor_u];
+        }
+    }
+
+    zgl_vec3_t light_intensity = {input->flatAttributes[10], input->flatAttributes[11], input->flatAttributes[12]};
+    return zgl_mul_vec3_color(light_intensity, unshadedColor);
+}
+
+
+/* Gouraud shading */
+// Compute the lighting at each vertex and interpolate the values at each fragment
 
 // Compute the lighting at each vertex
 typedef struct {
@@ -1272,7 +1356,7 @@ static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
 
     zgl_shader_context_t shaderContexts[3] = {shaderContext0, shaderContext1, shaderContext2};
     zgl__rasterize_triangle(x0, x1, x2, y0, y1, y2, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
-                            area, shaderContexts, zgl_colored_fragment_shader, NULL, canvas, renderOptions);
+                            area, shaderContexts, zgl_colored_fragment_shader, NULL, canvas);
 }
 
 #endif // ZEROGL_H
