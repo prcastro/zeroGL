@@ -785,7 +785,6 @@ typedef struct {
 } zgl_shader_context_t;
 
 typedef zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* uniformData);
-// TODO: Should we pass the texture as a parameter as we're doing now? What happens when we have multiple textures?
 typedef uint32_t zgl_fragment_shader_t(const zgl_shader_context_t* input, void* uniformData);
 
 static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
