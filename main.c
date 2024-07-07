@@ -622,14 +622,13 @@ void drawObjects(game_state_t* game) {
             };
             zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
         } else {
-            zgl_texture_t* textures = malloc(object.mesh->numMaterials * sizeof(zgl_texture_t));
+            zgl_canvas_t* textures = malloc(object.mesh->numMaterials * sizeof(zgl_canvas_t));
             for (int j = 0; j < object.mesh->numMaterials; j++) {
                 zgl_material_t material = object.mesh->materials[j];
-                zgl_texture_t texture = {
-                    .hasTexture = (material.textureHeight != 0) && (material.textureWidth != 0),
+                zgl_canvas_t texture = {
                     .width = material.textureWidth,
                     .height = material.textureHeight,
-                    .data = material.texture
+                    .frameBuffer = material.texture
                 };
                 textures[j] = texture;
             }
