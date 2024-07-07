@@ -715,6 +715,12 @@ static inline int zgl__edge_cross(int ax, int ay, int bx, int by, int px, int py
   return abx * apy - aby * apx;
 }
 
+static inline void zgl_clear_depth_buffer(zgl_canvas_t canvas) {
+    for (int i = 0; i < canvas.width * canvas.height; i++) {
+        canvas.depthBuffer[i] = FLT_MAX;
+    }
+}
+
 static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_canvas_t canvas) {
     if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
         int position = j * canvas.width + i;
