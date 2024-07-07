@@ -433,6 +433,14 @@ static inline void zgl_color_to_floats(uint32_t color, float* r, float* g, float
 /* 3D OBJECTS */
 
 typedef struct {
+    uint32_t* frameBuffer;
+    int       width;
+    int       height;
+    int       hasDepthBuffer;
+    float*    depthBuffer;
+} zgl_canvas_t;
+
+typedef struct {
   int     v0, v1, v2;
   int     t0, t1, t2;
   int     n0, n1, n2;
@@ -440,13 +448,11 @@ typedef struct {
 } zgl_triangle_t;
 
 typedef struct {
-    char*     name;
-    uint32_t  diffuseColor;
-    uint32_t  specularColor;
-    float     specularExponent;
-    int       textureWidth;
-    int       textureHeight;
-    uint32_t* texture;
+    char*        name;
+    uint32_t     diffuseColor;
+    uint32_t     specularColor;
+    float        specularExponent;
+    zgl_canvas_t diffuseTexture;
 } zgl_material_t;
 
 typedef struct {
@@ -698,14 +704,6 @@ static inline int zgl__tri_in_fustrum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v
 
 /* DRAWING */
 
-typedef struct {
-    uint32_t* frameBuffer;
-    int       width;
-    int       height;
-    int       hasDepthBuffer;
-    float*    depthBuffer;
-} zgl_canvas_t;
-
 static inline int zgl__edge_cross(int ax, int ay, int bx, int by, int px, int py) {
   int abx = bx - ax;
   int aby = by - ay;
@@ -886,7 +884,6 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
     }
 }
 
-// TODO: Pass texture as a canvas_t
 static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_canvas_t canvas,
                                        zgl_vertex_shader_t vertexShader, zgl_fragment_shader_t fragmentShader, uint16_t renderOptions) {
     zgl_mesh_t* mesh = object->mesh;
@@ -1044,21 +1041,13 @@ static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* i
 /* Flat shading */
 // Compute the lighting at one vertex and use it for the whole triangle
 
-// TODO: This should probably be a canvas_t
-typedef struct {
-    int hasTexture;
-    int width;
-    int height;
-    uint32_t* data;
-} zgl_texture_t;
-
 typedef struct {
     zgl_mat4x4_t        modelMatrix;
     zgl_mat4x4_t        modelInvRotationMatrixTransposed;
     zgl_mat4x4_t        viewProjectionMatrix;
     zgl_light_sources_t lightSources;
     int                 bilinearFiltering;
-    zgl_texture_t*      textures;
+    zgl_canvas_t*       textures;
 } zgl_flat_uniform_t;
 
 static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, void* uniformData) {
@@ -1104,14 +1093,13 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
 
     uint32_t unshadedColor;
     int textureIndex = input->flatAttributes[13];
+    int textureWidth = uniform->textures[textureIndex].width;
+    int textureHeight = uniform->textures[textureIndex].height;
 
-    if (!uniform->textures[textureIndex].hasTexture) {
+    if (textureWidth == 0 || textureHeight == 0) {
         unshadedColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
     } else {
-        int textureWidth = uniform->textures[textureIndex].width;
-        int textureHeight = uniform->textures[textureIndex].height;
-        uint32_t* texture = uniform->textures[textureIndex].data;
-
+        uint32_t* texture = uniform->textures[textureIndex].frameBuffer;
         float u = input->attributes[0];
         float v = input->attributes[1];
         float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
@@ -1152,7 +1140,7 @@ typedef struct {
     zgl_mat4x4_t        viewProjectionMatrix;
     zgl_light_sources_t lightSources;
     int                 bilinearFiltering;
-    zgl_texture_t*      textures;
+    zgl_canvas_t*       textures;
 } zgl_gourard_uniform_t;
 
 static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData) {
@@ -1196,14 +1184,13 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
 
     uint32_t unshadedColor;
     int textureIndex = input->flatAttributes[0];
+    int textureWidth = uniform->textures[textureIndex].width;
+    int textureHeight = uniform->textures[textureIndex].height;
 
-    if (!uniform->textures[textureIndex].hasTexture) {
+    if (textureWidth == 0 || textureHeight == 0) {
         unshadedColor = zgl_color_from_floats(input->attributes[5], input->attributes[6], input->attributes[7]);
     } else {
-        int textureWidth = uniform->textures[textureIndex].width;
-        int textureHeight = uniform->textures[textureIndex].height;
-        uint32_t* texture = uniform->textures[textureIndex].data;
-
+        uint32_t* texture = uniform->textures[textureIndex].frameBuffer;
         float u = input->attributes[3];
         float v = input->attributes[4];
         float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
@@ -1243,7 +1230,7 @@ typedef struct {
     zgl_mat4x4_t        viewProjectionMatrix;
     zgl_light_sources_t lightSources;
     int                 bilinearFiltering;
-    zgl_texture_t*      textures;
+    zgl_canvas_t*       textures;
 } zgl_phong_uniform_t;
 
 static inline zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, void* uniformData) {
@@ -1288,15 +1275,14 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     zgl_vec3_t lighting = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
 
     int textureIndex = input->flatAttributes[0];
+    int textureWidth  = uniform->textures[textureIndex].width;
+    int textureHeight = uniform->textures[textureIndex].height;
 
     uint32_t unshadedColor;
-    if (!uniform->textures[textureIndex].hasTexture) {
+    if (textureWidth == 0 || textureHeight == 0) {
         unshadedColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
     } else {
-        int textureWidth  = uniform->textures[textureIndex].width;
-        int textureHeight = uniform->textures[textureIndex].height;
-        uint32_t* texture = uniform->textures[textureIndex].data;
-
+        uint32_t* texture = uniform->textures[textureIndex].frameBuffer;
         float u = input->attributes[6];
         float v = input->attributes[7];
         float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
@@ -1326,7 +1312,7 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
 static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
                                        int x1, int y1, uint32_t color1,
                                        int x2, int y2, uint32_t color2,
-                                       zgl_canvas_t canvas, uint16_t renderOptions) {
+                                       zgl_canvas_t canvas) {
     int area = zgl__edge_cross(x0, y0, x1, y1, x2, y2);
     float r, g, b;
 
