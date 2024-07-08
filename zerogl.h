@@ -9,15 +9,12 @@
 #include <stdio.h>
 
 /* Utils */
+// Define ZGL_DEBUG to enable debug print
 #ifdef ZGL_DEBUG
 #define ZGL_DEBUG_PRINT(...) printf(__VA_ARGS__)
 #else
 #define ZGL_DEBUG_PRINT(...) do {} while (0)
 #endif
-
-#define ZGL__MIN(a,b) (((a)<(b))?(a):(b))
-#define ZGL__MAX(a,b) (((a)>(b))?(a):(b))
-#define ZGL_PI 3.14159265358979323846264338327950288
 
 /* Vectors and Matrices */
 typedef struct {
@@ -83,7 +80,6 @@ static const uint32_t ZGL_COLOR_CYAN   = 0x0000FFFF;
 
 static inline uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b);
 static inline void zgl_color_components(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b);
-static inline float zgl__clamp(float v, float max);
 static inline uint32_t zgl_mul_scalar_color(double x, uint32_t color);
 static inline uint32_t zgl_mul_vec3_color(zgl_vec3_t v, uint32_t color);
 static inline uint32_t zgl_add_colors(uint32_t c0, uint32_t c1);
@@ -188,11 +184,9 @@ typedef struct {
     float        turningSpeed;
 } zgl_camera_t;
 
-static inline zgl_vec4_t zgl__normalize_plane(zgl_vec4_t plane);
 static inline zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction, zgl_vec3_t up,
                                       float fov, float aspectRatio, float near, float far,
                                       float movementSpeed, float turningSpeed);
-static inline int zgl__tri_in_fustrum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v3);
 
 /* Shaders */
 
@@ -281,20 +275,11 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
 #define ZGL_FUSTRUM_CULLING (1 << 3)
 #define ZGL_BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
 
-static inline int zgl__edge_cross(int ax, int ay, int bx, int by, int px, int py);
 static inline void zgl_clear_depth_buffer(zgl_canvas_t canvas);
 static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_canvas_t canvas);
 static inline void zgl_render_fill(uint32_t color, zgl_canvas_t canvas);
 static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas);
 static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_canvas_t canvas);
-static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
-                                           int y0, int y1, int y2,
-                                           float z0, float z1, float z2,
-                                           float invw0, float invw1, float invw2,
-                                           int area,
-                                           zgl_shader_context_t vertexShaderOutput[3],
-                                           zgl_fragment_shader_t fragmentShader, void* uniformData,
-                                           zgl_canvas_t canvas);
 static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
                                        int x1, int y1, uint32_t color1,
                                        int x2, int y2, uint32_t color2,
@@ -309,6 +294,11 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
 #ifdef ZEROGL_IMPLEMENTATION
 #ifndef ZEROGL_IMPLEMENTATION_INCLUDED
 #define ZEROGL_IMPLEMENTATION_INCLUDED
+
+/* Utils */
+#define ZGL__PI 3.14159265358979323846264338327950288
+#define ZGL__MIN(a,b) (((a)<(b))?(a):(b))
+#define ZGL__MAX(a,b) (((a)>(b))?(a):(b))
 
 /* Vectors and Matrices */
 
@@ -568,7 +558,7 @@ static inline zgl_mat4x4_t zgl_scale_mat(float scale) {
 
 // TODO: Only use quaternion for rotation
 static inline zgl_mat4x4_t zgl_rotx_mat(float degrees) {
-    float radians = degrees * ZGL_PI / 180.0f;
+    float radians = degrees * ZGL__PI / 180.0f;
     float cos = cosf(radians);
     float sin = sinf(radians);
     return (zgl_mat4x4_t) {{
@@ -580,7 +570,7 @@ static inline zgl_mat4x4_t zgl_rotx_mat(float degrees) {
 }
 
 static inline zgl_mat4x4_t zgl_roty_mat(float degrees) {
-    float radians = degrees * ZGL_PI / 180.0f;
+    float radians = degrees * ZGL__PI / 180.0f;
     float cos = cosf(radians);
     float sin = sinf(radians);
     return (zgl_mat4x4_t) {{
@@ -592,7 +582,7 @@ static inline zgl_mat4x4_t zgl_roty_mat(float degrees) {
 }
 
 static inline zgl_mat4x4_t zgl_rotz_mat(float degrees) {
-    float radians = degrees * ZGL_PI / 180.0f;
+    float radians = degrees * ZGL__PI / 180.0f;
     float cos = cosf(radians);
     float sin = sinf(radians);
     return (zgl_mat4x4_t) {{
@@ -607,7 +597,7 @@ static inline zgl_mat4x4_t zgl_rotz_mat(float degrees) {
 
 static inline zgl_quaternion_t zgl_quaternion(float degrees, zgl_vec3_t axis) {
     zgl_vec3_t normalizedAxis = zgl_normalize(axis);
-    float angle = degrees * ZGL_PI / 180.0f;
+    float angle = degrees * ZGL__PI / 180.0f;
     float halfAngle = angle * 0.5f;
     float sinHalfAngle = sinf(halfAngle);
     return (zgl_quaternion_t) {cosf(halfAngle), normalizedAxis.x * sinHalfAngle, normalizedAxis.y * sinHalfAngle, normalizedAxis.z * sinHalfAngle};
@@ -806,7 +796,7 @@ static inline zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction,
     // Create the view matrix
     zgl_mat4x4_t viewMatrix = zgl_mul_mat(rotationMatrix, translationMatrix);
 
-    float fovRadians = fov * ZGL_PI / 180.0;
+    float fovRadians = fov * ZGL__PI / 180.0;
     float yScale = 1.0 / tan(fovRadians / 2.0);
     float xScale = yScale / aspectRatio;
     float zScale = far / (far - near);
