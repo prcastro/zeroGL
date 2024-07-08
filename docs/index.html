@@ -95,20 +95,20 @@ int main(void) {
     <img src="./img/shaders.png" width="700">
     </section>
     <hr>
-    <section id="docs">
+    <div id="docs">
       <header><nav>
         API Documentation (WIP)
         <ul>
           <li><a href="#settings">Settings</a></li>
-          <li><a href="#vectors">Vectors</a></li>
+          <li><a href="#linear-algebra">Linear Algebra</a></li>
           <li><a href="#colors">Colors</a></li>
           <li><a href="#objects">3D Objects</a></li>
+          <li><a href="#lighting">Lighting</a></li>
           <li><a href="#camera">Camera</a></li>
-          <li><a href="#drawing">Drawing</a></li>
+          <li><a href="#rendering">Rendering</a></li>
           <li><a href="#shaders">Shaders</a></li>
         </ul>
       </nav></header>
-      <article>
         <div id="settings">
           <h3>Settings</h3>
           <p>You can <code>#define ZGL_DEBUG</code> to enable debug logs on the console. Also, you can define the following variables to customize the program behavior</p>
@@ -117,13 +117,14 @@ int main(void) {
 #define ZGLMAX_VERTEX_SHADER_ATTRIBUTES 100
           </code></pre>
         </div>
-        <div id="vectors">
-          <h3>Vectors</h3>
+        <div id="linear-algebra">
+          <h3>Linear Algebra</h3>
+          <h4>Vectors</h4>
           <p>Vectors are represented by two types. The first is <code>vec3_t</code>, having an x, y and z attributes of type <code>float</code></p>
           <pre><code>
 zgl_vec3_t v = {1.0f, 2.0f, 3.0f};
           </code></pre>
-          <h3>Matrices</h3>
+          <h4>Matrices</h4>
           <p>ZeroGL provides a 4x4 matrix type called <code>zgl_mat4x4_t</code>, with <code>float</code> elements</p>
           <pre><code>
 zgl_mat4x4_t m = {{
@@ -157,8 +158,7 @@ zgl_mat4x4_t zgl_rotx_mat(float degrees);
 zgl_mat4x4_t zgl_roty_mat(float degrees);
 zgl_mat4x4_t zgl_rotz_mat(float degrees);
           </code></pre>
-        <div id="quaternions">
-          <h3>Quaternions</h3>
+          <h4>Quaternions</h4>
           <p>ZeroGL provides a quaternion type called <code>zgl_quaternion_t</code>, with <code>float</code> elements</p>
           <pre><code>
 zgl_quaternion_t q = {1.0f, 0.0f, 0.0f, 0.0f};
@@ -205,8 +205,8 @@ zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction, zgl_vec3_t up
                         float movementSpeed, float turningSpeed)
           </code></pre>
         </div>
-        <div id="drawing">
-          <h3>Drawing</h3>
+        <div id="rendering">
+          <h3>Rendering</h3>
           <p>To draw, you need to create a <code>zgl_canvas_t</code> type and pass it to the drawing functions</p>
           <pre><code>
 zgl_canvas_t canvas = {WIDTH, HEIGHT, pixels, 0, NULL};
@@ -235,6 +235,74 @@ uint32_t             zgl_fragment_shader_t(zgl_shader_context_t* input, void* un
           </code></pre>
           <p><strong>Vertex shaders</strong> receive a pointer to the vertex data and a pointer to the uniform data. They must return a <code>shader_context_t</code> type, which is a struct containing the transformed vertex data.</p>
           <p><strong>Fragment shaders</strong> receive a pointer to the shader context (containing the interpolated data from the vertexes of each triangle), a pointer to the uniform data. They must return a <code>uint32_t</code> type, which is the color of the pixel.</p>
+          <h4>Default Shaders</h4>
+          <p>ZeroGL provides default shaders for you to use</p>
+          <h5>Basic Shader</h5>
+          <p>Draw with a single color, no lighting or textures</p>
+          <pre><code>
+typedef struct {
+    zgl_mat4x4_t modelviewprojection;
+} zgl_basic_uniform_t;
+
+zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, void* uniformData);
+uint32_t zgl_basic_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+          </code></pre>
+          <h5>Colored Shader</h5>
+          <p>Draw with the color of the vertex, no lighting or textures</p>
+          <pre><code>
+typedef struct {
+    zgl_mat4x4_t modelviewprojection;
+} zgl_colored_uniform_t;
+
+zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, void* uniformData);
+uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+          </code></pre>
+          <h5>Flat Shader</h5>
+          <p>Compute the lighting at one vertex and use it for the whole triangle</p>
+          <pre><code>
+typedef struct {
+    zgl_mat4x4_t        modelMatrix;
+    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
+    zgl_mat4x4_t        viewProjectionMatrix;
+    zgl_light_sources_t lightSources;
+    int                 bilinearFiltering;
+    zgl_canvas_t*       textures;
+} zgl_flat_uniform_t;
+
+zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, void* uniformData);
+uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+          </code></pre>
+          <h5>Gourard Shader</h5>
+          <p>Compute the lighting at each vertex and interpolate the values at each fragment</p>
+          <pre><code>
+typedef struct {
+    zgl_mat4x4_t        modelMatrix;
+    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
+    zgl_mat4x4_t        viewProjectionMatrix;
+    zgl_light_sources_t lightSources;
+    int                 bilinearFiltering;
+    zgl_canvas_t*       textures;
+} zgl_gourard_uniform_t;
+
+zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData);
+uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+          </code></pre>
+          <h5>Phong Shader</h5>
+          <p>Compute the lighting at each fragment</p>
+          <pre><code>
+typedef struct {
+    zgl_mat4x4_t        modelMatrix;
+    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
+    zgl_mat4x4_t        viewProjectionMatrix;
+    zgl_light_sources_t lightSources;
+    int                 bilinearFiltering;
+    zgl_canvas_t*       textures;
+} zgl_phong_uniform_t;
+
+zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, void* uniformData);
+uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+          </code></pre>
+        </div>
       </article>
     </section>
   </main>
