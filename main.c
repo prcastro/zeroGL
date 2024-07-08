@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define  ZEROGL_IMPLEMENTATION
+#define ZEROGL_IMPLEMENTATION
 #include "zerogl.h"
 #include "objloader.h"
 
@@ -182,7 +182,7 @@ game_state_t* init() {
     game->lastTime = SDL_GetPerformanceCounter();
     game->window = SDL_CreateWindow("Rasterizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
     game->renderer = SDL_CreateRenderer(game->window, -1, 0);
-    game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
+    game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     game->canvas = canvas;
     game->backgroundColor = ZGL_COLOR_BLACK;
     game->drawLights    = 1;
