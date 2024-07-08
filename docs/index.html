@@ -172,7 +172,17 @@ zgl_vec3_t       zgl_rotate(zgl_vec3_t v, zgl_quaternion_t q);
         </div>
         <div id="colors">
           <h3>Colors</h3>
-          <p>Colors are represented as a <code>uint32_t</code> in the form of <code>0xAARRGGBB</code>, where <code>AA</code> is the alpha channel, <code>RR</code> is the red channel, <code>GG</code> is the green channel and <code>BB</code> is the blue channel.</p>
+          <p>Colors are represented as a <code>uint32_t</code> in the pixel format of choice. The default format is <code>ZEROGL_PIXELFORMAT_RGBA8888</code>, so colors are represented using the form <code>0xRRGGBBAA</code> where <code>AA</code> is the alpha channel, <code>RR</code> is the red channel, <code>GG</code> is the green channel and <code>BB</code> is the blue channel. This are all the supported formats:</p>
+          <pre><code>
+ZEROGL_PIXELFORMAT_RGBA8888
+ZEROGL_PIXELFORMAT_ARGB8888
+ZEROGL_PIXELFORMAT_BGRA8888
+ZEROGL_PIXELFORMAT_ABGR8888
+          </code></pre>
+          <p>The formats are compatible with the respective formats in SDL. The pixel format can be set by defining the following variable before importing zeroGL:</p>
+          <pre><code>
+#define ZEROGL_PIXELFORMAT ZEROGL_PIXELFORMAT_RGBA8888
+          </code></pre>
         </div>
         <p>You can manipulate colors by using the following functions:</p>
         <pre><code>

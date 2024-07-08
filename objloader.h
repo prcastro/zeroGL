@@ -21,7 +21,7 @@ static inline zgl_canvas_t loadTexture(char* filename) {
     }
 
     upng_decode(upng);
-    uint32_t  a, r, g, b;
+    uint8_t  a, r, g, b;
     if (upng_get_error(upng) == UPNG_EOK) {
         texture.width = upng_get_width(upng);
         texture.height = upng_get_height(upng);
@@ -39,8 +39,8 @@ static inline zgl_canvas_t loadTexture(char* filename) {
             b = (pixel & 0x00FF0000) >> 16;
             g = (pixel & 0x0000FF00) >> 8;
             r = (pixel & 0x000000FF);
-            texture.frameBuffer[i]  = (a << 24) | (r << 16) | (g << 8) |  b;
-        }   
+            texture.frameBuffer[i] = zgl_color(r, g, b);
+        }
     } else {
         fprintf(stderr, "ERROR: Couldn't decode texture file\n");
         exit(-1);
@@ -93,7 +93,7 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             char* name = (char*) malloc(128 * sizeof(char));
             sscanf(line, "newmtl %s\n", name);
             materials[*numMaterials - 1].name = name;
-            
+
             materials[*numMaterials - 1].diffuseTexture = (zgl_canvas_t) {NULL, 0, 0,};
         }
 
@@ -111,7 +111,7 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             sscanf(line, "Ns %f\n", &materials[*numMaterials - 1].specularExponent);
         }
 
-        
+
         if (line[0] == 'm' && line[1] == 'a' && line[2] == 'p' && line[3] == '_' && line[4] == 'K' && line[5] == 'd') {
             char* textureFilename = (char*) malloc(128 * sizeof(char));
             sscanf(line, "map_Kd %s\n", textureFilename);
@@ -148,7 +148,7 @@ static inline zgl_mesh_t* loadObjFile(const char* filename, bool flipTexturesVer
     int currentMaterial;
 
     char line[128];
-    
+
     FILE* fp = fopen(filename, "r");
 
     while (fgets(line, 128, fp) != NULL) {
@@ -254,7 +254,7 @@ static inline zgl_mesh_t* loadObjFile(const char* filename, bool flipTexturesVer
                 triangles[num_triangles - 1].t0 = t0 - 1;
                 triangles[num_triangles - 1].t1 = t1 - 1;
                 triangles[num_triangles - 1].t2 = t2 - 1;
-                
+
                 // Compute normals
                 zgl_vec3_t v0v1 = zgl_sub(vertices[v1 - 1], vertices[v0 - 1]);
                 zgl_vec3_t v0v2 = zgl_sub(vertices[v2 - 1], vertices[v0 - 1]);
@@ -293,7 +293,7 @@ static inline zgl_mesh_t* loadObjFile(const char* filename, bool flipTexturesVer
                 triangles[num_triangles - 1].n1 = num_normals - 1;
                 triangles[num_triangles - 1].n2 = num_normals - 1;
             }
-            
+
             triangles[num_triangles - 1].materialIndex = currentMaterial;
         }
     }
@@ -338,7 +338,7 @@ static inline zgl_mesh_t* loadObjFile(const char* filename, bool flipTexturesVer
         exit(-1);
     }
     strcpy(mesh->name, name);
-    
+
     ZGL_DEBUG_PRINT("DEBUG: Loaded mesh %s\n", mesh->name);
     return mesh;
 }
