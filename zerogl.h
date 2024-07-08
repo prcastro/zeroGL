@@ -2,37 +2,24 @@
 #define ZEROGL_H
 
 #include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 
+/* Utils */
 #ifdef ZGL_DEBUG
 #define ZGL_DEBUG_PRINT(...) printf(__VA_ARGS__)
 #else
 #define ZGL_DEBUG_PRINT(...) do {} while (0)
 #endif
 
-/* CONFIGURATION */
-
-#ifndef ZGL_MAX_VERTEX_SHADER_ATTRIBUTES
-#define ZGL_MAX_VERTEX_SHADER_ATTRIBUTES 50
-#endif // ZGL_MAX_VERTEX_SHADER_ATTRIBUTES
-
-// Rendering options
-#define ZGL_DIFFUSE_LIGHTING (1 << 0)
-#define ZGL_SPECULAR_LIGHTING (1 << 1)
-#define ZGL_BACKFACE_CULLING (1 << 2)
-#define ZGL_FUSTRUM_CULLING (1 << 3)
-#define ZGL_BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
-
 #define ZGL__MIN(a,b) (((a)<(b))?(a):(b))
 #define ZGL__MAX(a,b) (((a)>(b))?(a):(b))
-
-/* VECTORS AND MATRICES */
-
 #define ZGL_PI 3.14159265358979323846264338327950288
 
+/* Vectors and Matrices */
 typedef struct {
   float x, y, z;
 } zgl_vec3_t;
@@ -51,6 +38,279 @@ static const zgl_mat4x4_t IDENTITY_M4x4 = {{
     {0.0, 0.0, 1.0, 0.0},
     {0.0, 0.0, 0.0, 1.0}
 }};
+
+static inline zgl_vec3_t zgl_cross(zgl_vec3_t a, zgl_vec3_t b);
+static inline float zgl_dot(zgl_vec3_t a, zgl_vec3_t b);
+static inline float zgl_dot_v4(zgl_vec4_t a, zgl_vec4_t b);
+static inline float zgl_magnitude(zgl_vec3_t v);
+static inline zgl_vec3_t zgl_sub(zgl_vec3_t a, zgl_vec3_t b);
+static inline zgl_vec4_t zgl_sub_v4(zgl_vec4_t a, zgl_vec4_t b);
+static inline zgl_vec3_t zgl_add(zgl_vec3_t a, zgl_vec3_t b);
+static inline zgl_vec3_t zgl_add_three_vec3(zgl_vec3_t a, zgl_vec3_t b, zgl_vec3_t c);
+static inline zgl_vec4_t zgl_add_v4(zgl_vec4_t a, zgl_vec4_t b);
+static inline zgl_vec3_t zgl_normalize(zgl_vec3_t v);
+static inline zgl_vec3_t zgl_mul_scalar(float k, zgl_vec3_t v);
+static inline zgl_vec4_t zgl_mul_mat_v4(zgl_mat4x4_t mat4x4, zgl_vec4_t vec4);
+static inline zgl_vec3_t zgl_mul_mat_v3(zgl_mat4x4_t mat4x4, zgl_vec3_t v);
+static inline zgl_mat4x4_t zgl_mul_mat(zgl_mat4x4_t m1, zgl_mat4x4_t m2);
+static inline zgl_mat4x4_t zgl_transpose(zgl_mat4x4_t m);
+static inline float zgl_determinant(float a, float b, float c, float d, float e, float f, float g, float h, float i);
+static inline zgl_mat4x4_t zgl_inverse(zgl_mat4x4_t matrix);
+static inline zgl_mat4x4_t zgl_translation_mat(zgl_vec3_t vector);
+static inline zgl_mat4x4_t zgl_scale_mat(float scale);
+static inline zgl_mat4x4_t zgl_rotx_mat(float degrees);
+static inline zgl_mat4x4_t zgl_roty_mat(float degrees);
+static inline zgl_mat4x4_t zgl_rotz_mat(float degrees);
+
+/* Quaternions */
+typedef struct {
+    float w, x, y, z;
+} zgl_quaternion_t;
+
+static inline zgl_quaternion_t zgl_quaternion(float degrees, zgl_vec3_t axis);
+static inline zgl_quaternion_t zgl_mul_quat(zgl_quaternion_t q1, zgl_quaternion_t q2);
+static inline zgl_vec3_t zgl_rotate(zgl_vec3_t v, zgl_quaternion_t q);
+
+/* Colors */
+static const uint32_t ZGL_COLOR_WHITE  = 0x00FFFFFF;
+static const uint32_t ZGL_COLOR_BLACK  = 0x00000000;
+static const uint32_t ZGL_COLOR_RED    = 0x00FF0000;
+static const uint32_t ZGL_COLOR_GREEN  = 0x0000FF00;
+static const uint32_t ZGL_COLOR_BLUE   = 0x000000FF;
+static const uint32_t ZGL_COLOR_YELLOW = 0x00FFFF00;
+static const uint32_t ZGL_COLOR_PURPLE = 0x00FF00FF;
+static const uint32_t ZGL_COLOR_CYAN   = 0x0000FFFF;
+
+static inline uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b);
+static inline void zgl_color_components(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b);
+static inline float zgl__clamp(float v, float max);
+static inline uint32_t zgl_mul_scalar_color(double x, uint32_t color);
+static inline uint32_t zgl_mul_vec3_color(zgl_vec3_t v, uint32_t color);
+static inline uint32_t zgl_add_colors(uint32_t c0, uint32_t c1);
+static inline uint32_t zgl_color_from_floats(float r, float g, float b);
+static inline void zgl_color_to_floats(uint32_t color, float* r, float* g, float* b);
+
+/* 3D Objects */
+typedef struct {
+    uint32_t* frameBuffer;
+    int       width;
+    int       height;
+    int       hasDepthBuffer;
+    float*    depthBuffer;
+} zgl_canvas_t;
+
+typedef struct {
+  int     v0, v1, v2;
+  int     t0, t1, t2;
+  int     n0, n1, n2;
+  int     materialIndex;
+} zgl_triangle_t;
+
+typedef struct {
+    char*        name;
+    uint32_t     diffuseColor;
+    uint32_t     specularColor;
+    float        specularExponent;
+    zgl_canvas_t diffuseTexture;
+} zgl_material_t;
+
+typedef struct {
+    char*           name;
+    int             numVertices;
+    zgl_vec3_t*     vertices;
+    int             numTextureCoords;
+    zgl_vec3_t*     textureCoords;
+    int             numNormals;
+    zgl_vec3_t*     normals;
+    float*          invMagnitudeNormals;
+    int             numTriangles;
+    zgl_triangle_t* triangles;
+    int             numMaterials;
+    zgl_material_t* materials;
+    zgl_vec3_t      center;
+    float           boundsRadius;
+} zgl_mesh_t;
+
+typedef struct {
+    zgl_mesh_t*  mesh;
+    zgl_vec3_t   translation;
+    float        scale;
+    zgl_mat4x4_t rotation;
+    zgl_mat4x4_t transform;
+} zgl_object3D_t;
+
+static inline zgl_object3D_t zgl_object(zgl_mesh_t *mesh, zgl_vec3_t translation, float scale, zgl_mat4x4_t rotation);
+static inline zgl_vec3_t zgl_mesh_center(zgl_vec3_t* vertices, int numVertices);
+static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices, zgl_vec3_t center);
+
+/* Lighting */
+typedef struct {
+    zgl_vec3_t intensity;
+} zgl_ambient_light_t;
+
+typedef struct {
+    zgl_vec3_t intensity;
+    zgl_vec3_t direction;
+} zgl_dir_light_t;
+
+typedef struct {
+    zgl_vec3_t intensity;
+    zgl_vec3_t position;
+} zgl_point_light_t;
+
+typedef struct {
+    int                  numAmbientLights;
+    zgl_ambient_light_t* ambientLights;
+    int                  numDirectionalLights;
+    zgl_dir_light_t*     directionalLights;
+    int                  numPointLights;
+    zgl_point_light_t*   pointLights;
+} zgl_light_sources_t;
+
+static inline zgl_vec3_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
+                                      zgl_light_sources_t lightSources, uint8_t renderOptions);
+
+/* Camera */
+// Camera for left handed coordinate system
+typedef struct {
+    zgl_vec3_t   position;         // x, y, z coordinates of the camera
+    zgl_vec3_t   direction;        // Direction in which the camera is looking
+    zgl_vec3_t   up;               // Up direction for the camera (usually [0, 1, 0])
+    float        fov;              // Field of view (in degrees)
+    float        aspectRatio;      // Aspect ratio of the viewport
+    float        nearPlane;        // Distance to the near clipping plane
+    float        farPlane;         // Distance to the far clipping plane
+    zgl_mat4x4_t viewMatrix;       // View matrix
+    zgl_mat4x4_t projectionMatrix; // Projection matrix
+    zgl_mat4x4_t viewProjMatrix;   // View * Projection matrix
+    zgl_vec4_t   fustrumPlanes[6]; // View frustum planes
+    float        movementSpeed;
+    float        turningSpeed;
+} zgl_camera_t;
+
+static inline zgl_vec4_t zgl__normalize_plane(zgl_vec4_t plane);
+static inline zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction, zgl_vec3_t up,
+                                      float fov, float aspectRatio, float near, float far,
+                                      float movementSpeed, float turningSpeed);
+static inline int zgl__tri_in_fustrum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v3);
+
+/* Shaders */
+
+// Configuration
+#ifndef ZGL_MAX_VERTEX_SHADER_ATTRIBUTES
+#define ZGL_MAX_VERTEX_SHADER_ATTRIBUTES 50
+#endif // ZGL_MAX_VERTEX_SHADER_ATTRIBUTES
+
+typedef struct {
+    zgl_vec3_t position;
+    zgl_vec3_t normal;
+    zgl_vec3_t textureCoord;
+    zgl_vec3_t diffuseColor;
+    zgl_vec3_t specularColor;
+    float      specularExponent;
+    int        materialIndex;
+} zgl_vertex_input_t;
+
+typedef struct {
+    zgl_vec4_t position;
+    int        numAttributes;
+    float      attributes[ZGL_MAX_VERTEX_SHADER_ATTRIBUTES];
+    int        numFlatAttributes;
+    float      flatAttributes[ZGL_MAX_VERTEX_SHADER_ATTRIBUTES];
+} zgl_shader_context_t;
+
+typedef zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* uniformData);
+typedef uint32_t zgl_fragment_shader_t(const zgl_shader_context_t* input, void* uniformData);
+
+typedef struct {
+    zgl_mat4x4_t modelviewprojection;
+} zgl_basic_uniform_t;
+
+static inline zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, void* uniformData);
+static inline uint32_t zgl_basic_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+
+typedef struct {
+    zgl_mat4x4_t modelviewprojection;
+} zgl_colored_uniform_t;
+
+static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, void* uniformData);
+static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+
+typedef struct {
+    zgl_mat4x4_t        modelMatrix;
+    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
+    zgl_mat4x4_t        viewProjectionMatrix;
+    zgl_light_sources_t lightSources;
+    int                 bilinearFiltering;
+    zgl_canvas_t*       textures;
+} zgl_flat_uniform_t;
+
+static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, void* uniformData);
+static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+
+typedef struct {
+    zgl_mat4x4_t        modelMatrix;
+    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
+    zgl_mat4x4_t        viewProjectionMatrix;
+    zgl_light_sources_t lightSources;
+    int                 bilinearFiltering;
+    zgl_canvas_t*       textures;
+} zgl_gourard_uniform_t;
+
+static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData);
+static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+
+typedef struct {
+    zgl_mat4x4_t        modelMatrix;
+    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
+    zgl_mat4x4_t        viewProjectionMatrix;
+    zgl_light_sources_t lightSources;
+    int                 bilinearFiltering;
+    zgl_canvas_t*       textures;
+} zgl_phong_uniform_t;
+
+static inline zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, void* uniformData);
+static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+
+/* Rendering */
+
+//  Rendering options
+#define ZGL_DIFFUSE_LIGHTING (1 << 0)
+#define ZGL_SPECULAR_LIGHTING (1 << 1)
+#define ZGL_BACKFACE_CULLING (1 << 2)
+#define ZGL_FUSTRUM_CULLING (1 << 3)
+#define ZGL_BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
+
+static inline int zgl__edge_cross(int ax, int ay, int bx, int by, int px, int py);
+static inline void zgl_clear_depth_buffer(zgl_canvas_t canvas);
+static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_canvas_t canvas);
+static inline void zgl_render_fill(uint32_t color, zgl_canvas_t canvas);
+static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas);
+static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_canvas_t canvas);
+static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
+                                           int y0, int y1, int y2,
+                                           float z0, float z1, float z2,
+                                           float invw0, float invw1, float invw2,
+                                           int area,
+                                           zgl_shader_context_t vertexShaderOutput[3],
+                                           zgl_fragment_shader_t fragmentShader, void* uniformData,
+                                           zgl_canvas_t canvas);
+static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
+                                       int x1, int y1, uint32_t color1,
+                                       int x2, int y2, uint32_t color2,
+                                       zgl_canvas_t canvas);
+static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_canvas_t canvas,
+                                       zgl_vertex_shader_t vertexShader, zgl_fragment_shader_t fragmentShader, uint16_t renderOptions);
+
+#endif // ZEROGL_H
+
+
+// Include implementation if the client sets ZEROGL_IMPLEMENTATION, but not twice
+#ifdef ZEROGL_IMPLEMENTATION
+#ifndef ZEROGL_IMPLEMENTATION_INCLUDED
+#define ZEROGL_IMPLEMENTATION_INCLUDED
+
+/* Vectos and Matrices */
 
 static inline zgl_vec3_t zgl_cross(zgl_vec3_t a, zgl_vec3_t b) {
     zgl_vec3_t result;
@@ -343,11 +603,7 @@ static inline zgl_mat4x4_t zgl_rotz_mat(float degrees) {
     }};
 }
 
-/* QUATERNIONS */
-
-typedef struct {
-    float w, x, y, z;
-} zgl_quaternion_t;
+/* Quaternions */
 
 static inline zgl_quaternion_t zgl_quaternion(float degrees, zgl_vec3_t axis) {
     zgl_vec3_t normalizedAxis = zgl_normalize(axis);
@@ -373,16 +629,7 @@ static inline zgl_vec3_t zgl_rotate(zgl_vec3_t v, zgl_quaternion_t q) {
     return (zgl_vec3_t){rotated.x, rotated.y, rotated.z};
 }
 
-/* COLORS */
-
-static const uint32_t ZGL_COLOR_WHITE  = 0x00FFFFFF;
-static const uint32_t ZGL_COLOR_BLACK  = 0x00000000;
-static const uint32_t ZGL_COLOR_RED    = 0x00FF0000;
-static const uint32_t ZGL_COLOR_GREEN  = 0x0000FF00;
-static const uint32_t ZGL_COLOR_BLUE   = 0x000000FF;
-static const uint32_t ZGL_COLOR_YELLOW = 0x00FFFF00;
-static const uint32_t ZGL_COLOR_PURPLE = 0x00FF00FF;
-static const uint32_t ZGL_COLOR_CYAN   = 0x0000FFFF;
+/* Colors */
 
 static inline uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b) {
     return 0x00000000 | (r << 16) | (g << 8) |  b;
@@ -430,55 +677,7 @@ static inline void zgl_color_to_floats(uint32_t color, float* r, float* g, float
     *b = b8 / 255.0f;
 }
 
-/* 3D OBJECTS */
-
-typedef struct {
-    uint32_t* frameBuffer;
-    int       width;
-    int       height;
-    int       hasDepthBuffer;
-    float*    depthBuffer;
-} zgl_canvas_t;
-
-typedef struct {
-  int     v0, v1, v2;
-  int     t0, t1, t2;
-  int     n0, n1, n2;
-  int     materialIndex;
-} zgl_triangle_t;
-
-typedef struct {
-    char*        name;
-    uint32_t     diffuseColor;
-    uint32_t     specularColor;
-    float        specularExponent;
-    zgl_canvas_t diffuseTexture;
-} zgl_material_t;
-
-typedef struct {
-    char*           name;
-    int             numVertices;
-    zgl_vec3_t*     vertices;
-    int             numTextureCoords;
-    zgl_vec3_t*     textureCoords;
-    int             numNormals;
-    zgl_vec3_t*     normals;
-    float*          invMagnitudeNormals;
-    int             numTriangles;
-    zgl_triangle_t* triangles;
-    int             numMaterials;
-    zgl_material_t* materials;
-    zgl_vec3_t      center;
-    float           boundsRadius;
-} zgl_mesh_t;
-
-typedef struct {
-    zgl_mesh_t*  mesh;
-    zgl_vec3_t   translation;
-    float        scale;
-    zgl_mat4x4_t rotation;
-    zgl_mat4x4_t transform;
-} zgl_object3D_t;
+/* 3D Objects */
 
 static inline zgl_object3D_t zgl_object(zgl_mesh_t *mesh, zgl_vec3_t translation, float scale, zgl_mat4x4_t rotation) {
     zgl_mat4x4_t translationMatrix = zgl_translation_mat(translation);
@@ -506,30 +705,7 @@ static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices,
     return result;
 }
 
-/* LIGHTING */
-
-typedef struct {
-    zgl_vec3_t intensity;
-} zgl_ambient_light_t;
-
-typedef struct {
-    zgl_vec3_t intensity;
-    zgl_vec3_t direction;
-} zgl_dir_light_t;
-
-typedef struct {
-    zgl_vec3_t intensity;
-    zgl_vec3_t position;
-} zgl_point_light_t;
-
-typedef struct {
-    int                  numAmbientLights;
-    zgl_ambient_light_t* ambientLights;
-    int                  numDirectionalLights;
-    zgl_dir_light_t*     directionalLights;
-    int                  numPointLights;
-    zgl_point_light_t*   pointLights;
-} zgl_light_sources_t;
+/* Lighting */
 
 // TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
 static inline zgl_vec3_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
@@ -597,24 +773,7 @@ static inline zgl_vec3_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, fl
 }
 
 
-/* 3D CAMERA */
-
-// Camera for left handed coordinate system
-typedef struct {
-    zgl_vec3_t   position;         // x, y, z coordinates of the camera
-    zgl_vec3_t   direction;        // Direction in which the camera is looking
-    zgl_vec3_t   up;               // Up direction for the camera (usually [0, 1, 0])
-    float        fov;              // Field of view (in degrees)
-    float        aspectRatio;      // Aspect ratio of the viewport
-    float        nearPlane;        // Distance to the near clipping plane
-    float        farPlane;         // Distance to the far clipping plane
-    zgl_mat4x4_t viewMatrix;       // View matrix
-    zgl_mat4x4_t projectionMatrix; // Projection matrix
-    zgl_mat4x4_t viewProjMatrix;   // View * Projection matrix
-    zgl_vec4_t   fustrumPlanes[6]; // View frustum planes
-    float        movementSpeed;
-    float        turningSpeed;
-} zgl_camera_t;
+/* Camera */
 
 static inline zgl_vec4_t zgl__normalize_plane(zgl_vec4_t plane) {
     float mag = sqrt(plane.x*plane.x + plane.y*plane.y + plane.z*plane.z);
@@ -702,7 +861,7 @@ static inline int zgl__tri_in_fustrum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v
     return 1;
 }
 
-/* DRAWING */
+/* Rendering */
 
 static inline int zgl__edge_cross(int ax, int ay, int bx, int by, int px, int py) {
   int abx = bx - ax;
@@ -763,24 +922,6 @@ static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_ca
     }
 }
 
-typedef struct {
-    zgl_vec3_t position;
-    zgl_vec3_t normal;
-    zgl_vec3_t textureCoord;
-    zgl_vec3_t diffuseColor;
-    zgl_vec3_t specularColor;
-    float      specularExponent;
-    int        materialIndex;
-} zgl_vertex_input_t;
-
-typedef struct {
-    zgl_vec4_t position;
-    int        numAttributes;
-    float      attributes[ZGL_MAX_VERTEX_SHADER_ATTRIBUTES];
-    int        numFlatAttributes;
-    float      flatAttributes[ZGL_MAX_VERTEX_SHADER_ATTRIBUTES];
-} zgl_shader_context_t;
-
 typedef zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* uniformData);
 typedef uint32_t zgl_fragment_shader_t(const zgl_shader_context_t* input, void* uniformData);
 
@@ -838,7 +979,7 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                 if (z < canvas.depthBuffer[y * canvas.width + x]) {
                     // Compute fragment input attributes from the outputs of the vertex shader
                     zgl_shader_context_t fragmentShaderInput = {0};
-                    
+
                     // Interpolate clip position
                     fragmentShaderInput.position.x = alpha * vertexShaderOutput[0].position.x +
                                                         beta  * vertexShaderOutput[1].position.x +
@@ -992,14 +1133,46 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
     }
 }
 
-/* SHADER IMPLEMENTATIONS */
+static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
+                                       int x1, int y1, uint32_t color1,
+                                       int x2, int y2, uint32_t color2,
+                                       zgl_canvas_t canvas) {
+    int area = zgl__edge_cross(x0, y0, x1, y1, x2, y2);
+    float r, g, b;
+
+    zgl_shader_context_t shaderContext0 = {0};
+    shaderContext0.position = (zgl_vec4_t) {x0, y0, 0, 1};
+    shaderContext0.numAttributes = 3;
+    zgl_color_to_floats(color0, &r, &g, &b);
+    shaderContext0.attributes[0] = r;
+    shaderContext0.attributes[1] = g;
+    shaderContext0.attributes[2] = b;
+
+    zgl_shader_context_t shaderContext1 = {0};
+    shaderContext1.position = (zgl_vec4_t) {x1, y1, 0, 1};
+    shaderContext1.numAttributes = 3;
+    zgl_color_to_floats(color1, &r, &g, &b);
+    shaderContext1.attributes[0] = r;
+    shaderContext1.attributes[1] = g;
+    shaderContext1.attributes[2] = b;
+
+    zgl_shader_context_t shaderContext2 = {0};
+    shaderContext2.position = (zgl_vec4_t) {x2, y2, 0, 1};
+    shaderContext2.numAttributes = 3;
+    zgl_color_to_floats(color2, &r, &g, &b);
+    shaderContext2.attributes[0] = r;
+    shaderContext2.attributes[1] = g;
+    shaderContext2.attributes[2] = b;
+
+    zgl_shader_context_t shaderContexts[3] = {shaderContext0, shaderContext1, shaderContext2};
+    zgl__rasterize_triangle(x0, x1, x2, y0, y1, y2, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+                            area, shaderContexts, zgl_colored_fragment_shader, NULL, canvas);
+}
+
+/* Shaders */
 
 /* Basic shading */
 // Draw with a single color, no lighting or textures
-
-typedef struct {
-    zgl_mat4x4_t modelviewprojection;
-} zgl_basic_uniform_t;
 
 static inline zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, void* uniformData) {
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
@@ -1016,10 +1189,6 @@ static inline uint32_t zgl_basic_fragment_shader(const zgl_shader_context_t* inp
 
 /* Colored Shading */
 // Draw with the color of the vertex, no lighting or textures
-
-typedef struct {
-    zgl_mat4x4_t modelviewprojection;
-} zgl_colored_uniform_t;
 
 static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, void* uniformData) {
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
@@ -1040,15 +1209,6 @@ static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* i
 
 /* Flat shading */
 // Compute the lighting at one vertex and use it for the whole triangle
-
-typedef struct {
-    zgl_mat4x4_t        modelMatrix;
-    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
-    zgl_mat4x4_t        viewProjectionMatrix;
-    zgl_light_sources_t lightSources;
-    int                 bilinearFiltering;
-    zgl_canvas_t*       textures;
-} zgl_flat_uniform_t;
 
 static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, void* uniformData) {
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
@@ -1083,7 +1243,7 @@ static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, voi
     result.flatAttributes[10] = light_intensity.x;
     result.flatAttributes[11] = light_intensity.y;
     result.flatAttributes[12] = light_intensity.z;
-    
+
     result.flatAttributes[13] = inputVertexData->materialIndex;
     return result;
 }
@@ -1133,16 +1293,6 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
 /* Gouraud shading */
 // Compute the lighting at each vertex and interpolate the values at each fragment
 
-// Compute the lighting at each vertex
-typedef struct {
-    zgl_mat4x4_t        modelMatrix;
-    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
-    zgl_mat4x4_t        viewProjectionMatrix;
-    zgl_light_sources_t lightSources;
-    int                 bilinearFiltering;
-    zgl_canvas_t*       textures;
-} zgl_gourard_uniform_t;
-
 static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData) {
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
     zgl_shader_context_t result = {0};
@@ -1168,7 +1318,7 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
     result.attributes[9] = inputVertexData->specularColor.y;  // G
     result.attributes[10] = inputVertexData->specularColor.z; // B
     result.attributes[11] = inputVertexData->specularExponent;
-    
+
     zgl_vec3_t light_intensity = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
     result.attributes[12] = light_intensity.x;
     result.attributes[13] = light_intensity.y;
@@ -1223,15 +1373,6 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
 
 /* Phong shading */
 // Compute the lighting at each fragment
-
-typedef struct {
-    zgl_mat4x4_t        modelMatrix;
-    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
-    zgl_mat4x4_t        viewProjectionMatrix;
-    zgl_light_sources_t lightSources;
-    int                 bilinearFiltering;
-    zgl_canvas_t*       textures;
-} zgl_phong_uniform_t;
 
 static inline zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, void* uniformData) {
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
@@ -1309,40 +1450,5 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     return zgl_mul_vec3_color(lighting, unshadedColor);
 }
 
-static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
-                                       int x1, int y1, uint32_t color1,
-                                       int x2, int y2, uint32_t color2,
-                                       zgl_canvas_t canvas) {
-    int area = zgl__edge_cross(x0, y0, x1, y1, x2, y2);
-    float r, g, b;
-
-    zgl_shader_context_t shaderContext0 = {0};
-    shaderContext0.position = (zgl_vec4_t) {x0, y0, 0, 1};
-    shaderContext0.numAttributes = 3;
-    zgl_color_to_floats(color0, &r, &g, &b);
-    shaderContext0.attributes[0] = r;
-    shaderContext0.attributes[1] = g;
-    shaderContext0.attributes[2] = b;
-
-    zgl_shader_context_t shaderContext1 = {0};
-    shaderContext1.position = (zgl_vec4_t) {x1, y1, 0, 1};
-    shaderContext1.numAttributes = 3;
-    zgl_color_to_floats(color1, &r, &g, &b);
-    shaderContext1.attributes[0] = r;
-    shaderContext1.attributes[1] = g;
-    shaderContext1.attributes[2] = b;
-
-    zgl_shader_context_t shaderContext2 = {0};
-    shaderContext2.position = (zgl_vec4_t) {x2, y2, 0, 1};
-    shaderContext2.numAttributes = 3;
-    zgl_color_to_floats(color2, &r, &g, &b);
-    shaderContext2.attributes[0] = r;
-    shaderContext2.attributes[1] = g;
-    shaderContext2.attributes[2] = b;
-
-    zgl_shader_context_t shaderContexts[3] = {shaderContext0, shaderContext1, shaderContext2};
-    zgl__rasterize_triangle(x0, x1, x2, y0, y1, y2, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
-                            area, shaderContexts, zgl_colored_fragment_shader, NULL, canvas);
-}
-
-#endif // ZEROGL_H
+#endif // ZEROGL_IMPLEMENTATION_INCLUDED
+#endif // ZEROGL_IMPLEMENTATION
