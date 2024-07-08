@@ -6,7 +6,7 @@
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO
 #define NK_INCLUDE_STANDARD_VARARGS
-#define NK_INCLUDE_STANDARD_BOOL 
+#define NK_INCLUDE_STANDARD_BOOL
 #define NK_INCLUDE_DEFAULT_ALLOCATOR
 #define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
 #define NK_INCLUDE_FONT_BAKING
@@ -24,8 +24,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#define  ZEROGL_IMPLEMENTATION
 #include "zerogl.h"
 #include "objloader.h"
+
 
 #define WIDTH 1066
 #define HEIGHT 600
@@ -61,7 +64,7 @@ typedef struct game_state_t {
     int           draw3DObjects;
     int           bilinearFiltering;
     shader_type_t shaderType;
-    
+
     // Game objects
     int                  numMeshes;
     zgl_mesh_t*          meshes;
@@ -99,7 +102,7 @@ game_state_t* init() {
         fprintf(stderr, "ERROR: 3D objects memory couldn't be allocated.\n");
         exit(-1);
     }
-        
+
     meshes[0] = *loadObjFile("assets/light.obj", false);
     meshes[1] = *loadObjFile("assets/snake/snake.obj", true);
     meshes[2] = *loadObjFile("assets/engineer/engineer.obj", false);
@@ -173,7 +176,7 @@ game_state_t* init() {
         .frameBuffer = frameBuffer,
         .depthBuffer = depthBuffer
     };
-    
+
     game->running = 1;
     game->elapsedTime = 0;
     game->lastTime = SDL_GetPerformanceCounter();
@@ -201,7 +204,7 @@ game_state_t* init() {
         .pointLights = pointLights,
         .numPointLights = numPointLights
     };
-    
+
     game->pointLightObjects = pointLightObjects;
 
     game->camera = zgl_camera(
@@ -243,7 +246,7 @@ void handleEvents(game_state_t* game) {
     #ifdef DEBUGUI
     nk_input_begin(game->nuklearContext);
     #endif // DEBUGUI
-    
+
     while (SDL_PollEvent(&game->event)) {
         #ifdef DEBUGUI
         nk_sdl_handle_event(&game->event);
@@ -282,7 +285,7 @@ void updateDebugUI(game_state_t *game) {
         struct nk_context *ctx = game->nuklearContext;
         if (nk_begin(ctx, "Settings", nk_rect(0, 0, 220, HEIGHT),
                      NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE|NK_WINDOW_SCALABLE)) {
-            
+
             nk_layout_row_static(ctx, row_size, 150, 1);
             nk_labelf(ctx, NK_TEXT_LEFT, "FPS: %.2f (%.3lf ms)", floor(1000.0f / game->elapsedTime), game->elapsedTime);
 
@@ -432,7 +435,7 @@ void updateDebugUI(game_state_t *game) {
                 nk_layout_row_dynamic(ctx, row_size, 4);
                 nk_bool isBasic = game->shaderType == BASIC_SHADER;
                 if (nk_radio_label(ctx, "Basic", &isBasic)) {
-                    game->shaderType = BASIC_SHADER; 
+                    game->shaderType = BASIC_SHADER;
                 };
 
                 nk_bool isFlat = game->shaderType == FLAT_SHADER;
@@ -502,17 +505,17 @@ void updateCameraPosition(game_state_t* game) {
 
     // TODO: Store this in the camera struct
     zgl_vec3_t cameraRight = zgl_cross(camera->up, camera->direction);
-    
+
     float elapsedTime = game->elapsedTime / 1000.0f;
     float movementSpeed = camera->movementSpeed * elapsedTime;
     float turningSpeed = camera->turningSpeed * elapsedTime;
     zgl_vec3_t newCameraPosition = camera->position;
     zgl_vec3_t newCameraDirection = camera->direction;
     zgl_vec3_t newCameraUp = camera->up;
-    
+
 
     if (keys[SDL_SCANCODE_A]) {
-        // Translate left       
+        // Translate left
         newCameraPosition = zgl_add(newCameraPosition, zgl_mul_scalar(-movementSpeed, cameraRight));
     }
 
@@ -692,7 +695,7 @@ void render(game_state_t* game) {
         ZGL_DEBUG_PRINT("INFO: Drawing lights\n");
         drawLights(game);
     }
-    
+
     ZGL_DEBUG_PRINT("INFO: Update backbuffer\n");
     SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH);
     SDL_RenderCopy(game->renderer, game->texture, NULL, NULL);
@@ -705,7 +708,7 @@ void renderDebugUI(game_state_t* game) {
         nk_sdl_render(NK_ANTI_ALIASING_ON);
     }
 }
-#endif // DEBUGUI 
+#endif // DEBUGUI
 
 void destroy(game_state_t* game) {
     free(game->canvas.frameBuffer);
@@ -716,8 +719,8 @@ void destroy(game_state_t* game) {
         free(game->meshes[i].materials);
         free(game->meshes[i].triangles);
         free(game->meshes[i].vertices);
-    } 
-    
+    }
+
     free(game->meshes);
     free(game->objects);
     SDL_DestroyTexture(game->texture);
@@ -736,14 +739,14 @@ int main(int argc, char* argv[])
 
     while (game->running) {
         handleEvents(game);
-        
+
         #ifdef DEBUGUI
         updateDebugUI(game);
         #endif // DEBUGUI
 
         update(game);
         render(game);
-        
+
         #ifdef DEBUGUI
         renderDebugUI(game);
         #endif // DEBUGUI
