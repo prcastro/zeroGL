@@ -310,7 +310,7 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
 #ifndef ZEROGL_IMPLEMENTATION_INCLUDED
 #define ZEROGL_IMPLEMENTATION_INCLUDED
 
-/* Vectos and Matrices */
+/* Vectors and Matrices */
 
 static inline zgl_vec3_t zgl_cross(zgl_vec3_t a, zgl_vec3_t b) {
     zgl_vec3_t result;
