@@ -51,7 +51,6 @@ static inline zgl_vec4_t zgl_mul_mat_v4(zgl_mat4x4_t mat4x4, zgl_vec4_t vec4);
 static inline zgl_vec3_t zgl_mul_mat_v3(zgl_mat4x4_t mat4x4, zgl_vec3_t v);
 static inline zgl_mat4x4_t zgl_mul_mat(zgl_mat4x4_t m1, zgl_mat4x4_t m2);
 static inline zgl_mat4x4_t zgl_transpose(zgl_mat4x4_t m);
-static inline float zgl_determinant(float a, float b, float c, float d, float e, float f, float g, float h, float i);
 static inline zgl_mat4x4_t zgl_inverse(zgl_mat4x4_t matrix);
 static inline zgl_mat4x4_t zgl_translation_mat(zgl_vec3_t vector);
 static inline zgl_mat4x4_t zgl_scale_mat(float scale);
@@ -390,10 +389,6 @@ static inline zgl_mat4x4_t zgl_transpose(zgl_mat4x4_t m) {
         }
     }
     return result;
-}
-
-static inline float zgl_determinant(float a, float b, float c, float d, float e, float f, float g, float h, float i) {
-    return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
 }
 
 static inline zgl_mat4x4_t zgl_inverse(zgl_mat4x4_t matrix) {
