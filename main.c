@@ -1,4 +1,4 @@
-// #define ZGL_DEBUG
+#define ZGL_DEBUG
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
 
@@ -32,7 +32,7 @@
 
 #define WIDTH 1066
 #define HEIGHT 600
-#define ROTATION_SPEED 15.0f // degrees per second
+#define ROTATION_SPEED 0.0f //15.0f // degrees per second
 #define VIEWPORT_WIDTH (WIDTH /(float) HEIGHT)
 #define VIEWPORT_HEIGHT 1.0f
 #define VIEWPORT_DISTANCE 1.0f
@@ -95,19 +95,13 @@ game_state_t* init() {
 
     ZGL_DEBUG_PRINT("INFO: Loading meshes and objects\n");
     int numObjects = 1;
-    int numMeshes = 6;
+    int numMeshes = 7;
     zgl_mesh_t* meshes = (zgl_mesh_t*) malloc(numMeshes * sizeof(zgl_mesh_t));
     zgl_object3D_t *objects = (zgl_object3D_t*) malloc(numObjects * sizeof(zgl_object3D_t));
     if (meshes == NULL || objects == NULL) {
         fprintf(stderr, "ERROR: 3D objects memory couldn't be allocated.\n");
         exit(-1);
     }
-
-    meshes[0] = *loadObjFile("assets/light.obj", false);
-    meshes[1] = *loadObjFile("assets/snake/snake.obj", true);
-    meshes[2] = *loadObjFile("assets/engineer/engineer.obj", false);
-    meshes[3] = *loadObjFile("assets/cube.obj", false);
-    meshes[4] = *loadObjFile("assets/sphere.obj", false);
 
     // Define a debug mesh
     zgl_vec3_t* vertices = (zgl_vec3_t*) malloc(3 * sizeof(zgl_vec3_t));
@@ -123,7 +117,7 @@ game_state_t* init() {
     vertices[2] = (zgl_vec3_t) {0, 1, 0};
     triangles[0] = (zgl_triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
     materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_canvas_t) {NULL, 0, 0, 0, NULL}};
-    meshes[5] = (zgl_mesh_t) {
+    meshes[0] = (zgl_mesh_t) {
         .name = "Debug",
         .numVertices = 3,
         .numTriangles = 1,
@@ -133,11 +127,17 @@ game_state_t* init() {
         .materials = materials
     };
 
+    meshes[1] = *loadObjFile("assets/light.obj", false);
+    meshes[2] = *loadObjFile("assets/snake/snake.obj", true);
+    meshes[3] = *loadObjFile("assets/engineer/engineer.obj", false);
+    meshes[4] = *loadObjFile("assets/cube.obj", false);
+    meshes[5] = *loadObjFile("assets/woodcube/woodcube.obj", false);
+    meshes[6] = *loadObjFile("assets/sphere.obj", false);
 
-    objects[0] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    // objects[0] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
     // objects[0] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
     // objects[0] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    // objects[0] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     ZGL_DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;

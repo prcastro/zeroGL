@@ -25,22 +25,85 @@ static inline zgl_canvas_t loadTexture(char* filename) {
     if (upng_get_error(upng) == UPNG_EOK) {
         texture.width = upng_get_width(upng);
         texture.height = upng_get_height(upng);
+        ZGL_DEBUG_PRINT("DEBUG: Texture size %d x %d\n", texture.width, texture.height);
 
-        ZGL_DEBUG_PRINT("DEBUG: Texture size %d x %d\n", *textureWidth, *textureHeight);
-        uint32_t* buffer = (uint32_t*) upng_get_buffer(upng);
         texture.frameBuffer = (uint32_t*) malloc(texture.width * texture.height * sizeof(uint32_t));
         if (texture.frameBuffer == NULL) {
             fprintf(stderr, "ERROR: Texture memory allocation failed.\n");
             exit(-1);
         }
-        for (int i = 0; i < texture.width * texture.height; i++) {
-            uint32_t pixel = buffer[i];
-            a = (pixel & 0xFF000000) >> 24;
-            b = (pixel & 0x00FF0000) >> 16;
-            g = (pixel & 0x0000FF00) >> 8;
-            r = (pixel & 0x000000FF);
-            texture.frameBuffer[i] = zgl_color(r, g, b);
+
+        upng_format format = upng_get_format(upng);
+        switch (format) {
+            case UPNG_BADFORMAT:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_BADFORMAT\n");
+                break;
+            case UPNG_RGB8:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_RGB8\n");
+                break;
+            case UPNG_RGB16:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_RGB16\n");
+                break;
+            case UPNG_RGBA8:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_RGBA8\n");
+                break;
+            case UPNG_RGBA16:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_RGBA16\n");
+                break;
+            case UPNG_LUMINANCE1:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_LUMINANCE1\n");
+                break;
+            case UPNG_LUMINANCE2:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_LUMINANCE2\n");
+                break;
+            case UPNG_LUMINANCE4:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_LUMINANCE4\n");
+                break;
+            case UPNG_LUMINANCE8:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_LUMINANCE8\n");
+                break;
+            case UPNG_LUMINANCE_ALPHA1:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_LUMINANCE_ALPHA1\n");
+                break;
+            case UPNG_LUMINANCE_ALPHA2:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_LUMINANCE_ALPHA2\n");
+                break;
+            case UPNG_LUMINANCE_ALPHA4:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_LUMINANCE_ALPHA4\n");
+                break;
+            case UPNG_LUMINANCE_ALPHA8:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UPNG_LUMINANCE_ALPHA8\n");
+                break;
+            default:
+                ZGL_DEBUG_PRINT("DEBUG: Texture format UNKNOWN\n");
+                break;
         }
+
+        if (format == UPNG_RGBA8) {
+            uint32_t* buffer = (uint32_t*) upng_get_buffer(upng);
+            for (int i = 0; i < texture.width * texture.height; i++) {
+                uint32_t pixel = buffer[i];
+                a = (pixel & 0xFF000000) >> 24;
+                b = (pixel & 0x00FF0000) >> 16;
+                g = (pixel & 0x0000FF00) >> 8;
+                r = (pixel & 0x000000FF);
+                texture.frameBuffer[i] = zgl_color(r, g, b);
+            }
+        } else if (format == UPNG_RGB8) {
+            uint8_t* buffer = (uint8_t*) upng_get_buffer(upng);
+            for (int i = 0; i < texture.width * texture.height; i++) {
+                int bufferIndex = i * 3;
+                r = buffer[bufferIndex];
+                g = buffer[bufferIndex + 1];
+                b = buffer[bufferIndex + 2];
+                texture.frameBuffer[i] = zgl_color(r, g, b);
+            }
+        } else {
+            fprintf(stderr, "ERROR: Unsupported texture format\n");
+            exit(-1);
+        }
+
+        
     } else {
         fprintf(stderr, "ERROR: Couldn't decode texture file\n");
         exit(-1);
