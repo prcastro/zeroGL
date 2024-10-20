@@ -1,0 +1,18 @@
+# Blender 4.2.2 LTS MTL File: 'None'
+# www.blender.org
+
+newmtl Material
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+Ps 0.000000
+Pc 0.000000
+Pcr 0.030000
+aniso 0.000000
+anisor 0.000000
+map_Kd laminate-flooring-brown_albedo.png
+map_Pm laminate-flooring-brown_metallic.png
+map_Pr laminate-flooring-brown_roughness.png
+map_Bump -bm 1.000000 laminate-flooring-brown_normal-ogl.png
