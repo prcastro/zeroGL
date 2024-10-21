@@ -202,9 +202,10 @@ void     zgl_color_to_floats(uint32_t color, float* r, float* g, float* b);
           <h3>Lighting</h3>
           <p>ZeroGL provides a simple lighting system. You can define a light using three diffent structs: <code>zgl_ambient_light_t</code>, <code>zgl_point_light_t</code> and <code>zgl_dir_light_t</code>. You can bundle all lights in a scene in a <code>zgl_light_sources_t</code>. To compute lights in a point, you can just use:</p>
           <pre><code>
-zgl_vec3_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
-                        zgl_light_sources_t lightSources, uint8_t renderOptions);
+zgl_lighting_result_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
+                                   zgl_light_sources_t lightSources, uint8_t renderOptions);
           </code></pre>
+          This function returns a <code>zgl_lighting_result_t</code> struct containing the specular, diffuse and ambient light intensity at the point.
         </div>
         <div id="camera">
           <h3>Camera</h3>
