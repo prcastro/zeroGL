@@ -192,7 +192,13 @@ typedef struct {
     zgl_point_light_t*   pointLights;
 } zgl_light_sources_t;
 
-static inline zgl_vec3_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
+typedef struct {
+    zgl_vec3_t diffuse;
+    zgl_vec3_t specular;
+    zgl_vec3_t ambient;
+} zgl_lighting_result_t;
+
+static inline zgl_lighting_result_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
                                       zgl_light_sources_t lightSources, uint8_t renderOptions);
 
 /* Camera */
@@ -745,7 +751,7 @@ static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices,
 /* Lighting */
 
 // TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
-static inline zgl_vec3_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
+static inline zgl_lighting_result_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float invMagnitudeNormal, float specularExponent,
                    zgl_light_sources_t lightSources, uint8_t renderOptions) {
     int numDirectionalLights = lightSources.numDirectionalLights;
     zgl_dir_light_t* directionalLights = lightSources.directionalLights;
@@ -806,7 +812,8 @@ static inline zgl_vec3_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, fl
         ambientIntensity.z += ambientLights[i].intensity.z;
     }
 
-    return zgl_add_three_vec3(diffuseIntensity, specularIntensity, ambientIntensity);
+    zgl_lighting_result_t result = {diffuseIntensity, specularIntensity, ambientIntensity};
+    return result;
 }
 
 
@@ -1276,7 +1283,8 @@ static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, voi
     result.flatAttributes[8] = inputVertexData->specularColor.z; // B
     result.flatAttributes[9] = inputVertexData->specularExponent;
 
-    zgl_vec3_t light_intensity = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    zgl_lighting_result_t light_result = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    zgl_vec3_t light_intensity = zgl_add_three_vec3(light_result.diffuse, light_result.specular, light_result.ambient);
     result.flatAttributes[10] = light_intensity.x;
     result.flatAttributes[11] = light_intensity.y;
     result.flatAttributes[12] = light_intensity.z;
@@ -1356,7 +1364,8 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
     result.attributes[10] = inputVertexData->specularColor.z; // B
     result.attributes[11] = inputVertexData->specularExponent;
 
-    zgl_vec3_t light_intensity = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    zgl_lighting_result_t light_result = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    zgl_vec3_t light_intensity = zgl_add_three_vec3(light_result.diffuse, light_result.specular, light_result.ambient);
     result.attributes[12] = light_intensity.x;
     result.attributes[13] = light_intensity.y;
     result.attributes[14] = light_intensity.z;
@@ -1450,8 +1459,8 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     zgl_vec3_t position = {input->attributes[3], input->attributes[4], input->attributes[5]};
     float specularExponent = input->attributes[14];
     float invMagNormal = 1.0f / zgl_magnitude(normal);
-    zgl_vec3_t lighting = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
-
+    zgl_lighting_result_t lighting_result = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    zgl_vec3_t lighting = zgl_add_three_vec3(lighting_result.diffuse, lighting_result.specular, lighting_result.ambient);
     int textureIndex = input->flatAttributes[0];
     int textureWidth  = uniform->textures[textureIndex].width;
     int textureHeight = uniform->textures[textureIndex].height;
