@@ -156,8 +156,8 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             char* name = (char*) malloc(128 * sizeof(char));
             sscanf(line, "newmtl %s\n", name);
             materials[*numMaterials - 1].name = name;
-
             materials[*numMaterials - 1].diffuseTexture = (zgl_canvas_t) {NULL, 0, 0,};
+            materials[*numMaterials - 1].specularExponent = 10.0f;
         }
 
         if (line[0] == 'K' && line[1] == 'd') {
