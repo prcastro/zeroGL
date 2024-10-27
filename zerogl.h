@@ -1329,8 +1329,8 @@ static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* inp
     zgl_unlit_uniform_t* uniform = (zgl_unlit_uniform_t*) uniformData;
 
     uint32_t unshadedColor;
-    int textureIndex = input->flatAttributes[13];
-    zgl_canvas_t texture = uniform->materials[textureIndex].diffuseTexture;
+    int materialIndex = input->flatAttributes[13];
+    zgl_canvas_t texture = uniform->materials[materialIndex].diffuseTexture;
 
     if (texture.width == 0 || texture.height == 0) {
         unshadedColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
@@ -1390,9 +1390,9 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
     zgl_flat_uniform_t* uniform = (zgl_flat_uniform_t*) uniformData;
 
     uint32_t unshadedColor;
-    int textureIndex = input->flatAttributes[13];
-    zgl_canvas_t texture = uniform->materials[textureIndex].diffuseTexture;
-    int textureHeight = uniform->materials[textureIndex].diffuseTexture.height;
+    int materialIndex = input->flatAttributes[13];
+    zgl_canvas_t texture = uniform->materials[materialIndex].diffuseTexture;
+    int textureHeight = uniform->materials[materialIndex].diffuseTexture.height;
 
     if (texture.width == 0 || texture.height == 0) {
         unshadedColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
@@ -1452,8 +1452,8 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
     zgl_gourard_uniform_t* uniform = (zgl_gourard_uniform_t*) uniformData;
 
     uint32_t unshadedColor;
-    int textureIndex = input->flatAttributes[0];
-    zgl_canvas_t texture = uniform->materials[textureIndex].diffuseTexture;
+    int materialIndex = input->flatAttributes[0];
+    zgl_canvas_t texture = uniform->materials[materialIndex].diffuseTexture;
 
     if (texture.width == 0 || texture.height == 0) {
         unshadedColor = zgl_color_from_floats(input->attributes[5], input->attributes[6], input->attributes[7]);
@@ -1512,8 +1512,8 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     float invMagNormal = 1.0f / zgl_magnitude(normal);
     zgl_lighting_result_t lighting_result = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
     zgl_vec3_t lighting = zgl_add_three_vec3(lighting_result.diffuse, lighting_result.specular, lighting_result.ambient);
-    int textureIndex = input->flatAttributes[0];
-    zgl_canvas_t texture = uniform->materials[textureIndex].diffuseTexture;
+    int materialIndex = input->flatAttributes[0];
+    zgl_canvas_t texture = uniform->materials[materialIndex].diffuseTexture;
 
     uint32_t unshadedColor;
     if (texture.width == 0 || texture.height == 0) {

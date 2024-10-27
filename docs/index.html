@@ -105,6 +105,7 @@ int main(void) {
           <li><a href="#objects">3D Objects</a></li>
           <li><a href="#lighting">Lighting</a></li>
           <li><a href="#camera">Camera</a></li>
+          <li><a href="#materials">Materials</a></li>
           <li><a href="#rendering">Rendering</a></li>
           <li><a href="#shaders">Shaders</a></li>
         </ul>
@@ -218,8 +219,7 @@ zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction, zgl_vec3_t up
         </div>
         <div id="materials">
           <h3>Texture and Materials</h3>
-          <p>You can define a texture using the <code>zgl_canvas_t</code> struct, the same type used for a the framebuffer.
-          <p>ZeroGL provides a simple material system. You can define a material using the <code>zgl_material_t</code> struct:</p>
+          <p>You can define a texture using the <code>zgl_canvas_t</code> struct (the same type used for the framebuffer). ZeroGL also provides a simple material system. Define a material using the <code>zgl_material_t</code> struct:</p>
           <pre><code>
 typedef struct {
     char*        name;
