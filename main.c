@@ -117,7 +117,7 @@ game_state_t* init() {
     vertices[1] = (zgl_vec3_t) {1, 0, 0};
     vertices[2] = (zgl_vec3_t) {0, 1, 0};
     triangles[0] = (zgl_triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
-    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_canvas_t) {NULL, 0, 0, 0, NULL}};
+    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_canvas_t) {NULL, 0, 0, 0, NULL}};
     meshes[0] = (zgl_mesh_t) {
         .name = "Debug",
         .numVertices = 3,
@@ -135,9 +135,6 @@ game_state_t* init() {
     meshes[5] = *loadObjFile("assets/woodcube/woodcube.obj", false);
     meshes[6] = *loadObjFile("assets/sphere.obj", false);
 
-    // objects[0] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    // objects[0] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    // objects[0] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
     objects[0] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     ZGL_DEBUG_PRINT("INFO: Loading lights\n");
@@ -159,7 +156,7 @@ game_state_t* init() {
     directionalLights[0] = (zgl_dir_light_t) {{0.0, 0.0, 0.0}, {0.0, -1.0, 1.0}};
     pointLights[0] = (zgl_point_light_t) {{0.9, 0.9, 0.9}, {-0.5, 1.5, -2.0}};
 
-    pointLightObjects[0] = zgl_object(&meshes[0], pointLights[0].position, 0.05, IDENTITY_M4x4);
+    pointLightObjects[0] = zgl_object(&meshes[1], pointLights[0].position, 0.05, IDENTITY_M4x4);
 
     ZGL_DEBUG_PRINT("INFO: Initializing game state\n");
     uint32_t *frameBuffer = (uint32_t*) malloc(WIDTH * HEIGHT * sizeof(uint32_t));

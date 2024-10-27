@@ -133,9 +133,11 @@ typedef struct {
 
 typedef struct {
     char*        name;
+    uint32_t     ambientColor;
     uint32_t     diffuseColor;
     uint32_t     specularColor;
     float        specularExponent;
+    zgl_canvas_t ambientTexture;
     zgl_canvas_t diffuseTexture;
     zgl_canvas_t specularTexture;
 } zgl_material_t;
