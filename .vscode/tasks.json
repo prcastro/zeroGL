@@ -7,7 +7,7 @@
             "args": [
                 "/Zi",
                 "/EHsc",
-                "/O2",
+                // "/O2",
                 "/nologo",
                 "/Fo${fileDirname}\\target\\obj\\",
                 "/Fe${fileDirname}\\target\\${fileBasenameNoExtension}.exe",

@@ -158,7 +158,7 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             char* name = (char*) malloc(128 * sizeof(char));
             sscanf(line, "newmtl %s\n", name);
             materials[*numMaterials - 1].name = name;
-            materials[*numMaterials - 1].diffuseColor = zgl_color(0, 0, 0);
+            materials[*numMaterials - 1].diffuseColor = zgl_color(255, 255, 255);
             materials[*numMaterials - 1].specularColor = zgl_color(0, 0, 0);
             materials[*numMaterials - 1].specularExponent = 10.0f;
             materials[*numMaterials - 1].diffuseTexture = (zgl_canvas_t) {NULL, 0, 0,};
