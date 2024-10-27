@@ -158,6 +158,7 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             materials[*numMaterials - 1].name = name;
             materials[*numMaterials - 1].diffuseTexture = (zgl_canvas_t) {NULL, 0, 0,};
             materials[*numMaterials - 1].specularExponent = 10.0f;
+            materials[*numMaterials - 1].specularTexture = (zgl_canvas_t) {NULL, 0, 0,};
         }
 
         if (line[0] == 'K' && line[1] == 'd') {
@@ -180,8 +181,17 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             sscanf(line, "map_Kd %s\n", textureFilename);
             char* path = getPath(filename);
             strcat(path, textureFilename);
-            ZGL_DEBUG_PRINT("DEBUG: Loading texture %s\n", textureFilename);
+            ZGL_DEBUG_PRINT("DEBUG: Loading diffuse texture %s\n", textureFilename);
             materials[*numMaterials - 1].diffuseTexture = loadTexture(path);
+        }
+
+        if (line[0] == 'm' && line[1] == 'a' && line[2] == 'p' && line[3] == '_' && line[4] == 'K' && line[5] == 's') {
+            char* textureFilename = (char*) malloc(128 * sizeof(char));
+            sscanf(line, "map_Ks %s\n", textureFilename);
+            char* path = getPath(filename);
+            strcat(path, textureFilename);
+            ZGL_DEBUG_PRINT("DEBUG: Loading diffuse texture %s\n", textureFilename);
+            materials[*numMaterials - 1].specularTexture = loadTexture(path);
         }
     }
 

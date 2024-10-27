@@ -42,6 +42,7 @@
 typedef enum {
     BASIC_SHADER,
     FLAT_SHADER,
+    UNLIT_SHADER,
     GOURAUD_SHADER,
     PHONG_SHADER,
 } shader_type_t;
@@ -438,6 +439,11 @@ void updateDebugUI(game_state_t *game) {
                     game->shaderType = BASIC_SHADER;
                 };
 
+                nk_bool isUnlit = game->shaderType == UNLIT_SHADER;
+                if (nk_radio_label(ctx, "Unlit", &isUnlit)) {
+                    game->shaderType = UNLIT_SHADER;
+                };
+
                 nk_bool isFlat = game->shaderType == FLAT_SHADER;
                 if (nk_radio_label(ctx, "Flat", &isFlat)) {
                     game->shaderType = FLAT_SHADER;
@@ -629,7 +635,16 @@ void drawObjects(game_state_t* game) {
                 zgl_canvas_t texture = object.mesh->materials[j].diffuseTexture;
                 textures[j] = texture;
             }
-
+            if (game->shaderType == UNLIT_SHADER) {
+                zgl_unlit_uniform_t uniformData = {
+                    .modelMatrix = object.transform,
+                    .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
+                    .viewProjectionMatrix = game->camera.viewProjMatrix,
+                    .bilinearFiltering = game->bilinearFiltering,
+                    .materials = object.mesh->materials
+                };
+                zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_unlit_vertex_shader, zgl_unlit_fragment_shader, game->renderOptions);
+            }
             if (game->shaderType == FLAT_SHADER) {
                 zgl_flat_uniform_t uniformData = {
                     .modelMatrix = object.transform,
@@ -637,7 +652,7 @@ void drawObjects(game_state_t* game) {
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
                     .lightSources = game->lightSources,
                     .bilinearFiltering = game->bilinearFiltering,
-                    .textures = textures
+                    .materials = object.mesh->materials
                 };
                 zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_flat_vertex_shader, zgl_flat_fragment_shader, game->renderOptions);
             } else if (game->shaderType == GOURAUD_SHADER) {
@@ -647,7 +662,7 @@ void drawObjects(game_state_t* game) {
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
                     .lightSources = game->lightSources,
                     .bilinearFiltering = game->bilinearFiltering,
-                    .textures = textures
+                    .materials = object.mesh->materials
                 };
                 zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_gourard_vertex_shader, zgl_gourard_fragment_shader, game->renderOptions);
             } else if (game->shaderType == PHONG_SHADER) {
@@ -657,7 +672,7 @@ void drawObjects(game_state_t* game) {
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
                     .lightSources = game->lightSources,
                     .bilinearFiltering = game->bilinearFiltering,
-                    .textures = textures
+                    .materials = object.mesh->materials
                 };
                 zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_phong_vertex_shader, zgl_phong_fragment_shader, game->renderOptions);
             }
