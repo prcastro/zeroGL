@@ -216,6 +216,21 @@ zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction, zgl_vec3_t up
                         float movementSpeed, float turningSpeed)
           </code></pre>
         </div>
+        <div id="materials">
+          <h3>Texture and Materials</h3>
+          <p>You can define a texture using the <code>zgl_canvas_t</code> struct, the same type used for a the framebuffer.
+          <p>ZeroGL provides a simple material system. You can define a material using the <code>zgl_material_t</code> struct:</p>
+          <pre><code>
+typedef struct {
+    char*        name;
+    uint32_t     diffuseColor;
+    uint32_t     specularColor;
+    float        specularExponent;
+    zgl_canvas_t diffuseTexture;
+    zgl_canvas_t specularTexture;
+} zgl_material_t;
+          </code></pre>
+        </div>
         <div id="rendering">
           <h3>Rendering</h3>
           <p>To draw, you need to create a <code>zgl_canvas_t</code> type and pass it to the drawing functions</p>
@@ -268,6 +283,20 @@ typedef struct {
 zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, void* uniformData);
 uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
           </code></pre>
+          <h5>Unlit Shader</h5>
+          <p>Draw with colors and textures, no lighting</p>
+          <pre><code>
+typedef struct {
+    zgl_mat4x4_t        modelMatrix;
+    zgl_mat4x4_t        modelInvRotationMatrixTransposed;
+    zgl_mat4x4_t        viewProjectionMatrix;
+    int                 bilinearFiltering;
+    zgl_material_t*     materials;
+} zgl_unlit_uniform_t;
+
+zgl_shader_context_t zgl_unlit_vertex_shader(void* inputVertex, void* uniformData);
+uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+          </code></pre>
           <h5>Flat Shader</h5>
           <p>Compute the lighting at one vertex and use it for the whole triangle</p>
           <pre><code>
@@ -277,14 +306,14 @@ typedef struct {
     zgl_mat4x4_t        viewProjectionMatrix;
     zgl_light_sources_t lightSources;
     int                 bilinearFiltering;
-    zgl_canvas_t*       textures;
+    zgl_material_t*     materials;
 } zgl_flat_uniform_t;
 
 zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, void* uniformData);
 uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
           </code></pre>
           <h5>Gourard Shader</h5>
-          <p>Compute the lighting at each vertex and interpolate the values at each fragment</p>
+          <p>Compute the lighting at each vertex and interpolate the values at each pixel</p>
           <pre><code>
 typedef struct {
     zgl_mat4x4_t        modelMatrix;
@@ -292,14 +321,14 @@ typedef struct {
     zgl_mat4x4_t        viewProjectionMatrix;
     zgl_light_sources_t lightSources;
     int                 bilinearFiltering;
-    zgl_canvas_t*       textures;
+    zgl_material_t*     materials;
 } zgl_gourard_uniform_t;
 
 zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData);
 uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
           </code></pre>
           <h5>Phong Shader</h5>
-          <p>Compute the lighting at each fragment</p>
+          <p>Compute the lighting per pixel</p>
           <pre><code>
 typedef struct {
     zgl_mat4x4_t        modelMatrix;
@@ -307,7 +336,7 @@ typedef struct {
     zgl_mat4x4_t        viewProjectionMatrix;
     zgl_light_sources_t lightSources;
     int                 bilinearFiltering;
-    zgl_canvas_t*       textures;
+    zgl_material_t*     materials;
 } zgl_phong_uniform_t;
 
 zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, void* uniformData);

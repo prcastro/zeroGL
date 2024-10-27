@@ -1448,7 +1448,6 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
 }
 
 
-
 static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
     zgl_gourard_uniform_t* uniform = (zgl_gourard_uniform_t*) uniformData;
 
