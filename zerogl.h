@@ -168,6 +168,7 @@ typedef struct {
 static inline zgl_object3D_t zgl_object(zgl_mesh_t *mesh, zgl_vec3_t translation, float scale, zgl_mat4x4_t rotation);
 static inline zgl_vec3_t zgl_mesh_center(zgl_vec3_t* vertices, int numVertices);
 static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices, zgl_vec3_t center);
+uint32_t zgl_sample_texture(float u, float v, zgl_canvas_t texture, int bilinearFiltering);
 
 /* Lighting */
 typedef struct {
@@ -760,6 +761,31 @@ static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices,
     return result;
 }
 
+uint32_t zgl_sample_texture(float u, float v, zgl_canvas_t texture, int bilinearFiltering) {
+    int textureWidth = texture.width;
+    int textureHeight = texture.height;
+    float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
+    float tex_v = ZGL__MIN(fabs(v * textureHeight), textureHeight - 1);
+    int floor_u = floor(tex_u);
+    int floor_v = floor(tex_v);
+
+    if (bilinearFiltering) {
+        float ratio_u = tex_u - floor_u;
+        float ratio_v = tex_v - floor_v;
+        int next_u = ZGL__MIN(floor_u + 1, textureWidth - 1);
+        int next_v = ZGL__MIN(floor_v + 1, textureHeight - 1);
+        uint32_t color00 = texture.frameBuffer[floor_v * textureWidth + floor_u];
+        uint32_t color10 = texture.frameBuffer[floor_v * textureWidth + next_u];
+        uint32_t color01 = texture.frameBuffer[next_v * textureWidth + floor_u];
+        uint32_t color11 = texture.frameBuffer[next_v * textureWidth + next_u];
+        uint32_t color0 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color00), zgl_mul_scalar_color(ratio_u, color10));
+        uint32_t color1 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color01), zgl_mul_scalar_color(ratio_u, color11));
+        return zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_v, color0), zgl_mul_scalar_color(ratio_v, color1));
+    } else {
+        return texture.frameBuffer[floor_v * textureWidth + floor_u];
+    }
+}
+
 /* Lighting */
 
 // TODO: Code here is a bit repeated between directional and point lights. Maybe refactor?
@@ -1304,36 +1330,14 @@ static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* inp
 
     uint32_t unshadedColor;
     int textureIndex = input->flatAttributes[13];
-    int textureWidth = uniform->materials[textureIndex].diffuseTexture.width;
-    int textureHeight = uniform->materials[textureIndex].diffuseTexture.height;
+    zgl_canvas_t texture = uniform->materials[textureIndex].diffuseTexture;
 
-    if (textureWidth == 0 || textureHeight == 0) {
+    if (texture.width == 0 || texture.height == 0) {
         unshadedColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
     } else {
-        uint32_t* texture = uniform->materials[textureIndex].diffuseTexture.frameBuffer;
         float u = input->attributes[0];
         float v = input->attributes[1];
-        float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
-        float tex_v = ZGL__MIN(fabs(v * textureHeight), textureHeight - 1);
-        int floor_u = floor(tex_u);
-        int floor_v = floor(tex_v);
-
-        if (uniform->bilinearFiltering) {
-            // Bilinear filtering
-            float ratio_u = tex_u - floor_u;
-            float ratio_v = tex_v - floor_v;
-            int next_u = ZGL__MIN(floor_u + 1, textureWidth - 1);
-            int next_v = ZGL__MIN(floor_v + 1, textureHeight - 1);
-            uint32_t color00 = texture[floor_v * textureWidth + floor_u];
-            uint32_t color10 = texture[floor_v * textureWidth + next_u];
-            uint32_t color01 = texture[next_v * textureWidth + floor_u];
-            uint32_t color11 = texture[next_v * textureWidth + next_u];
-            uint32_t color0 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color00), zgl_mul_scalar_color(ratio_u, color10));
-            uint32_t color1 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color01), zgl_mul_scalar_color(ratio_u, color11));
-            unshadedColor = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_v, color0), zgl_mul_scalar_color(ratio_v, color1));
-        } else {
-            unshadedColor = texture[floor_v * textureWidth + floor_u];
-        }
+        unshadedColor = zgl_sample_texture(u, v, texture, uniform->bilinearFiltering);
     }
 
     return unshadedColor;
@@ -1387,36 +1391,15 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
 
     uint32_t unshadedColor;
     int textureIndex = input->flatAttributes[13];
-    int textureWidth = uniform->materials[textureIndex].diffuseTexture.width;
+    zgl_canvas_t texture = uniform->materials[textureIndex].diffuseTexture;
     int textureHeight = uniform->materials[textureIndex].diffuseTexture.height;
 
-    if (textureWidth == 0 || textureHeight == 0) {
+    if (texture.width == 0 || texture.height == 0) {
         unshadedColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
     } else {
-        uint32_t* texture = uniform->materials[textureIndex].diffuseTexture.frameBuffer;
         float u = input->attributes[0];
         float v = input->attributes[1];
-        float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
-        float tex_v = ZGL__MIN(fabs(v * textureHeight), textureHeight - 1);
-        int floor_u = floor(tex_u);
-        int floor_v = floor(tex_v);
-
-        if (uniform->bilinearFiltering) {
-            // Bilinear filtering
-            float ratio_u = tex_u - floor_u;
-            float ratio_v = tex_v - floor_v;
-            int next_u = ZGL__MIN(floor_u + 1, textureWidth - 1);
-            int next_v = ZGL__MIN(floor_v + 1, textureHeight - 1);
-            uint32_t color00 = texture[floor_v * textureWidth + floor_u];
-            uint32_t color10 = texture[floor_v * textureWidth + next_u];
-            uint32_t color01 = texture[next_v * textureWidth + floor_u];
-            uint32_t color11 = texture[next_v * textureWidth + next_u];
-            uint32_t color0 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color00), zgl_mul_scalar_color(ratio_u, color10));
-            uint32_t color1 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color01), zgl_mul_scalar_color(ratio_u, color11));
-            unshadedColor = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_v, color0), zgl_mul_scalar_color(ratio_v, color1));
-        } else {
-            unshadedColor = texture[floor_v * textureWidth + floor_u];
-        }
+        unshadedColor = zgl_sample_texture(u, v, texture, uniform->bilinearFiltering);
     }
 
     zgl_vec3_t light_intensity = {input->flatAttributes[10], input->flatAttributes[11], input->flatAttributes[12]};
@@ -1464,41 +1447,21 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
     return result;
 }
 
+
+
 static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
     zgl_gourard_uniform_t* uniform = (zgl_gourard_uniform_t*) uniformData;
 
     uint32_t unshadedColor;
     int textureIndex = input->flatAttributes[0];
-    int textureWidth = uniform->materials[textureIndex].diffuseTexture.width;
-    int textureHeight = uniform->materials[textureIndex].diffuseTexture.height;
+    zgl_canvas_t texture = uniform->materials[textureIndex].diffuseTexture;
 
-    if (textureWidth == 0 || textureHeight == 0) {
+    if (texture.width == 0 || texture.height == 0) {
         unshadedColor = zgl_color_from_floats(input->attributes[5], input->attributes[6], input->attributes[7]);
     } else {
-        uint32_t* texture = uniform->materials[textureIndex].diffuseTexture.frameBuffer;
         float u = input->attributes[3];
         float v = input->attributes[4];
-        float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
-        float tex_v = ZGL__MIN(fabs(v * textureHeight), textureHeight - 1);
-        int floor_u = floor(tex_u);
-        int floor_v = floor(tex_v);
-
-        if (uniform->bilinearFiltering) {
-            // Bilinear filtering
-            float ratio_u = tex_u - floor_u;
-            float ratio_v = tex_v - floor_v;
-            int next_u = ZGL__MIN(floor_u + 1, textureWidth - 1);
-            int next_v = ZGL__MIN(floor_v + 1, textureHeight - 1);
-            uint32_t color00 = texture[floor_v * textureWidth + floor_u];
-            uint32_t color10 = texture[floor_v * textureWidth + next_u];
-            uint32_t color01 = texture[next_v * textureWidth + floor_u];
-            uint32_t color11 = texture[next_v * textureWidth + next_u];
-            uint32_t color0 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color00), zgl_mul_scalar_color(ratio_u, color10));
-            uint32_t color1 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color01), zgl_mul_scalar_color(ratio_u, color11));
-            unshadedColor = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_v, color0), zgl_mul_scalar_color(ratio_v, color1));
-        } else {
-            unshadedColor = texture[floor_v * textureWidth + floor_u];
-        }
+        unshadedColor = zgl_sample_texture(u, v, texture, uniform->bilinearFiltering);
     }
 
     zgl_vec3_t light_intensity = {input->attributes[12], input->attributes[13], input->attributes[14]};
@@ -1551,36 +1514,15 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     zgl_lighting_result_t lighting_result = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
     zgl_vec3_t lighting = zgl_add_three_vec3(lighting_result.diffuse, lighting_result.specular, lighting_result.ambient);
     int textureIndex = input->flatAttributes[0];
-    int textureWidth  = uniform->materials[textureIndex].diffuseTexture.width;
-    int textureHeight = uniform->materials[textureIndex].diffuseTexture.height;
+    zgl_canvas_t texture = uniform->materials[textureIndex].diffuseTexture;
 
     uint32_t unshadedColor;
-    if (textureWidth == 0 || textureHeight == 0) {
+    if (texture.width == 0 || texture.height == 0) {
         unshadedColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
     } else {
-        uint32_t* texture = uniform->materials[textureIndex].diffuseTexture.frameBuffer;
         float u = input->attributes[6];
         float v = input->attributes[7];
-        float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
-        float tex_v = ZGL__MIN(fabs(v * textureHeight), textureHeight - 1);
-        int floor_u = floor(tex_u);
-        int floor_v = floor(tex_v);
-
-        if (uniform->bilinearFiltering) {
-            float ratio_u = tex_u - floor_u;
-            float ratio_v = tex_v - floor_v;
-            int next_u = ZGL__MIN(floor_u + 1, textureWidth - 1);
-            int next_v = ZGL__MIN(floor_v + 1, textureHeight - 1);
-            uint32_t color00 = texture[floor_v * textureWidth + floor_u];
-            uint32_t color10 = texture[floor_v * textureWidth + next_u];
-            uint32_t color01 = texture[next_v * textureWidth + floor_u];
-            uint32_t color11 = texture[next_v * textureWidth + next_u];
-            uint32_t color0 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color00), zgl_mul_scalar_color(ratio_u, color10));
-            uint32_t color1 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color01), zgl_mul_scalar_color(ratio_u, color11));
-            unshadedColor = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_v, color0), zgl_mul_scalar_color(ratio_v, color1));
-        } else {
-            unshadedColor = texture[floor_v * textureWidth + floor_u];
-        }
+        unshadedColor = zgl_sample_texture(u, v, texture, uniform->bilinearFiltering);
     }
     return zgl_mul_vec3_color(lighting, unshadedColor);
 }
