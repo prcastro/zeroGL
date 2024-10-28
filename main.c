@@ -1,4 +1,4 @@
-#define ZGL_DEBUG
+// #define ZGL_DEBUG
 #define DEBUGUI
 #define SDL_MAIN_HANDLED
 
@@ -41,8 +41,9 @@
 
 typedef enum {
     BASIC_SHADER,
-    FLAT_SHADER,
+    COLORED_SHADER,
     UNLIT_SHADER,
+    FLAT_SHADER,
     GOURAUD_SHADER,
     PHONG_SHADER,
 } shader_type_t;
@@ -436,6 +437,11 @@ void updateDebugUI(game_state_t *game) {
                     game->shaderType = BASIC_SHADER;
                 };
 
+                nk_bool isColored = game->shaderType == COLORED_SHADER;
+                if (nk_radio_label(ctx, "Colored", &isColored)) {
+                    game->shaderType = COLORED_SHADER;
+                };
+
                 nk_bool isUnlit = game->shaderType == UNLIT_SHADER;
                 if (nk_radio_label(ctx, "Unlit", &isUnlit)) {
                     game->shaderType = UNLIT_SHADER;
@@ -631,6 +637,12 @@ void drawObjects(game_state_t* game) {
             for (int j = 0; j < object.mesh->numMaterials; j++) {
                 zgl_canvas_t texture = object.mesh->materials[j].diffuseTexture;
                 textures[j] = texture;
+            }
+            if (game->shaderType == COLORED_SHADER) {
+                zgl_colored_uniform_t uniformData = {
+                    .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                };
+                zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_colored_vertex_shader, zgl_colored_fragment_shader, game->renderOptions);
             }
             if (game->shaderType == UNLIT_SHADER) {
                 zgl_unlit_uniform_t uniformData = {
