@@ -70,6 +70,5 @@ Open `main.c` on the editor and then click on `Run C/C++ File` on the top right 
 ## Current limitations
 
 * No alpha compositing
-* Diffuse colors on MTL files are used for as specular colors as well
 * No multi-threading/SIMD
 * Support only a subset of the OBJ specification

@@ -641,6 +641,7 @@ void drawObjects(game_state_t* game) {
             if (game->shaderType == COLORED_SHADER) {
                 zgl_colored_uniform_t uniformData = {
                     .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                    .materials = object.mesh->materials
                 };
                 zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_colored_vertex_shader, zgl_colored_fragment_shader, game->renderOptions);
             }

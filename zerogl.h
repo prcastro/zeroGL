@@ -263,7 +263,8 @@ static inline zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, vo
 static inline uint32_t zgl_basic_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
 
 typedef struct {
-    zgl_mat4x4_t modelviewprojection;
+    zgl_mat4x4_t    modelviewprojection;
+    zgl_material_t* materials;
 } zgl_colored_uniform_t;
 
 static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, void* uniformData);
@@ -1288,15 +1289,20 @@ static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, 
     zgl_colored_uniform_t* basicUniformData = (zgl_colored_uniform_t*) uniformData;
     zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     result.position = zgl_mul_mat_v4(basicUniformData->modelviewprojection, inputVertex4);
-    result.numAttributes = 3;
-    result.attributes[0] = inputVertexData->diffuseColor.x;
-    result.attributes[1] = inputVertexData->diffuseColor.y;
-    result.attributes[2] = inputVertexData->diffuseColor.z;
+    result.numAttributes = 9;
+    zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].ambientColor, &result.attributes[0], &result.attributes[1], &result.attributes[2]);
+    zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].diffuseColor, &result.attributes[3], &result.attributes[4], &result.attributes[5]);
+    zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].specularColor, &result.attributes[6], &result.attributes[7], &result.attributes[8]);
+
     return result;
 }
 
 static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
-    return zgl_color_from_floats(input->attributes[0], input->attributes[1], input->attributes[2]);
+    uint32_t ambientColor = zgl_color_from_floats(input->attributes[0], input->attributes[1], input->attributes[2]);
+    uint32_t diffuseColor = zgl_color_from_floats(input->attributes[3], input->attributes[4], input->attributes[5]);
+    uint32_t specularColor = zgl_color_from_floats(input->attributes[6], input->attributes[7], input->attributes[8]);
+
+    return zgl_mul_colors(ambientColor, zgl_mul_colors(diffuseColor, specularColor));
 }
 
 /* Unlit shading */
@@ -1323,13 +1329,10 @@ static inline zgl_shader_context_t zgl_unlit_vertex_shader(void* inputVertex, vo
     result.flatAttributes[0] = worldSpaceNormal.x;
     result.flatAttributes[1] = worldSpaceNormal.y;
     result.flatAttributes[2] = worldSpaceNormal.z;
-    result.flatAttributes[3] = inputVertexData->diffuseColor.x;   // R
-    result.flatAttributes[4] = inputVertexData->diffuseColor.y;   // G
-    result.flatAttributes[5] = inputVertexData->diffuseColor.z;   // B
-    result.flatAttributes[6] = inputVertexData->specularColor.x;  // R
-    result.flatAttributes[7] = inputVertexData->specularColor.y;  // G
-    result.flatAttributes[8] = inputVertexData->specularColor.z;  // B
-    result.flatAttributes[9] = inputVertexData->specularExponent;
+    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].ambientColor, &result.flatAttributes[3], &result.flatAttributes[4], &result.flatAttributes[5]);
+    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].diffuseColor, &result.flatAttributes[6], &result.flatAttributes[7], &result.flatAttributes[8]);
+    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].specularColor, &result.flatAttributes[9], &result.flatAttributes[10], &result.flatAttributes[11]);
+    result.flatAttributes[12] = defaultUniformData->materials[inputVertexData->materialIndex].specularExponent;
 
     result.flatAttributes[13] = inputVertexData->materialIndex;
     return result;
@@ -1337,18 +1340,33 @@ static inline zgl_shader_context_t zgl_unlit_vertex_shader(void* inputVertex, vo
 
 static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
     zgl_unlit_uniform_t* uniform = (zgl_unlit_uniform_t*) uniformData;
-
     int materialIndex = input->flatAttributes[13];
-    zgl_canvas_t texture = uniform->materials[materialIndex].diffuseTexture;
 
-    uint32_t unshadedColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
-    if (texture.width != 0 && texture.height != 0) {
+    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    uint32_t ambientColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
+    if (ambientTexture.width != 0 && ambientTexture.height != 0) {
         float u = input->attributes[0];
         float v = input->attributes[1];
-        unshadedColor = zgl_mul_colors(unshadedColor, zgl_sample_texture(u, v, texture, uniform->bilinearFiltering));
+        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
     }
 
-    return unshadedColor;
+    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    uint32_t diffuseColor = zgl_color_from_floats(input->flatAttributes[6], input->flatAttributes[7], input->flatAttributes[8]);
+    if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
+        float u = input->attributes[0];
+        float v = input->attributes[1];
+        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
+    }
+
+    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    uint32_t specularColor = zgl_color_from_floats(input->flatAttributes[9], input->flatAttributes[10], input->flatAttributes[11]);
+    if (specularTexture.width != 0 && specularTexture.height != 0) {
+        float u = input->attributes[0];
+        float v = input->attributes[1];
+        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(u, v, specularTexture, uniform->bilinearFiltering));
+    }
+
+    return zgl_mul_colors(ambientColor, zgl_mul_colors(diffuseColor, specularColor));
 }
 
 
