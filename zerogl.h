@@ -238,9 +238,6 @@ typedef struct {
     zgl_vec3_t position;
     zgl_vec3_t normal;
     zgl_vec3_t textureCoord;
-    zgl_vec3_t diffuseColor;
-    zgl_vec3_t specularColor;
-    float      specularExponent;
     int        materialIndex;
 } zgl_vertex_input_t;
 
@@ -1178,9 +1175,6 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
                 .position = vertices[v],
                 .normal = normals[v],
                 .textureCoord = textureCoords[v],
-                .diffuseColor = {diffR, diffG, diffB},
-                .specularColor = {specR, specG, specB},
-                .specularExponent = specularExponent,
                 .materialIndex = triangle.materialIndex
             };
 
@@ -1398,7 +1392,10 @@ static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, voi
     zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].specularColor, &result.flatAttributes[9], &result.flatAttributes[10], &result.flatAttributes[11]);
     result.flatAttributes[12] = defaultUniformData->materials[inputVertexData->materialIndex].specularExponent;
 
-    zgl_lighting_result_t lightResult = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    zgl_lighting_result_t lightResult = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z},
+                                                     worldSpaceNormal, invMagNormal,
+                                                     defaultUniformData->materials[inputVertexData->materialIndex].specularExponent,
+                                                     defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
     result.flatAttributes[13] = lightResult.ambient.x;
     result.flatAttributes[14] = lightResult.ambient.y;
     result.flatAttributes[15] = lightResult.ambient.z;
@@ -1477,7 +1474,10 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
     zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].specularColor, &result.attributes[11], &result.attributes[12], &result.attributes[13]);
     result.attributes[14] = defaultUniformData->materials[inputVertexData->materialIndex].specularExponent;
 
-    zgl_lighting_result_t lightResult = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z}, worldSpaceNormal, invMagNormal, inputVertexData->specularExponent, defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    zgl_lighting_result_t lightResult = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z},
+                                                     worldSpaceNormal, invMagNormal,
+                                                     defaultUniformData->materials[inputVertexData->materialIndex].specularExponent,
+                                                     defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
     result.attributes[15] = lightResult.ambient.x;
     result.attributes[16] = lightResult.ambient.y;
     result.attributes[17] = lightResult.ambient.z;
