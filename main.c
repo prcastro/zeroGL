@@ -683,8 +683,6 @@ void drawObjects(game_state_t* game) {
                 };
                 zgl_render_object3D(&object, &phongUniformData, game->camera, game->canvas, zgl_phong_vertex_shader, zgl_phong_fragment_shader, game->renderOptions);
                 break;
-            default:
-                break;
         }
     }
 }
