@@ -627,46 +627,31 @@ void update(game_state_t* game) {
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
         zgl_object3D_t object = game->objects[i];
-        if (game->shaderType == BASIC_SHADER) {
-            zgl_basic_uniform_t uniformData = {
-                .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
-            };
-            zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
-        } else {
-            zgl_canvas_t* textures = malloc(object.mesh->numMaterials * sizeof(zgl_canvas_t));
-            for (int j = 0; j < object.mesh->numMaterials; j++) {
-                zgl_canvas_t texture = object.mesh->materials[j].diffuseTexture;
-                textures[j] = texture;
-            }
-            if (game->shaderType == COLORED_SHADER) {
+        switch (game->shaderType) {
+            case BASIC_SHADER:
+                zgl_basic_uniform_t basicUniformData = {
+                    .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                };
+                zgl_render_object3D(&object, &basicUniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
+            case COLORED_SHADER:
                 zgl_colored_uniform_t uniformData = {
                     .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
                     .materials = object.mesh->materials
                 };
                 zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_colored_vertex_shader, zgl_colored_fragment_shader, game->renderOptions);
-            }
-            if (game->shaderType == UNLIT_SHADER) {
-                zgl_unlit_uniform_t uniformData = {
+                break;
+            case UNLIT_SHADER:
+                zgl_unlit_uniform_t unlitUniformData = {
                     .modelMatrix = object.transform,
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
                     .bilinearFiltering = game->bilinearFiltering,
                     .materials = object.mesh->materials
                 };
-                zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_unlit_vertex_shader, zgl_unlit_fragment_shader, game->renderOptions);
-            }
-            if (game->shaderType == FLAT_SHADER) {
-                zgl_flat_uniform_t uniformData = {
-                    .modelMatrix = object.transform,
-                    .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
-                    .viewProjectionMatrix = game->camera.viewProjMatrix,
-                    .lightSources = game->lightSources,
-                    .bilinearFiltering = game->bilinearFiltering,
-                    .materials = object.mesh->materials
-                };
-                zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_flat_vertex_shader, zgl_flat_fragment_shader, game->renderOptions);
-            } else if (game->shaderType == GOURAUD_SHADER) {
-                zgl_gourard_uniform_t uniformData = {
+                zgl_render_object3D(&object, &unlitUniformData, game->camera, game->canvas, zgl_unlit_vertex_shader, zgl_unlit_fragment_shader, game->renderOptions);
+                break;
+            case FLAT_SHADER:
+                zgl_flat_uniform_t flatUniformData = {
                     .modelMatrix = object.transform,
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
@@ -674,9 +659,10 @@ void drawObjects(game_state_t* game) {
                     .bilinearFiltering = game->bilinearFiltering,
                     .materials = object.mesh->materials
                 };
-                zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_gourard_vertex_shader, zgl_gourard_fragment_shader, game->renderOptions);
-            } else if (game->shaderType == PHONG_SHADER) {
-                zgl_phong_uniform_t uniformData = {
+                zgl_render_object3D(&object, &flatUniformData, game->camera, game->canvas, zgl_flat_vertex_shader, zgl_flat_fragment_shader, game->renderOptions);
+                break;
+            case GOURAUD_SHADER:
+                zgl_gourard_uniform_t gourardUniformData = {
                     .modelMatrix = object.transform,
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
@@ -684,8 +670,21 @@ void drawObjects(game_state_t* game) {
                     .bilinearFiltering = game->bilinearFiltering,
                     .materials = object.mesh->materials
                 };
-                zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_phong_vertex_shader, zgl_phong_fragment_shader, game->renderOptions);
-            }
+                zgl_render_object3D(&object, &gourardUniformData, game->camera, game->canvas, zgl_gourard_vertex_shader, zgl_gourard_fragment_shader, game->renderOptions);
+                break;
+            case PHONG_SHADER:
+                zgl_phong_uniform_t phongUniformData = {
+                    .modelMatrix = object.transform,
+                    .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
+                    .viewProjectionMatrix = game->camera.viewProjMatrix,
+                    .lightSources = game->lightSources,
+                    .bilinearFiltering = game->bilinearFiltering,
+                    .materials = object.mesh->materials
+                };
+                zgl_render_object3D(&object, &phongUniformData, game->camera, game->canvas, zgl_phong_vertex_shader, zgl_phong_fragment_shader, game->renderOptions);
+                break;
+            default:
+                break;
         }
     }
 }
