@@ -12,7 +12,6 @@
                 "/Fo${fileDirname}\\target\\obj\\",
                 "/Fe${fileDirname}\\target\\${fileBasenameNoExtension}.exe",
                 "${file}",
-                "external\\upng\\upng.c",
                 "/I",
                 "external\\sdl2\\include",
                 "/link",

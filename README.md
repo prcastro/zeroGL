@@ -26,12 +26,12 @@ The project comes with a distribution for sdl2 under `external/` . On other syst
 
 **Windows**
 ```console
-> zig build-exe main.c external\upng\upng.c -O ReleaseFast --library c -I.\external\sdl2\include -Lexternal\sdl2\lib\x64 -lSDL2 -lSDL2main -femit-bin=target\main.exe
+> zig build-exe main.c -O ReleaseFast --library c -I.\external\sdl2\include -Lexternal\sdl2\lib\x64 -lSDL2 -lSDL2main -femit-bin=target\main.exe
 ```
 
 **linux, macOS** (replace `/usr/local/lib` with the path you found with `sdl2-config --libs`):
 ```console
-$ zig build-exe main.c external/upng/upng.c -O ReleaseFast --library c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -femit-bin=target/main
+$ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -femit-bin=target/main
 ```
 
 ### Windows
@@ -49,7 +49,7 @@ Install Visual Studio Community 2022 (the C/C++ compilers may suffice), then run
 ```console
 > "c:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
 
-> cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c external\upng\upng.c /I external\sdl2\include /link /LIBPATH:external\sdl2\lib\x64 SDL2.lib SDL2main.lib
+> cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c /I external\sdl2\include /link /LIBPATH:external\sdl2\lib\x64 SDL2.lib SDL2main.lib
 ```
 
 Change the `vcvarsall.bat` path according to your VS installation.
@@ -59,7 +59,7 @@ Change the `vcvarsall.bat` path according to your VS installation.
 On Linux sytems where SDL2 is installed, the exemple main program can also be built by running (again, replace `/usr/local/lib` with the path you found with `sdl2-config --libs`):
 
 ```console
-gcc main.c external/upng/upng.c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -lm -o target/main
+gcc main.c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -lm -o target/main
 ```
 
 #### VS Code

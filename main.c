@@ -136,7 +136,7 @@ game_state_t* init() {
     meshes[5] = *loadObjFile("assets/woodcube/woodcube.obj", false);
     meshes[6] = *loadObjFile("assets/sphere.obj", false);
 
-    objects[0] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
 
     ZGL_DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
