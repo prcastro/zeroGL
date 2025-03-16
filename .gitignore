@@ -24,3 +24,6 @@ target/*
 *.pdb
 *.dmp
 *.dmp.gz
+
+# CMake
+build/

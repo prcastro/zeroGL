@@ -195,7 +195,7 @@ static inline zgl_mesh_t* loadObjFile(const char* filename, bool flipTexturesVer
     zgl_material_t* materials = NULL;
     int num_materials = 0;
 
-    int currentMaterial;
+    int currentMaterial = 0;
 
     char line[128];
 
