@@ -148,6 +148,21 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
     float r, g, b;
     while (fgets(line, 128, fp) != NULL) {
         if (line[0] == 'n' && line[1] == 'e' && line[2] == 'w') {
+            // Cleanup last material
+            if (*numMaterials > 0) {
+                if (!hasKa) {
+                    materials[*numMaterials - 1].ambientColor = materials[*numMaterials - 1].diffuseColor;
+                }
+
+                if (!hasMapKa) {
+                    // Deep copy diffuse texture to ambient texture if no ambient texture is present
+                    materials[*numMaterials - 1].ambientTexture.height = materials[*numMaterials - 1].diffuseTexture.height;
+                    materials[*numMaterials - 1].ambientTexture.width = materials[*numMaterials - 1].diffuseTexture.width;
+                    materials[*numMaterials - 1].ambientTexture.frameBuffer = (uint32_t*) malloc(materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
+                    memcpy(materials[*numMaterials - 1].ambientTexture.frameBuffer, materials[*numMaterials - 1].diffuseTexture.frameBuffer, materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
+                }
+            }
+
             *numMaterials = *numMaterials + 1;
             materials = (zgl_material_t*) realloc(materials, *numMaterials * sizeof(zgl_material_t));
             if (materials == NULL) {
@@ -190,7 +205,7 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             sscanf(line, "map_Ka %s\n", textureFilename);
             char* path = getPath(filename);
             strcat(path, textureFilename);
-            ZGL_DEBUG_PRINT("DEBUG: Loading diffuse texture %s\n", textureFilename);
+            ZGL_DEBUG_PRINT("DEBUG: Loading ambient texture %s\n", textureFilename);
             materials[*numMaterials - 1].ambientTexture = loadTexture(path);
             hasMapKa = 1;
         }
@@ -209,17 +224,22 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             sscanf(line, "map_Ks %s\n", textureFilename);
             char* path = getPath(filename);
             strcat(path, textureFilename);
-            ZGL_DEBUG_PRINT("DEBUG: Loading diffuse texture %s\n", textureFilename);
+            ZGL_DEBUG_PRINT("DEBUG: Loading specular texture %s\n", textureFilename);
             materials[*numMaterials - 1].specularTexture = loadTexture(path);
         }
     }
 
+    // Cleanup last material
     if (!hasKa) {
         materials[*numMaterials - 1].ambientColor = materials[*numMaterials - 1].diffuseColor;
     }
 
     if (!hasMapKa) {
-        materials[*numMaterials - 1].ambientTexture = materials[*numMaterials - 1].diffuseTexture;
+        // Deep copy diffuse texture to ambient texture if no ambient texture is present
+        materials[*numMaterials - 1].ambientTexture.height = materials[*numMaterials - 1].diffuseTexture.height;
+        materials[*numMaterials - 1].ambientTexture.width = materials[*numMaterials - 1].diffuseTexture.width;
+        materials[*numMaterials - 1].ambientTexture.frameBuffer = (uint32_t*) malloc(materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
+        memcpy(materials[*numMaterials - 1].ambientTexture.frameBuffer, materials[*numMaterials - 1].diffuseTexture.frameBuffer, materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
     }
 
     fclose(fp);
