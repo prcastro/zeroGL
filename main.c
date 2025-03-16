@@ -72,6 +72,7 @@ typedef struct game_state_t {
     zgl_mesh_t*          meshes;
     int                  numObjects;
     zgl_object3D_t*      objects;
+    int*                 objectsRenderToggle;
     zgl_light_sources_t  lightSources;
     zgl_object3D_t*      pointLightObjects;
     zgl_camera_t         camera;
@@ -96,7 +97,7 @@ game_state_t* init() {
     }
 
     ZGL_DEBUG_PRINT("INFO: Loading meshes and objects\n");
-    int numObjects = 1;
+    int numObjects = 7;
     int numMeshes = 7;
     zgl_mesh_t* meshes = (zgl_mesh_t*) malloc(numMeshes * sizeof(zgl_mesh_t));
     zgl_object3D_t *objects = (zgl_object3D_t*) malloc(numObjects * sizeof(zgl_object3D_t));
@@ -120,7 +121,7 @@ game_state_t* init() {
     triangles[0] = (zgl_triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
     materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_canvas_t) {NULL, 0, 0, 0, NULL}};
     meshes[0] = (zgl_mesh_t) {
-        .name = "Debug",
+        .name = "debug",
         .numVertices = 3,
         .numTriangles = 1,
         .numTextureCoords = 0,
@@ -136,7 +137,23 @@ game_state_t* init() {
     meshes[5] = *loadObjFile("assets/woodcube/woodcube.obj", false);
     meshes[6] = *loadObjFile("assets/sphere.obj", false);
 
-    objects[0] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[0] = zgl_object(&meshes[0], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
+    objects[1] = zgl_object(&meshes[1], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
+    objects[2] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
+    objects[3] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
+    objects[4] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
+    objects[5] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
+    objects[6] = zgl_object(&meshes[6], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
+    
+    // Allocate object render toggles
+    int* objectsRenderToggle = (int*) calloc(numObjects, sizeof(int));
+    if (objectsRenderToggle == NULL) {
+        fprintf(stderr, "ERROR: Object render toggles memory couldn't be allocated.\n");
+        exit(-1);
+    }
+
+    objectsRenderToggle[5] = 1;
+
 
     ZGL_DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -193,6 +210,7 @@ game_state_t* init() {
     game->meshes = meshes;
     game->numObjects = numObjects;
     game->objects = objects;
+    game->objectsRenderToggle = objectsRenderToggle;
 
     // Lights
     game->lightSources = (zgl_light_sources_t) {
@@ -296,18 +314,29 @@ void updateDebugUI(game_state_t *game) {
                 nk_tree_pop(ctx);
             }
 
-            if (nk_tree_push(ctx, NK_TREE_NODE, "Objects", NK_MAXIMIZED)) {
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Objects", NK_MINIMIZED)) {
                 for (int i = 0; i < game->numObjects; i++) {
-                    nk_layout_row_dynamic(ctx, row_size, 1);
-                    nk_labelf(ctx, NK_TEXT_LEFT, "%d: %s at (%.0f, %.0f, %.0f)", i, game->objects[i].mesh->name, game->objects[i].translation.x, game->objects[i].translation.y, game->objects[i].translation.z);
-                    nk_layout_row_dynamic(ctx, row_size, 1);
-                    nk_property_float(ctx, "x", -10.0f, &game->objects[i].translation.x, 10.0f, 0.1f, 0.1f);
-                    nk_layout_row_dynamic(ctx, row_size, 1);
-                    nk_property_float(ctx, "y", -10.0f, &game->objects[i].translation.y, 10.0f, 0.1f, 0.1f);
-                    nk_layout_row_dynamic(ctx, row_size, 1);
-                    nk_property_float(ctx, "z", -10.0f, &game->objects[i].translation.z, 10.0f, 0.1f, 0.1f);
-                    nk_layout_row_dynamic(ctx, row_size, 1);
-                    nk_property_float(ctx, "scale", -0.01f, &game->objects[i].scale, 10.0f, 0.01f, 0.01f);
+                    if (nk_tree_push_id(ctx, NK_TREE_NODE, game->objects[i].mesh->name, NK_MINIMIZED, i)) {
+                        nk_layout_row_dynamic(ctx, row_size, 1);
+                        nk_labelf(ctx, NK_TEXT_LEFT, "%d: %s at (%.0f, %.0f, %.0f)", i, game->objects[i].mesh->name, game->objects[i].translation.x, game->objects[i].translation.y, game->objects[i].translation.z);
+                        nk_layout_row_dynamic(ctx, row_size, 1);
+                        
+                        nk_bool isRendered = game->objectsRenderToggle[i];
+                        if (nk_checkbox_label(ctx, "Render", &isRendered)) {
+                            game->objectsRenderToggle[i] = isRendered;
+                        }
+
+                        nk_layout_row_dynamic(ctx, row_size, 1);
+                        nk_property_float(ctx, "x", -10.0f, &game->objects[i].translation.x, 10.0f, 0.1f, 0.1f);
+                        nk_layout_row_dynamic(ctx, row_size, 1);
+                        nk_property_float(ctx, "y", -10.0f, &game->objects[i].translation.y, 10.0f, 0.1f, 0.1f);
+                        nk_layout_row_dynamic(ctx, row_size, 1);
+                        nk_property_float(ctx, "z", -10.0f, &game->objects[i].translation.z, 10.0f, 0.1f, 0.1f);
+                        nk_layout_row_dynamic(ctx, row_size, 1);
+                        nk_property_float(ctx, "scale", -0.01f, &game->objects[i].scale, 10.0f, 0.01f, 0.01f);
+
+                        nk_tree_pop(ctx);
+                    }
                 }
                 nk_tree_pop(ctx);
             }
@@ -626,6 +655,10 @@ void update(game_state_t* game) {
 
 void drawObjects(game_state_t* game) {
     for (int i = 0; i < game->numObjects; i++) {
+        if (!game->objectsRenderToggle[i]) {
+            continue;
+        }
+
         zgl_object3D_t object = game->objects[i];
         switch (game->shaderType) {
             case BASIC_SHADER:

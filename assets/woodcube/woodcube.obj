@@ -1,7 +1,7 @@
 # Blender 4.2.2 LTS
 # www.blender.org
 mtllib woodcube.mtl
-o Cube
+o woodcube
 v 1.000000 1.000000 -1.000000
 v 1.000000 -1.000000 -1.000000
 v 1.000000 1.000000 1.000000
