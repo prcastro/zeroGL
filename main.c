@@ -1,5 +1,5 @@
-// #define ZGL_DEBUG
-#define DEBUGUI
+#define ZGL_DEBUG
+// #define DEBUGUI
 #define SDL_MAIN_HANDLED
 
 #ifdef DEBUGUI
@@ -17,7 +17,8 @@
 #include "external/nuklear/nuklear_sdl_renderer.h"
 #endif // DEBUGUI
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <math.h>
 #include <assert.h>
 #include <float.h>
@@ -91,7 +92,7 @@ game_state_t* init() {
     ZGL_DEBUG_PRINT("INFO: Initializing game objects\n");
 
     ZGL_DEBUG_PRINT("INFO: Initializing SDL\n");
-    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+    if (!SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO)) {
         fprintf(stderr, "ERROR: error initializing SDL: %s\n", SDL_GetError());
         exit(-1);
     }
@@ -144,7 +145,7 @@ game_state_t* init() {
     objects[4] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
     objects[5] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
     objects[6] = zgl_object(&meshes[6], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    
+
     // Allocate object render toggles
     int* objectsRenderToggle = (int*) calloc(numObjects, sizeof(int));
     if (objectsRenderToggle == NULL) {
@@ -153,7 +154,6 @@ game_state_t* init() {
     }
 
     objectsRenderToggle[5] = 1;
-
 
     ZGL_DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -196,9 +196,14 @@ game_state_t* init() {
     game->running = 1;
     game->elapsedTime = 0;
     game->lastTime = SDL_GetPerformanceCounter();
-    game->window = SDL_CreateWindow("Rasterizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
-    game->renderer = SDL_CreateRenderer(game->window, -1, 0);
-    game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
+
+    int createdWindow = SDL_CreateWindowAndRenderer("Rasterizer", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE, &game->window, &game->renderer);
+    if (!createdWindow) {
+        fprintf(stderr, "ERROR: Window and Renderer couldn't be created: %s.\n", SDL_GetError());
+        exit(-1);
+    }
+
+    game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);
     game->canvas = canvas;
     game->backgroundColor = ZGL_COLOR_BLACK;
     game->drawLights    = 1;
@@ -269,7 +274,7 @@ void handleEvents(game_state_t* game) {
         nk_sdl_handle_event(&game->event);
         #endif // DEBUGUI
         switch (game->event.type) {
-        case SDL_QUIT:
+        case SDL_EVENT_QUIT:
             // handling of close button
             ZGL_DEBUG_PRINT("INFO: Quitting application\n");
             game->running = 0;
@@ -659,6 +664,8 @@ void drawObjects(game_state_t* game) {
             continue;
         }
 
+        ZGL_DEBUG_PRINT("INFO: Drawing object %d: %s\n", i, game->objects[i].mesh->name);
+
         zgl_object3D_t object = game->objects[i];
         switch (game->shaderType) {
             case BASIC_SHADER:
@@ -752,8 +759,17 @@ void render(game_state_t* game) {
     }
 
     ZGL_DEBUG_PRINT("INFO: Update backbuffer\n");
-    SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH);
-    SDL_RenderCopy(game->renderer, game->texture, NULL, NULL);
+    int updatedTexture = SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH);
+    if (updatedTexture != 1) {
+        fprintf(stderr, "ERROR: Texture couldn't be updated: %s\n", SDL_GetError());
+        exit(-1);
+    }
+
+    int renderedTexture = SDL_RenderTexture(game->renderer, game->texture, NULL, NULL);
+    if (renderedTexture != 1) {
+        fprintf(stderr, "ERROR: Texture couldn't be rendered: %s\n", SDL_GetError());
+        exit(-1);
+    }
 }
 
 #ifdef DEBUGUI

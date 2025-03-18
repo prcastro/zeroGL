@@ -13,11 +13,10 @@
                 "/Fe${fileDirname}\\target\\${fileBasenameNoExtension}.exe",
                 "${file}",
                 "/I",
-                "external\\sdl2\\include",
+                "external\\sdl3\\include",
                 "/link",
-                "/LIBPATH:external\\sdl2\\lib\\x64",
-                "SDL2.lib",
-                "SDL2main.lib",
+                "/LIBPATH:external\\sdl3\\lib\\x64",
+                "SDL3.lib",
             ],
             "options": {
                 "cwd": "${fileDirname}"
