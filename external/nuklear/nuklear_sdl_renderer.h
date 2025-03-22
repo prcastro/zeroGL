@@ -11,7 +11,7 @@
 #ifndef NK_SDL_RENDERER_H_
 #define NK_SDL_RENDERER_H_
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 NK_API struct nk_context*   nk_sdl_init(SDL_Window *win, SDL_Renderer *renderer);
 NK_API void                 nk_sdl_font_stash_begin(struct nk_font_atlas **atlas);
 NK_API void                 nk_sdl_font_stash_end(void);
@@ -71,7 +71,7 @@ nk_sdl_device_upload_atlas(const void *image, int width, int height)
 
     SDL_Texture *g_SDLFontTexture = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, width, height);
     if (g_SDLFontTexture == NULL) {
-        SDL_Log("error creating texture");
+        SDL_Log("Error creating texture: %s", SDL_GetError());
         return;
     }
     SDL_UpdateTexture(g_SDLFontTexture, NULL, image, 4 * width);
@@ -90,7 +90,7 @@ nk_sdl_render(enum nk_anti_aliasing AA)
 #ifdef NK_SDL_CLAMP_CLIP_RECT
         SDL_Rect viewport;
 #endif
-        SDL_bool clipping_enabled;
+        bool clipping_enabled;
         int vs = sizeof(struct nk_sdl_vertex);
         size_t vp = offsetof(struct nk_sdl_vertex, position);
         size_t vt = offsetof(struct nk_sdl_vertex, uv);
@@ -129,10 +129,10 @@ nk_sdl_render(enum nk_anti_aliasing AA)
         /* iterate over and execute each draw command */
         offset = (const nk_draw_index*)nk_buffer_memory_const(&ebuf);
 
-        clipping_enabled = SDL_RenderIsClipEnabled(sdl.renderer);
-        SDL_RenderGetClipRect(sdl.renderer, &saved_clip);
+        clipping_enabled = SDL_RenderClipEnabled(sdl.renderer);
+        SDL_GetRenderClipRect(sdl.renderer, &saved_clip);
 #ifdef NK_SDL_CLAMP_CLIP_RECT
-        SDL_RenderGetViewport(sdl.renderer, &viewport);
+        SDL_GetRenderViewport(sdl.renderer, &viewport);
 #endif
 
         nk_draw_foreach(cmd, &sdl.ctx, &dev->cmds)
@@ -161,7 +161,7 @@ nk_sdl_render(enum nk_anti_aliasing AA)
                     r.w = viewport.w;
                 }
 #endif
-                SDL_RenderSetClipRect(sdl.renderer, &r);
+                SDL_SetRenderClipRect(sdl.renderer, &r);
             }
 
             {
@@ -179,9 +179,9 @@ nk_sdl_render(enum nk_anti_aliasing AA)
             }
         }
 
-        SDL_RenderSetClipRect(sdl.renderer, &saved_clip);
+        SDL_SetRenderClipRect(sdl.renderer, &saved_clip);
         if (!clipping_enabled) {
-            SDL_RenderSetClipRect(sdl.renderer, NULL);
+            SDL_SetRenderClipRect(sdl.renderer, NULL);
         }
 
         nk_clear(&sdl.ctx);
@@ -271,23 +271,23 @@ nk_sdl_handle_event(SDL_Event *evt)
 
     /* optional grabbing behavior */
     if (ctx->input.mouse.grab) {
-        SDL_SetRelativeMouseMode(SDL_TRUE);
+        SDL_SetWindowRelativeMouseMode(sdl.win, true);
         ctx->input.mouse.grab = 0;
     } else if (ctx->input.mouse.ungrab) {
         int x = (int)ctx->input.mouse.prev.x, y = (int)ctx->input.mouse.prev.y;
-        SDL_SetRelativeMouseMode(SDL_FALSE);
+        SDL_SetWindowRelativeMouseMode(sdl.win, false);
         SDL_WarpMouseInWindow(sdl.win, x, y);
         ctx->input.mouse.ungrab = 0;
     }
 
     switch(evt->type)
     {
-        case SDL_KEYUP: /* KEYUP & KEYDOWN share same routine */
-        case SDL_KEYDOWN:
+        case SDL_EVENT_KEY_UP: /* KEYUP & KEYDOWN share same routine */
+        case SDL_EVENT_KEY_DOWN:
             {
-                int down = evt->type == SDL_KEYDOWN;
+                int down = evt->type == SDL_EVENT_KEY_DOWN;
                 const Uint8* state = SDL_GetKeyboardState(0);
-                switch(evt->key.keysym.sym)
+                switch(evt->key.key)
                 {
                     case SDLK_RSHIFT: /* RSHIFT & LSHIFT share same routine */
                     case SDLK_LSHIFT:    nk_input_key(ctx, NK_KEY_SHIFT, down); break;
@@ -301,13 +301,13 @@ nk_sdl_handle_event(SDL_Event *evt)
                                          nk_input_key(ctx, NK_KEY_SCROLL_END, down); break;
                     case SDLK_PAGEDOWN:  nk_input_key(ctx, NK_KEY_SCROLL_DOWN, down); break;
                     case SDLK_PAGEUP:    nk_input_key(ctx, NK_KEY_SCROLL_UP, down); break;
-                    case SDLK_z:         nk_input_key(ctx, NK_KEY_TEXT_UNDO, down && state[SDL_SCANCODE_LCTRL]); break;
-                    case SDLK_r:         nk_input_key(ctx, NK_KEY_TEXT_REDO, down && state[SDL_SCANCODE_LCTRL]); break;
-                    case SDLK_c:         nk_input_key(ctx, NK_KEY_COPY, down && state[SDL_SCANCODE_LCTRL]); break;
-                    case SDLK_v:         nk_input_key(ctx, NK_KEY_PASTE, down && state[SDL_SCANCODE_LCTRL]); break;
-                    case SDLK_x:         nk_input_key(ctx, NK_KEY_CUT, down && state[SDL_SCANCODE_LCTRL]); break;
-                    case SDLK_b:         nk_input_key(ctx, NK_KEY_TEXT_LINE_START, down && state[SDL_SCANCODE_LCTRL]); break;
-                    case SDLK_e:         nk_input_key(ctx, NK_KEY_TEXT_LINE_END, down && state[SDL_SCANCODE_LCTRL]); break;
+                    case SDLK_Z:         nk_input_key(ctx, NK_KEY_TEXT_UNDO, down && state[SDL_SCANCODE_LCTRL]); break;
+                    case SDLK_R:         nk_input_key(ctx, NK_KEY_TEXT_REDO, down && state[SDL_SCANCODE_LCTRL]); break;
+                    case SDLK_C:         nk_input_key(ctx, NK_KEY_COPY, down && state[SDL_SCANCODE_LCTRL]); break;
+                    case SDLK_V:         nk_input_key(ctx, NK_KEY_PASTE, down && state[SDL_SCANCODE_LCTRL]); break;
+                    case SDLK_X:         nk_input_key(ctx, NK_KEY_CUT, down && state[SDL_SCANCODE_LCTRL]); break;
+                    case SDLK_B:         nk_input_key(ctx, NK_KEY_TEXT_LINE_START, down && state[SDL_SCANCODE_LCTRL]); break;
+                    case SDLK_E:         nk_input_key(ctx, NK_KEY_TEXT_LINE_END, down && state[SDL_SCANCODE_LCTRL]); break;
                     case SDLK_UP:        nk_input_key(ctx, NK_KEY_UP, down); break;
                     case SDLK_DOWN:      nk_input_key(ctx, NK_KEY_DOWN, down); break;
                     case SDLK_LEFT:
@@ -324,10 +324,10 @@ nk_sdl_handle_event(SDL_Event *evt)
             }
             return 1;
 
-        case SDL_MOUSEBUTTONUP: /* MOUSEBUTTONUP & MOUSEBUTTONDOWN share same routine */
-        case SDL_MOUSEBUTTONDOWN:
+        case SDL_EVENT_MOUSE_BUTTON_UP: /* MOUSEBUTTONUP & MOUSEBUTTONDOWN share same routine */
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
             {
-                int down = evt->type == SDL_MOUSEBUTTONDOWN;
+                int down = evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN;
                 const int x = evt->button.x, y = evt->button.y;
                 switch(evt->button.button)
                 {
@@ -341,7 +341,7 @@ nk_sdl_handle_event(SDL_Event *evt)
             }
             return 1;
 
-        case SDL_MOUSEMOTION:
+        case SDL_EVENT_MOUSE_MOTION:
             if (ctx->input.mouse.grabbed) {
                 int x = (int)ctx->input.mouse.prev.x, y = (int)ctx->input.mouse.prev.y;
                 nk_input_motion(ctx, x + evt->motion.xrel, y + evt->motion.yrel);
@@ -349,7 +349,7 @@ nk_sdl_handle_event(SDL_Event *evt)
             else nk_input_motion(ctx, evt->motion.x, evt->motion.y);
             return 1;
 
-        case SDL_TEXTINPUT:
+        case SDL_EVENT_TEXT_INPUT:
             {
                 nk_glyph glyph;
                 memcpy(glyph, evt->text.text, NK_UTF_SIZE);
@@ -357,7 +357,7 @@ nk_sdl_handle_event(SDL_Event *evt)
             }
             return 1;
 
-        case SDL_MOUSEWHEEL:
+        case SDL_EVENT_MOUSE_WHEEL:
             nk_input_scroll(ctx,nk_vec2((float)evt->wheel.x,(float)evt->wheel.y));
             return 1;
     }
