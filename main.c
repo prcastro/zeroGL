@@ -203,7 +203,7 @@ game_state_t* init() {
         exit(-1);
     }
 
-    game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);
+    game->texture = SDL_CreateTexture(game->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
     game->canvas = canvas;
     game->backgroundColor = ZGL_COLOR_BLACK;
     game->drawLights    = 1;
@@ -759,14 +759,12 @@ void render(game_state_t* game) {
     }
 
     ZGL_DEBUG_PRINT("INFO: Update backbuffer\n");
-    int updatedTexture = SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH);
-    if (updatedTexture != 1) {
+    if (!SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH)) {
         fprintf(stderr, "ERROR: Texture couldn't be updated: %s\n", SDL_GetError());
         exit(-1);
     }
-
-    int renderedTexture = SDL_RenderTexture(game->renderer, game->texture, NULL, NULL);
-    if (renderedTexture != 1) {
+     
+    if (!SDL_RenderTexture(game->renderer, game->texture, NULL, NULL)) {
         fprintf(stderr, "ERROR: Texture couldn't be rendered: %s\n", SDL_GetError());
         exit(-1);
     }
