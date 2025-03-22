@@ -197,8 +197,7 @@ game_state_t* init() {
     game->elapsedTime = 0;
     game->lastTime = SDL_GetPerformanceCounter();
 
-    int createdWindow = SDL_CreateWindowAndRenderer("Rasterizer", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE, &game->window, &game->renderer);
-    if (!createdWindow) {
+    if (!SDL_CreateWindowAndRenderer("Rasterizer", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE, &game->window, &game->renderer)) {
         fprintf(stderr, "ERROR: Window and Renderer couldn't be created: %s.\n", SDL_GetError());
         exit(-1);
     }
