@@ -1,6 +1,10 @@
-#define ZGL_DEBUG
-// #define DEBUGUI
+// #define ZGL_DEBUG
+#define DEBUGUI
 #define SDL_MAIN_HANDLED
+
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 
 #ifdef DEBUGUI
 #define NK_INCLUDE_FIXED_TYPES
@@ -12,13 +16,13 @@
 #define NK_INCLUDE_FONT_BAKING
 #define NK_INCLUDE_DEFAULT_FONT
 #define NK_IMPLEMENTATION
-#define NK_SDL_RENDERER_IMPLEMENTATION
+#define NK_SDL3_RENDERER_IMPLEMENTATION
+#define NK_INCLUDE_COMMAND_USERDATA
 #include "external/nuklear/nuklear.h"
-#include "external/nuklear/nuklear_sdl_renderer.h"
+#include "external/nuklear/nuklear_sdl3_renderer.h"
 #endif // DEBUGUI
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
+
 #include <math.h>
 #include <assert.h>
 #include <float.h>
@@ -31,14 +35,15 @@
 #include "objloader.h"
 
 
-#define WIDTH 1066
-#define HEIGHT 600
+#define WIDTH 1920
+#define HEIGHT 1080
 #define ROTATION_SPEED 0.0f //15.0f // degrees per second
 #define VIEWPORT_WIDTH (WIDTH /(float) HEIGHT)
 #define VIEWPORT_HEIGHT 1.0f
 #define VIEWPORT_DISTANCE 1.0f
 #define PIXEL_DEPTH 4
 #define PITCH (PIXEL_DEPTH * WIDTH)
+#define FONT_SIZE 22
 
 typedef enum {
     BASIC_SHADER,
@@ -244,14 +249,14 @@ game_state_t* init() {
     game->keys = SDL_GetKeyboardState(NULL);
 
     #ifdef DEBUGUI
-    ZGL_DEBUG_PRINT("INFO:  Initializing Dear ImGui\n");
+    ZGL_DEBUG_PRINT("INFO:  Initializing Nuklear\n");
     struct nk_context *ctx = nk_sdl_init(game->window, game->renderer);
     struct nk_font_atlas *atlas;
-    struct nk_font_config config = nk_font_config(0);
+    struct nk_font_config config = nk_font_config(10);
     struct nk_font *font;
-    nk_sdl_font_stash_begin(&atlas);
-    font = nk_font_atlas_add_default(atlas, 10.0, &config);
-    nk_sdl_font_stash_end();
+    atlas = nk_sdl_font_stash_begin(ctx);
+    font = nk_font_atlas_add_default(atlas, FONT_SIZE, &config);
+    nk_sdl_font_stash_end(ctx);
     nk_style_set_font(ctx, &font->handle);
     game->nuklearContext = ctx;
     game->showGUI = 1;
@@ -270,7 +275,7 @@ void handleEvents(game_state_t* game) {
 
     while (SDL_PollEvent(&game->event)) {
         #ifdef DEBUGUI
-        nk_sdl_handle_event(&game->event);
+        nk_sdl_handle_event(game->nuklearContext, &game->event);
         #endif // DEBUGUI
         switch (game->event.type) {
         case SDL_EVENT_QUIT:
@@ -302,9 +307,14 @@ void updateDebugUI(game_state_t *game) {
 
     if (game->showGUI) {
         ZGL_DEBUG_PRINT("INFO: Updating GUI\n");
-        int row_size = 12;
+        int row_size = FONT_SIZE + 5;
+
+        // Get current window dimensions
+        int width, height;
+        SDL_GetWindowSize(game->window, &width, &height);
+
         struct nk_context *ctx = game->nuklearContext;
-        if (nk_begin(ctx, "Settings", nk_rect(0, 0, 220, HEIGHT),
+        if (nk_begin(ctx, "Settings", nk_rect(0, 0, width/4, height),
                      NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE|NK_WINDOW_SCALABLE)) {
 
             nk_layout_row_static(ctx, row_size, 150, 1);
@@ -773,7 +783,7 @@ void render(game_state_t* game) {
 void renderDebugUI(game_state_t* game) {
     if (game->showGUI) {
         ZGL_DEBUG_PRINT("INFO: Rendering GUI\n");
-        nk_sdl_render(NK_ANTI_ALIASING_ON);
+        nk_sdl_render(game->nuklearContext, NK_ANTI_ALIASING_ON);
     }
 }
 #endif // DEBUGUI
@@ -795,7 +805,7 @@ void destroy(game_state_t* game) {
     SDL_DestroyWindow(game->window);
 
     #ifdef DEBUGUI
-    nk_sdl_shutdown();
+    nk_sdl_shutdown(game->nuklearContext);
     #endif // DEBUGUI
 
     SDL_Quit();

@@ -10,15 +10,15 @@ target_compile_options(main PRIVATE /Zi /EHsc /nologo)
 # Link Nuklear
 target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/nuklear)
 
-# Link SDL2
-target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/sdl2/include)
-target_link_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/sdl2/lib/x64)
-set(SDL2_DLL_PATH "${CMAKE_SOURCE_DIR}/external/sdl2/lib/x64/SDL2.dll")
-target_link_libraries(main PRIVATE SDL2 SDL2main)
+# Link SDL3
+target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/sdl3/include)
+target_link_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/sdl3/lib/x64)
+set(SDL3_DLL_PATH "${CMAKE_SOURCE_DIR}/external/sdl3/lib/x64/SDL3.dll")
+target_link_libraries(main PRIVATE SDL3)
 
 add_custom_command(TARGET main POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${SDL2_DLL_PATH}"          # Source DLL
+    "${SDL3_DLL_PATH}"          # Source DLL
     "$<TARGET_FILE_DIR:main>/"  # Destination: same directory as executable
 )
 

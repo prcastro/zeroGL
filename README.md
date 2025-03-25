@@ -22,16 +22,16 @@ To run the demo, download the latest .zip file from the releases page, uncompres
 
 ### All platforms using Zig
 
-The project comes with a distribution for sdl2 under `external/` . On other systems, just install SDL v2.28.2 (using `apt` or `brew`) and find the compiled libraries using `sdl2-config --libs` . To compile, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
+The project comes with a distribution for sdl3 under `external/` . On other systems, just install SDL v2.28.2 (using `apt` or `brew`) and find the compiled libraries using `sdl3-config --libs` . To compile, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
 
 **Windows**
 ```console
-> zig build-exe main.c -O ReleaseFast --library c -I.\external\sdl2\include -Lexternal\sdl2\lib\x64 -lSDL2 -lSDL2main -femit-bin=target\main.exe
+> zig build-exe main.c -O ReleaseFast --library c -I.\external\sdl3\include -Lexternal\sdl3\lib\x64 -lSDL3 -femit-bin=target\main.exe
 ```
 
-**linux, macOS** (replace `/usr/local/lib` with the path you found with `sdl2-config --libs`):
+**linux, macOS** (replace `/usr/local/lib` with the path you found with `sdl3-config --libs`):
 ```console
-$ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -femit-bin=target/main
+$ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -L/usr/local/lib -lSDL3 -femit-bin=target/main
 ```
 
 ### Windows
@@ -62,7 +62,7 @@ Install Visual Studio Community 2022 (the C/C++ compilers may suffice), then run
 ```console
 > "c:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
 
-> cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c /I external\sdl2\include /link /LIBPATH:external\sdl2\lib\x64 SDL2.lib SDL2main.lib
+> cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c /I external\sdl3\include /link /LIBPATH:external\sdl3\lib\x64 SDL3.lib
 ```
 
 Change the `vcvarsall.bat` path according to your VS installation. The binary will be written to target/Release/main.exe.
@@ -74,10 +74,10 @@ Open `main.c` on the editor and then click on `Run C/C++ File` on the top right 
 
 ### Linux
 
-On Linux sytems where SDL2 is installed, the exemple main program can also be built by running (again, replace `/usr/local/lib` with the path you found with `sdl2-config --libs`):
+On Linux sytems where SDL3 is installed, the exemple main program can also be built by running (again, replace `/usr/local/lib` with the path you found with `sdl3-config --libs`):
 
 ```console
-gcc main.c -I./external/sdl2/include -L/usr/local/lib -lSDL2main -lSDL2 -lm -o target/main
+gcc main.c -I./external/sdl3/include -L/usr/local/lib -lSDL3 -lm -o target/main
 ```
 
 ## Current limitations
