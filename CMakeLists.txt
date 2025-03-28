@@ -22,7 +22,7 @@ add_custom_command(TARGET main POST_BUILD
     "$<TARGET_FILE_DIR:main>/"  # Destination: same directory as executable
 )
 
-# Link UPNG
+# Link STB
 target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/stb)
 
 # Link my libraries in root folder

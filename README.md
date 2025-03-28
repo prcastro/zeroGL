@@ -70,7 +70,7 @@ Change the `vcvarsall.bat` path according to your VS installation. The binary wi
 #### VS Code
 If you're using Visual Studio Code, then you can install Visual Studio Community 2022 (the C/C++ compilers may suffice) and also install the C/C++ extensions from Microsoft.
 
-Open `main.c` on the editor and then click on `Run C/C++ File` on the top right corner. Remember to open VS Code from within a developer terminal (or run `vcvarsall.bat` on the terminal before opening VS Code from within it).
+Open `main.c` on the editor and then click on `Run C/C++ File` on the top right corner. Remember to open VS Code from within a developer terminal (or run `vcvarsall.bat` on the terminal before opening VS Code from within it). You might want to have the `SDL3.dll` on your `PATH` or put that in the target folder next to `main.exe`.
 
 ### Linux
 

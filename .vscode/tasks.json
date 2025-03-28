@@ -16,7 +16,7 @@
                 "external\\sdl3\\include",
                 "/link",
                 "/LIBPATH:external\\sdl3\\lib\\x64",
-                "SDL3.lib",
+                "SDL3.lib"
             ],
             "options": {
                 "cwd": "${fileDirname}"

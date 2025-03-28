@@ -2,11 +2,14 @@ WINDOWS
 
 "c:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
 cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c /I external\sdl3\include /link /LIBPATH:external\sdl3\lib\x64 SDL3.lib
+copy external\sdl3\lib\x64\SDL3.dll target\SDL3.dll
 
 zig build-exe main.c  -O ReleaseFast --library c -I.\external\sdl3\include -Lexternal\sdl3\lib\x64 -lSDL3 -femit-bin=target\main.exe
+copy external\sdl3\lib\x64\SDL3.dll target\SDL3.dll
 
 cmake -B build/ -G "Visual Studio 17 2022"
 cmake --build build/ --config Release
 
 MACOS
 zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -L/usr/local/lib -lSDL3 -femit-bin=target/main
+cp external\sdl3\lib\x64\SDL3.dll target\SDL3.dll
