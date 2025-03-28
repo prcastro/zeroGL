@@ -18,26 +18,18 @@ A zero-dependencies, single-header 3D graphics library
 
 To run the demo, download the latest .zip file from the releases page, uncompress it and run
 
-## Building the project
+## Building the demo
 
-### All platforms using Zig
+Before starting, you need to decide whether you are going to use the vendored SDL3 version (in the `external/sdl3` directory) or if you're going to use the system SDL3 you've installed.
 
-The project comes with a distribution for sdl3 under `external/` . On other systems, just install SDL v2.28.2 (using `apt` or `brew`) and find the compiled libraries using `sdl3-config --libs` . To compile, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
+The following instructions assume you're using the vendored SDL3 distribution. Before starting then, you're going to [build SDL3](https://github.com/libsdl-org/SDL/blob/main/docs/README-cmake.md) from the `external/sdl3` directory, unless you're using CMake (then you can just use CMake and it will automatically compile SDL3 along the way).
 
-**Windows**
-```console
-> zig build-exe main.c -O ReleaseFast --library c -I.\external\sdl3\include -Lexternal\sdl3\lib\x64 -lSDL3 -femit-bin=target\main.exe
-```
-
-**linux, macOS** (replace `/usr/local/lib` with the path you found with `sdl3-config --libs`):
-```console
-$ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -L/usr/local/lib -lSDL3 -femit-bin=target/main
-```
 
 ### Windows
 
 #### CMake
-Install Visual Studio Community 2022 (the C/C++ compilers may suffice) and CMake. Then, from the command-line run:
+Install Visual Studio Community 2022 (the C/C++ compilers may suffice) and CMake. This is the only option that doesn't require you to pre-build SDL3 before starting. Then, from the command-line run:
+
 ```console
 > cmake -B build/ -G "Visual Studio 17 2022"
 
@@ -45,6 +37,16 @@ Install Visual Studio Community 2022 (the C/C++ compilers may suffice) and CMake
 ```
 
 The binary will be written to target/Release/main.exe
+
+#### Zig
+
+To compile, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
+
+```console
+> zig build-exe main.c -O ReleaseFast --library c -I.\external\sdl3\include -Lexternal\sdl3\build\RelWithDebInfo\ -lSDL3 -femit-bin=target\main.exe
+
+> copy external\sdl3\build\RelWithDebInfo\SDL3.dll target\SDL3.dll
+```
 
 #### build.bat
 Install Visual Studio Community 2022 (the C/C++ compilers may suffice) and then double-click the `build.bat` file. Alternatively, from the command-line run:
@@ -62,23 +64,50 @@ Install Visual Studio Community 2022 (the C/C++ compilers may suffice), then run
 ```console
 > "c:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
 
-> cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c /I external\sdl3\include /link /LIBPATH:external\sdl3\lib\x64 SDL3.lib
+> cl.exe /Zi /EHsc /O2 /nologo /Fotarget\obj\ /Fetarget\main.exe main.c /I external\sdl3\include /link /LIBPATH:external\sdl3\build\RelWithDebInfo SDL3.lib
+
+> copy external\sdl3\build\RelWithDebInfo\SDL3.dll target\SDL3.dll
 ```
 
 Change the `vcvarsall.bat` path according to your VS installation. The binary will be written to target/Release/main.exe.
 
 #### VS Code
-If you're using Visual Studio Code, then you can install Visual Studio Community 2022 (the C/C++ compilers may suffice) and also install the C/C++ extensions from Microsoft.
+If you're using Visual Studio Code, then you can install Visual Studio Community 2022 (the C/C++ compilers may suffice) and CMake. Also install the C/C++ extensions from Microsoft and the CMake Tools extension as well.
 
-Open `main.c` on the editor and then click on `Run C/C++ File` on the top right corner. Remember to open VS Code from within a developer terminal (or run `vcvarsall.bat` on the terminal before opening VS Code from within it). You might want to have the `SDL3.dll` on your `PATH` or put that in the target folder next to `main.exe`.
+Open `main.c` on the editor and then click on ▶ on status bar at the bottom.
 
 ### Linux
 
-On Linux sytems where SDL3 is installed, the exemple main program can also be built by running (again, replace `/usr/local/lib` with the path you found with `sdl3-config --libs`):
+#### GCC
+
+On Linux sytems where SDL3 is installed, the exemple main program can also be built by running (again, ):
 
 ```console
-gcc main.c -I./external/sdl3/include -L/usr/local/lib -lSDL3 -lm -o target/main
+gcc main.c -I./external/sdl3/include -Lexternal/sdl3/build/RelWithDebInfo -lSDL3 -lm -o target/main
 ```
+
+#### Zig
+
+```console
+$ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -Lexternal/sdl3/build/RelWithDebInfo -lSDL3 -femit-bin=target/main
+```
+
+### macOS
+
+#### Zig
+
+To compile, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
+
+```console
+$ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -Lexternal/sdl3/build/RelWithDebInfo -lSDL3 -femit-bin=target/main
+```
+
+### Installing SDL apart
+
+If you want to SDL apart, use version v3.2.8 (using `apt` or `brew`) and find the installed libraries in your system. On everey instruction, you can replace:
+
+* Library path: `external/sdl3/build/RelWithDebInfo` to `usr/include/SDL3` (or wherever you have the SDL3 headers installed)
+* Include path: `external\sdl3\include` to `usr\local\lib` (or wherever you have the SDL3 libraries installed)
 
 ## Current limitations
 
