@@ -110,10 +110,16 @@ $ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -Lex
 
 ### Installing SDL apart
 
-If you want to SDL apart, use version v3.2.8 (using `apt` or `brew`) and find the installed libraries in your system. On everey instruction, you can replace:
+If you want to SDL apart, use version v3.2.8 (using `apt` or `brew`) and find the installed libraries in your system. On every instruction, you can replace:
 
 * Library path: `external/sdl3/build/RelWithDebInfo` to `usr/include/SDL3` (or wherever you have the SDL3 headers installed)
 * Include path: `external/sdl3/include` to `usr/local/lib` (or wherever you have the SDL3 libraries installed)
+
+If you're using CMake, simply set the `USE_VENDORED_SDL3` to `OFF` during the configure step:
+
+```console
+> cmake -DUSE_VENDORED_SDL3=OFF -B build/ -G "Visual Studio 17 2022"
+```
 
 ## Current limitations
 
