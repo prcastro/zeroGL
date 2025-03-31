@@ -5,13 +5,24 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/target/obj)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/target/obj)
 
 add_executable(main main.c)
-target_compile_options(main PRIVATE /Zi /EHsc /nologo)
+if (MSVC)
+    target_compile_options(main PRIVATE /Zi /EHsc /nologo)
+else()
+    target_compile_options(main PRIVATE -g -Wall -Wextra)
+endif()
 
 # Link Nuklear
 target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/nuklear)
 
-# Link SDL3
-add_subdirectory(${CMAKE_SOURCE_DIR}/external/sdl3 EXCLUDE_FROM_ALL)
+# Link SDL3 (optionally use vendored version)
+option(USE_VENDORED_SDL3 "Use vendored SDL3" ON)
+
+if(USE_VENDORED_SDL3)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/external/sdl3 EXCLUDE_FROM_ALL)
+else()
+  find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
+endif()
+
 target_link_libraries(main PRIVATE SDL3::SDL3)
 
 # Link STB
