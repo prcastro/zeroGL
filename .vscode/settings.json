@@ -5,6 +5,11 @@
         "nuklear.h": "c",
         "zerogl.h": "c",
         "objloader.h": "c",
-        "stb_image.h": "c"
+        "stb_image.h": "c",
+        "sdl_main.h": "c",
+        "nuklear_sdl3_renderer.h": "c"
+    },
+    "cmake.debugConfig": {
+        "cwd": "${workspaceFolder}"
     }
 }

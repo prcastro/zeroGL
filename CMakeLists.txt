@@ -1,28 +1,31 @@
 cmake_minimum_required(VERSION 3.10)
 project(main C)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/target)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/target/obj)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/target/obj)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/obj)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/obj)
 
 add_executable(main main.c)
-target_compile_options(main PRIVATE /Zi /EHsc /nologo)
+if (MSVC)
+    target_compile_options(main PRIVATE /Zi /EHsc /nologo)
+else()
+    target_compile_options(main PRIVATE -g -Wall -Wextra)
+endif()
 
 # Link Nuklear
 target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/nuklear)
 
-# Link SDL2
-target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/sdl2/include)
-target_link_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/sdl2/lib/x64)
-set(SDL2_DLL_PATH "${CMAKE_SOURCE_DIR}/external/sdl2/lib/x64/SDL2.dll")
-target_link_libraries(main PRIVATE SDL2 SDL2main)
+# Link SDL3 (optionally use vendored version)
+option(USE_VENDORED_SDL3 "Use vendored SDL3" ON)
 
-add_custom_command(TARGET main POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${SDL2_DLL_PATH}"          # Source DLL
-    "$<TARGET_FILE_DIR:main>/"  # Destination: same directory as executable
-)
+if(USE_VENDORED_SDL3)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/external/sdl3 EXCLUDE_FROM_ALL)
+else()
+  find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
+endif()
 
-# Link UPNG
+target_link_libraries(main PRIVATE SDL3::SDL3)
+
+# Link STB
 target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/external/stb)
 
 # Link my libraries in root folder
