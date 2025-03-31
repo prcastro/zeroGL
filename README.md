@@ -16,7 +16,7 @@ A zero-dependencies, single-header 3D graphics library
 
 ## Getting started
 
-To run the demo, download the latest .zip file from the releases page, uncompress it and run
+To use zeroGL in your project, download `zerogl.h` from the releases page and include it in your project. To run the demo, download the latest .zip file from the releases page, uncompress it and run.
 
 ## Building the demo
 
