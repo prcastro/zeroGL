@@ -20,9 +20,15 @@ To run the demo, download the latest .zip file from the releases page, uncompres
 
 ## Building the demo
 
+Clone this repo with submodules:
+
+```console
+$ git clone --recurse-submodules https://github.com/prcastro/zeroGL.git
+```
+
 Before starting, you need to decide whether you are going to use the vendored SDL3 version (in the `external/sdl3` directory) or if you're going to use the system SDL3 you've installed.
 
-The following instructions assume you're using the vendored SDL3 distribution. Before starting then, you're going to [build SDL3](https://github.com/libsdl-org/SDL/blob/main/docs/README-cmake.md) from the `external/sdl3` directory, unless you're using CMake (then you can just use CMake and it will automatically compile SDL3 along the way).
+The following instructions assume you're using the vendored SDL3 distribution. Before starting then, you need to [build SDL3](https://github.com/libsdl-org/SDL/blob/main/docs/README-cmake.md) from the `external/sdl3` directory, unless you're using CMake (as it will automatically compile SDL3 along the way).
 
 
 ### Windows
