@@ -113,7 +113,7 @@ $ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -Lex
 If you want to SDL apart, use version v3.2.8 (using `apt` or `brew`) and find the installed libraries in your system. On everey instruction, you can replace:
 
 * Library path: `external/sdl3/build/RelWithDebInfo` to `usr/include/SDL3` (or wherever you have the SDL3 headers installed)
-* Include path: `external\sdl3\include` to `usr\local\lib` (or wherever you have the SDL3 libraries installed)
+* Include path: `external/sdl3/include` to `usr/local/lib` (or wherever you have the SDL3 libraries installed)
 
 ## Current limitations
 
