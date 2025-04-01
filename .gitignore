@@ -27,3 +27,7 @@ target/*
 
 # CMake
 build/
+
+# Zig
+*.zig-cache
+*.zig-out

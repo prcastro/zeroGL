@@ -26,9 +26,9 @@ Clone this repo with submodules:
 $ git clone --recurse-submodules https://github.com/prcastro/zeroGL.git
 ```
 
-Before starting, you need to decide whether you are going to use the vendored SDL3 version (in the `external/sdl3` directory) or if you're going to use the system SDL3 you've installed.
+Before starting, you need to decide whether you are going to use the vendored SDL3 version (in the `external/sdl3` directory) or if you're going to use the system SDL3 you've installed. The following instructions assume you're using the vendored SDL3 distribution. If you want to use the SDL system library, see the instructions [here](#using-a-system-SDL-library).
 
-The following instructions assume you're using the vendored SDL3 distribution. Before starting then, you need to [build SDL3](https://github.com/libsdl-org/SDL/blob/main/docs/README-cmake.md) from the `external/sdl3` directory, unless you're using CMake (as it will automatically compile SDL3 along the way).
+If you're not using CMake or Zig, you first need to [build SDL3](https://github.com/libsdl-org/SDL/blob/main/docs/README-cmake.md) from the `external/sdl3` directory. If you're using CMake, the `external/sdl3` will build automatically. If you're using Zig as the build system, we're using [castholm/SDL](https://github.com/castholm/SDL) as the SDL dependency, as it provides SDL integration with Zig's build system, so you don't even need to download the `external/sdl3` git submodule.
 
 
 ### Windows
@@ -46,12 +46,10 @@ The binary will be written to build/Release/main.exe
 
 #### Zig
 
-To compile, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
+To run the demo, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
 
 ```console
-> zig build-exe main.c -O ReleaseFast --library c -I.\external\sdl3\include -Lexternal\sdl3\build\RelWithDebInfo\ -lSDL3 -femit-bin=build\main.exe
-
-> copy external\sdl3\build\RelWithDebInfo\SDL3.dll build\SDL3.dll
+> zig build run --release=fast
 ```
 
 #### build.bat
@@ -95,25 +93,25 @@ gcc main.c -I./external/sdl3/include -Lexternal/sdl3/build/RelWithDebInfo -lSDL3
 #### Zig
 
 ```console
-$ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -Lexternal/sdl3/build/RelWithDebInfo -lSDL3 -femit-bin=build/main
+$ zig build run --release=fast
 ```
 
 ### macOS
 
 #### Zig
 
-To compile, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
+To run the demo, just [install zig](https://ziglang.org/learn/getting-started/#installing-zig) (it's basically downloading a binary and adding it to your path) and then run:
 
 ```console
-$ zig build-exe main.c -O ReleaseFast --library c -I./external/sdl3/include -Lexternal/sdl3/build/RelWithDebInfo -lSDL3 -femit-bin=build/main
+$ zig build run --release=fast
 ```
 
-### Installing SDL apart
+### Using a system SDL library
 
-If you want to SDL apart, use version v3.2.8 (using `apt` or `brew`) and find the installed libraries in your system. On every instruction, you can replace:
+If you want to use the SDL library installed in your system, make sure you have version v3.2.8 (using `apt` or `brew`) and find the installed libraries. On every instruction, you can replace:
 
-* Library path: `external/sdl3/build/RelWithDebInfo` to `usr/include/SDL3` (or wherever you have the SDL3 headers installed)
-* Include path: `external/sdl3/include` to `usr/local/lib` (or wherever you have the SDL3 libraries installed)
+* Library path: `external/sdl3/build/RelWithDebInfo` with `usr/include/SDL3` (or wherever you have the SDL3 headers installed)
+* Include path: `external/sdl3/include` with `usr/local/lib` (or wherever you have the SDL3 libraries installed)
 
 If you're using CMake, simply set the `USE_VENDORED_SDL3` to `OFF` during the configure step:
 
