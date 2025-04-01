@@ -667,13 +667,13 @@ static inline zgl_vec3_t zgl_rotate(zgl_vec3_t v, zgl_quaternion_t q) {
 
 static inline uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b) {
     #if  ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_RGBA8888
-    return 0x000000FF | (r << 24) | (g << 16) | (b << 8);
+    return 0x000000FF | ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8);
     #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ARGB8888
-    return 0xFF000000 | (r << 16) | (g << 8) |  b;
+    return 0xFF000000 | ((uint32_t)r << 16) | ((uint32_t)g << 8) |  (uint32_t)b;
     #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_BGRA8888
-    return 0x000000FF | (b << 24) | (g << 16) | (r << 8);
+    return 0x000000FF | ((uint32_t)b << 24) | ((uint32_t)g << 16) | ((uint32_t)r << 8);
     #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ABGR8888
-    return 0xFF000000 | (b << 16) | (g << 8) |  r;
+    return 0xFF000000 | ((uint32_t)b << 16) | ((uint32_t)g << 8) |  (uint32_t)r;
     #endif
 }
 

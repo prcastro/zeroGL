@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug via CMake",
+      "name": "Debug with CMake",
       "type": "cppvsdbg", // or "lldb" on macOS, "gdb" on Linux
       "request": "launch",
       "program": "${command:cmake.launchTargetPath}",
@@ -11,6 +11,15 @@
       "cwd": "${workspaceFolder}",
       "environment": [],
       "preLaunchTask": "CMake: build"
-    }
+    },
+    {
+      "type": "cppvsdbg",
+      "request": "launch",
+      "name": "Debug with Zig",
+      "program": "${workspaceFolder}/zig-out/bin/main",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "zig build"
+    },
   ]
 }
