@@ -37,7 +37,7 @@
 
 #define WIDTH 1920
 #define HEIGHT 1080
-#define ROTATION_SPEED 0.0f //15.0f // degrees per second
+#define ROTATION_SPEED 15.0f // degrees per second
 #define VIEWPORT_WIDTH (WIDTH /(float) HEIGHT)
 #define VIEWPORT_HEIGHT 1.0f
 #define VIEWPORT_DISTANCE 1.0f
@@ -158,7 +158,7 @@ game_state_t* init() {
         exit(-1);
     }
 
-    objectsRenderToggle[5] = 1;
+    objectsRenderToggle[3] = 1;
 
     ZGL_DEBUG_PRINT("INFO: Loading lights\n");
     int numAmbientLights = 1;
@@ -334,7 +334,7 @@ void updateDebugUI(game_state_t *game) {
                         nk_layout_row_dynamic(ctx, row_size, 1);
                         nk_labelf(ctx, NK_TEXT_LEFT, "%d: %s at (%.0f, %.0f, %.0f)", i, game->objects[i].mesh->name, game->objects[i].translation.x, game->objects[i].translation.y, game->objects[i].translation.z);
                         nk_layout_row_dynamic(ctx, row_size, 1);
-                        
+
                         nk_bool isRendered = game->objectsRenderToggle[i];
                         if (nk_checkbox_label(ctx, "Render", &isRendered)) {
                             game->objectsRenderToggle[i] = isRendered;
@@ -658,7 +658,9 @@ zgl_object3D_t rotateObjectY(zgl_object3D_t object, float degrees) {
 // TODO: Use quaternions for rotation
 void animateObjects(game_state_t* game) {
     float degrees = game->rotationSpeed * (game->elapsedTime / 1000.0f);
-    game->objects[0] = rotateObjectY(game->objects[0], fmod(degrees, 360.0f));
+    for (int i = 0; i < game->numObjects; i++) {
+        game->objects[i] = rotateObjectY(game->objects[i], fmod(degrees, 360.0f));
+    }
 }
 
 void update(game_state_t* game) {
@@ -772,7 +774,7 @@ void render(game_state_t* game) {
         fprintf(stderr, "ERROR: Texture couldn't be updated: %s\n", SDL_GetError());
         exit(-1);
     }
-     
+
     if (!SDL_RenderTexture(game->renderer, game->texture, NULL, NULL)) {
         fprintf(stderr, "ERROR: Texture couldn't be rendered: %s\n", SDL_GetError());
         exit(-1);
