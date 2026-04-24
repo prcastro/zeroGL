@@ -218,7 +218,7 @@ typedef struct {
     zgl_mat4x4_t viewMatrix;       // View matrix
     zgl_mat4x4_t projectionMatrix; // Projection matrix
     zgl_mat4x4_t viewProjMatrix;   // View * Projection matrix
-    zgl_vec4_t   fustrumPlanes[6]; // View frustum planes
+    zgl_vec4_t   frustumPlanes[6]; // View frustum planes
     float        movementSpeed;
     float        turningSpeed;
 } zgl_camera_t;
@@ -253,14 +253,14 @@ typedef zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* unifor
 typedef uint32_t zgl_fragment_shader_t(const zgl_shader_context_t* input, void* uniformData);
 
 typedef struct {
-    zgl_mat4x4_t modelviewprojection;
+    zgl_mat4x4_t modelViewProjection;
 } zgl_basic_uniform_t;
 
 static inline zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, void* uniformData);
 static inline uint32_t zgl_basic_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
 
 typedef struct {
-    zgl_mat4x4_t    modelviewprojection;
+    zgl_mat4x4_t    modelViewProjection;
     zgl_material_t* materials;
 } zgl_colored_uniform_t;
 
@@ -297,10 +297,10 @@ typedef struct {
     zgl_light_sources_t lightSources;
     int                 bilinearFiltering;
     zgl_material_t*     materials;
-} zgl_gourard_uniform_t;
+} zgl_gouraud_uniform_t;
 
-static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData);
-static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+static inline zgl_shader_context_t zgl_gouraud_vertex_shader(void* inputVertex, void* uniformData);
+static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
 
 typedef struct {
     zgl_mat4x4_t        modelMatrix;
@@ -320,7 +320,7 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
 #define ZGL_DIFFUSE_LIGHTING (1 << 0)
 #define ZGL_SPECULAR_LIGHTING (1 << 1)
 #define ZGL_BACKFACE_CULLING (1 << 2)
-#define ZGL_FUSTRUM_CULLING (1 << 3)
+#define ZGL_FRUSTUM_CULLING (1 << 3)
 #define ZGL_BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
 
 static inline void zgl_clear_depth_buffer(zgl_canvas_t canvas);
@@ -934,13 +934,13 @@ static inline zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction,
         .viewMatrix = viewMatrix,
         .projectionMatrix = projectionMatrix,
         .viewProjMatrix = viewProjMatrix,
-        .fustrumPlanes = {leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane},
+        .frustumPlanes = {leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane},
         .movementSpeed = movementSpeed,
         .turningSpeed = turningSpeed
     };
 }
 
-static inline int zgl__tri_in_fustrum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v3) {
+static inline int zgl__tri_in_frustum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v3) {
     // Using NDC coordinates
     if (v1.x < -1 && v2.x < -1 && v3.x < -1) return 0;
     if (v1.x >  1 && v2.x >  1 && v3.x >  1) return 0;
@@ -1119,14 +1119,14 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
                                        zgl_vertex_shader_t vertexShader, zgl_fragment_shader_t fragmentShader, uint16_t renderOptions) {
     zgl_mesh_t* mesh = object->mesh;
 
-    // Don't draw if the object is fully outside the camera fustrum
-    if (renderOptions & ZGL_FUSTRUM_CULLING) {
+    // Don't draw if the object is fully outside the camera frustum
+    if (renderOptions & ZGL_FRUSTUM_CULLING) {
         for (int p = 0; p < 6; p++) {
-            zgl_vec4_t plane = camera.fustrumPlanes[p];
+            zgl_vec4_t plane = camera.frustumPlanes[p];
             int isInside = 1;
             zgl_vec4_t center = zgl_mul_mat_v4(object->transform, (zgl_vec4_t) {mesh->center.x, mesh->center.y, mesh->center.z, 1});
             if (zgl_dot_v4(plane, center) < -(object->scale * mesh->boundsRadius)) {
-                ZGL_DEBUG_PRINT("DEBUG: Culled object using fustrum culling {plane %d}\n", p);
+                ZGL_DEBUG_PRINT("DEBUG: Culled object using frustum culling {plane %d}\n", p);
                 return;
             }
         }
@@ -1204,10 +1204,10 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
             continue;
         }
 
-        if ((renderOptions & ZGL_FUSTRUM_CULLING) && !zgl__tri_in_fustrum(vertexShaderOutput[0].position,
+        if ((renderOptions & ZGL_FRUSTUM_CULLING) && !zgl__tri_in_frustum(vertexShaderOutput[0].position,
                                                                           vertexShaderOutput[1].position,
                                                                           vertexShaderOutput[2].position)) {
-            ZGL_DEBUG_PRINT("DEBUG: Culled triangle using fustrum culling\n");
+            ZGL_DEBUG_PRINT("DEBUG: Culled triangle using frustum culling\n");
             continue;
         }
 
@@ -1266,7 +1266,7 @@ static inline zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, vo
     zgl_shader_context_t result = {0};
     zgl_basic_uniform_t* basicUniformData = (zgl_basic_uniform_t*) uniformData;
     zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
-    result.position = zgl_mul_mat_v4(basicUniformData->modelviewprojection, inputVertex4);
+    result.position = zgl_mul_mat_v4(basicUniformData->modelViewProjection, inputVertex4);
     return result;
 }
 
@@ -1282,7 +1282,7 @@ static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, 
     zgl_shader_context_t result = {0};
     zgl_colored_uniform_t* basicUniformData = (zgl_colored_uniform_t*) uniformData;
     zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
-    result.position = zgl_mul_mat_v4(basicUniformData->modelviewprojection, inputVertex4);
+    result.position = zgl_mul_mat_v4(basicUniformData->modelViewProjection, inputVertex4);
     result.numAttributes = 9;
     zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].ambientColor, &result.attributes[0], &result.attributes[1], &result.attributes[2]);
     zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].diffuseColor, &result.attributes[3], &result.attributes[4], &result.attributes[5]);
@@ -1451,10 +1451,10 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
 /* Gouraud shading */
 // Compute the lighting at each vertex and interpolate the values at each fragment
 
-static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData) {
+static inline zgl_shader_context_t zgl_gouraud_vertex_shader(void* inputVertex, void* uniformData) {
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
     zgl_shader_context_t result = {0};
-    zgl_gourard_uniform_t* defaultUniformData = (zgl_gourard_uniform_t*) uniformData;
+    zgl_gouraud_uniform_t* defaultUniformData = (zgl_gouraud_uniform_t*) uniformData;
     zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
     result.position = zgl_mul_mat_v4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
@@ -1494,8 +1494,8 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
 }
 
 
-static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
-    zgl_gourard_uniform_t* uniform = (zgl_gourard_uniform_t*) uniformData;
+static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
+    zgl_gouraud_uniform_t* uniform = (zgl_gouraud_uniform_t*) uniformData;
     int materialIndex = input->flatAttributes[0];
 
     zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;

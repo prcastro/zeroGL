@@ -214,7 +214,7 @@ game_state_t* init() {
     game->draw3DObjects = 1;
     game->bilinearFiltering = 0;
     game->shaderType = GOURAUD_SHADER;
-    game->renderOptions = ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING | ZGL_BACKFACE_CULLING | ZGL_FUSTRUM_CULLING;
+    game->renderOptions = ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING | ZGL_BACKFACE_CULLING | ZGL_FRUSTUM_CULLING;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -511,9 +511,9 @@ void updateDebugUI(game_state_t *game) {
                 game->renderOptions = isBackfaceCulling ? game->renderOptions | ZGL_BACKFACE_CULLING : game->renderOptions & ~ZGL_BACKFACE_CULLING;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
-                nk_bool isFustrumCulling = game->renderOptions & ZGL_FUSTRUM_CULLING;
-                nk_checkbox_label(ctx, "Fustrum culling", &isFustrumCulling);
-                game->renderOptions = isFustrumCulling ? game->renderOptions | ZGL_FUSTRUM_CULLING : game->renderOptions & ~ZGL_FUSTRUM_CULLING;
+                nk_bool isFrustumCulling = game->renderOptions & ZGL_FRUSTUM_CULLING;
+                nk_checkbox_label(ctx, "Frustum culling", &isFrustumCulling);
+                game->renderOptions = isFrustumCulling ? game->renderOptions | ZGL_FRUSTUM_CULLING : game->renderOptions & ~ZGL_FRUSTUM_CULLING;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_bool isBilinearFiltering = game->bilinearFiltering;
@@ -681,12 +681,12 @@ void drawObjects(game_state_t* game) {
         switch (game->shaderType) {
             case BASIC_SHADER:
                 zgl_basic_uniform_t basicUniformData = {
-                    .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                    .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
                 };
                 zgl_render_object3D(&object, &basicUniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
             case COLORED_SHADER:
                 zgl_colored_uniform_t uniformData = {
-                    .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                    .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
                     .materials = object.mesh->materials
                 };
                 zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_colored_vertex_shader, zgl_colored_fragment_shader, game->renderOptions);
@@ -713,7 +713,7 @@ void drawObjects(game_state_t* game) {
                 zgl_render_object3D(&object, &flatUniformData, game->camera, game->canvas, zgl_flat_vertex_shader, zgl_flat_fragment_shader, game->renderOptions);
                 break;
             case GOURAUD_SHADER:
-                zgl_gourard_uniform_t gourardUniformData = {
+                zgl_gouraud_uniform_t gouraudUniformData = {
                     .modelMatrix = object.transform,
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
@@ -721,7 +721,7 @@ void drawObjects(game_state_t* game) {
                     .bilinearFiltering = game->bilinearFiltering,
                     .materials = object.mesh->materials
                 };
-                zgl_render_object3D(&object, &gourardUniformData, game->camera, game->canvas, zgl_gourard_vertex_shader, zgl_gourard_fragment_shader, game->renderOptions);
+                zgl_render_object3D(&object, &gouraudUniformData, game->camera, game->canvas, zgl_gouraud_vertex_shader, zgl_gouraud_fragment_shader, game->renderOptions);
                 break;
             case PHONG_SHADER:
                 zgl_phong_uniform_t phongUniformData = {
@@ -742,7 +742,7 @@ void drawLights(game_state_t* game) {
     // Use basic shader to draw lights
     for (int i = 0; i < game->lightSources.numPointLights; i++) {
         zgl_basic_uniform_t uniformData = {
-            .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
+            .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
         };
         zgl_render_object3D(&game->pointLightObjects[i], &uniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
     }
