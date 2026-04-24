@@ -1,5 +1,5 @@
-#ifndef ZEROGL_H
-#define ZEROGL_H
+#ifndef ZGL_H
+#define ZGL_H
 
 #include <assert.h>
 #include <float.h>
@@ -29,7 +29,7 @@ typedef struct {
   float data[4][4];
 } zgl_mat4x4_t;
 
-static const zgl_mat4x4_t IDENTITY_M4x4 = {{
+static const zgl_mat4x4_t ZGL_IDENTITY_M4 = {{
     {1.0, 0.0, 0.0, 0.0},
     {0.0, 1.0, 0.0, 0.0},
     {0.0, 0.0, 1.0, 0.0},
@@ -70,36 +70,36 @@ static inline zgl_vec3_t zgl_rotate(zgl_vec3_t v, zgl_quaternion_t q);
 /* Colors */
 
 // Pixel formats
-#define ZEROGL_PIXELFORMAT_RGBA8888 0
-#define ZEROGL_PIXELFORMAT_ARGB8888 1
-#define ZEROGL_PIXELFORMAT_BGRA8888 2
-#define ZEROGL_PIXELFORMAT_ABGR8888 3
+#define ZGL_PIXELFORMAT_RGBA8888 0
+#define ZGL_PIXELFORMAT_ARGB8888 1
+#define ZGL_PIXELFORMAT_BGRA8888 2
+#define ZGL_PIXELFORMAT_ABGR8888 3
 
 // Configure pixel format
-#ifndef ZEROGL_PIXELFORMAT
-#define ZEROGL_PIXELFORMAT ZEROGL_PIXELFORMAT_RGBA8888
-#endif // ZEROGL_PIXELFORMAT
+#ifndef ZGL_PIXELFORMAT
+#define ZGL_PIXELFORMAT ZGL_PIXELFORMAT_RGBA8888
+#endif // ZGL_PIXELFORMAT
 
 // Default colors
-#if  ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_RGBA8888
+#if  ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_RGBA8888
 static const uint32_t ZGL_COLOR_WHITE  = 0xFFFFFFFF;
 static const uint32_t ZGL_COLOR_BLACK  = 0x000000FF;
 static const uint32_t ZGL_COLOR_RED    = 0xFF0000FF;
 static const uint32_t ZGL_COLOR_GREEN  = 0x00FF00FF;
 static const uint32_t ZGL_COLOR_BLUE   = 0x0000FFFF;
-#elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ARGB8888
+#elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ARGB8888
 static const uint32_t ZGL_COLOR_WHITE  = 0x00FFFFFF;
 static const uint32_t ZGL_COLOR_BLACK  = 0x00000000;
 static const uint32_t ZGL_COLOR_RED    = 0x00FF0000;
 static const uint32_t ZGL_COLOR_GREEN  = 0x0000FF00;
 static const uint32_t ZGL_COLOR_BLUE   = 0x000000FF;
-#elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_BGRA8888
+#elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_BGRA8888
 static const uint32_t ZGL_COLOR_WHITE  = 0xFFFFFF00;
 static const uint32_t ZGL_COLOR_BLACK  = 0x00000000;
 static const uint32_t ZGL_COLOR_RED    = 0x0000FF00;
 static const uint32_t ZGL_COLOR_GREEN  = 0x00FF0000;
 static const uint32_t ZGL_COLOR_BLUE   = 0xFF000000;
-#elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ABGR8888
+#elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ABGR8888
 static const uint32_t ZGL_COLOR_WHITE  = 0x00FFFFFF;
 static const uint32_t ZGL_COLOR_BLACK  = 0x00000000;
 static const uint32_t ZGL_COLOR_RED    = 0x000000FF;
@@ -117,12 +117,15 @@ static inline void zgl_color_to_floats(uint32_t color, float* r, float* g, float
 
 /* 3D Objects */
 typedef struct {
-    uint32_t* frameBuffer;
+    uint32_t* pixels;
     int       width;
     int       height;
-    int       hasDepthBuffer;
-    float*    depthBuffer;
-} zgl_canvas_t;
+} zgl_texture_t;
+
+typedef struct {
+    zgl_texture_t color;   // color attachment; also usable as a zgl_texture_t
+    float*        depth;   // optional; NULL means no depth buffer
+} zgl_framebuffer_t;
 
 typedef struct {
   int     v0, v1, v2;
@@ -137,9 +140,9 @@ typedef struct {
     uint32_t     diffuseColor;
     uint32_t     specularColor;
     float        specularExponent;
-    zgl_canvas_t ambientTexture;
-    zgl_canvas_t diffuseTexture;
-    zgl_canvas_t specularTexture;
+    zgl_texture_t ambientTexture;
+    zgl_texture_t diffuseTexture;
+    zgl_texture_t specularTexture;
 } zgl_material_t;
 
 typedef struct {
@@ -170,7 +173,7 @@ typedef struct {
 static inline zgl_object3D_t zgl_object(zgl_mesh_t *mesh, zgl_vec3_t translation, float scale, zgl_mat4x4_t rotation);
 static inline zgl_vec3_t zgl_mesh_center(zgl_vec3_t* vertices, int numVertices);
 static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices, zgl_vec3_t center);
-uint32_t zgl_sample_texture(float u, float v, zgl_canvas_t texture, int bilinearFiltering);
+uint32_t zgl_sample_texture(float u, float v, zgl_texture_t texture, int bilinearFiltering);
 
 /* Lighting */
 typedef struct {
@@ -218,7 +221,7 @@ typedef struct {
     zgl_mat4x4_t viewMatrix;       // View matrix
     zgl_mat4x4_t projectionMatrix; // Projection matrix
     zgl_mat4x4_t viewProjMatrix;   // View * Projection matrix
-    zgl_vec4_t   fustrumPlanes[6]; // View frustum planes
+    zgl_vec4_t   frustumPlanes[6]; // View frustum planes
     float        movementSpeed;
     float        turningSpeed;
 } zgl_camera_t;
@@ -253,14 +256,14 @@ typedef zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* unifor
 typedef uint32_t zgl_fragment_shader_t(const zgl_shader_context_t* input, void* uniformData);
 
 typedef struct {
-    zgl_mat4x4_t modelviewprojection;
+    zgl_mat4x4_t modelViewProjection;
 } zgl_basic_uniform_t;
 
 static inline zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, void* uniformData);
 static inline uint32_t zgl_basic_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
 
 typedef struct {
-    zgl_mat4x4_t    modelviewprojection;
+    zgl_mat4x4_t    modelViewProjection;
     zgl_material_t* materials;
 } zgl_colored_uniform_t;
 
@@ -297,10 +300,10 @@ typedef struct {
     zgl_light_sources_t lightSources;
     int                 bilinearFiltering;
     zgl_material_t*     materials;
-} zgl_gourard_uniform_t;
+} zgl_gouraud_uniform_t;
 
-static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData);
-static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+static inline zgl_shader_context_t zgl_gouraud_vertex_shader(void* inputVertex, void* uniformData);
+static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
 
 typedef struct {
     zgl_mat4x4_t        modelMatrix;
@@ -320,28 +323,28 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
 #define ZGL_DIFFUSE_LIGHTING (1 << 0)
 #define ZGL_SPECULAR_LIGHTING (1 << 1)
 #define ZGL_BACKFACE_CULLING (1 << 2)
-#define ZGL_FUSTRUM_CULLING (1 << 3)
+#define ZGL_FRUSTUM_CULLING (1 << 3)
 #define ZGL_BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
 
-static inline void zgl_clear_depth_buffer(zgl_canvas_t canvas);
-static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_canvas_t canvas);
-static inline void zgl_render_fill(uint32_t color, zgl_canvas_t canvas);
-static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas);
-static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_canvas_t canvas);
+static inline void zgl_clear_depth_buffer(zgl_framebuffer_t fb);
+static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_framebuffer_t fb);
+static inline void zgl_render_fill(uint32_t color, zgl_framebuffer_t fb);
+static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_framebuffer_t fb);
+static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_framebuffer_t fb);
 static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
                                        int x1, int y1, uint32_t color1,
                                        int x2, int y2, uint32_t color2,
-                                       zgl_canvas_t canvas);
-static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_canvas_t canvas,
+                                       zgl_framebuffer_t fb);
+static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_framebuffer_t fb,
                                        zgl_vertex_shader_t vertexShader, zgl_fragment_shader_t fragmentShader, uint16_t renderOptions);
 
-#endif // ZEROGL_H
+#endif // ZGL_H
 
 
-// Include implementation if the client sets ZEROGL_IMPLEMENTATION, but not twice
-#ifdef ZEROGL_IMPLEMENTATION
-#ifndef ZEROGL_IMPLEMENTATION_INCLUDED
-#define ZEROGL_IMPLEMENTATION_INCLUDED
+// Include implementation if the client sets ZGL_IMPLEMENTATION, but not twice
+#ifdef ZGL_IMPLEMENTATION
+#ifndef ZGL_IMPLEMENTATION_INCLUDED
+#define ZGL_IMPLEMENTATION_INCLUDED
 
 /* Utils */
 #define ZGL__PI 3.14159265358979323846264338327950288
@@ -564,7 +567,7 @@ static inline zgl_mat4x4_t zgl_inverse(zgl_mat4x4_t matrix) {
     det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
 
     if (det == 0)
-        return IDENTITY_M4x4;
+        return ZGL_IDENTITY_M4;
 
     det = 1.0 / det;
 
@@ -666,31 +669,31 @@ static inline zgl_vec3_t zgl_rotate(zgl_vec3_t v, zgl_quaternion_t q) {
 /* Colors */
 
 static inline uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b) {
-    #if  ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_RGBA8888
+    #if  ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_RGBA8888
     return 0x000000FF | ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8);
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ARGB8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ARGB8888
     return 0xFF000000 | ((uint32_t)r << 16) | ((uint32_t)g << 8) |  (uint32_t)b;
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_BGRA8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_BGRA8888
     return 0x000000FF | ((uint32_t)b << 24) | ((uint32_t)g << 16) | ((uint32_t)r << 8);
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ABGR8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ABGR8888
     return 0xFF000000 | ((uint32_t)b << 16) | ((uint32_t)g << 8) |  (uint32_t)r;
     #endif
 }
 
 static inline void zgl_color_components(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b) {
-    #if  ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_RGBA8888
+    #if  ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_RGBA8888
     *r = (c & 0xFF000000) >> 24;
     *g = (c & 0x00FF0000) >> 16;
     *b = (c & 0x0000FF00) >> 8;
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ARGB8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ARGB8888
     *r = (c & 0x00FF0000) >> 16;
     *g = (c & 0x0000FF00) >> 8;
     *b = c & 0x000000FF;
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_BGRA8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_BGRA8888
     *r = (c & 0x0000FF00) >> 8;
     *g = (c & 0x00FF0000) >> 16;
     *b = (c & 0xFF000000) >> 24;
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ABGR8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ABGR8888
     *r = c & 0x000000FF;
     *g = (c & 0x0000FF00) >> 8;
     *b = (c & 0x00FF0000) >> 16;
@@ -769,7 +772,7 @@ static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices,
     return result;
 }
 
-uint32_t zgl_sample_texture(float u, float v, zgl_canvas_t texture, int bilinearFiltering) {
+uint32_t zgl_sample_texture(float u, float v, zgl_texture_t texture, int bilinearFiltering) {
     int textureWidth = texture.width;
     int textureHeight = texture.height;
     float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
@@ -782,15 +785,15 @@ uint32_t zgl_sample_texture(float u, float v, zgl_canvas_t texture, int bilinear
         float ratio_v = tex_v - floor_v;
         int next_u = ZGL__MIN(floor_u + 1, textureWidth - 1);
         int next_v = ZGL__MIN(floor_v + 1, textureHeight - 1);
-        uint32_t color00 = texture.frameBuffer[floor_v * textureWidth + floor_u];
-        uint32_t color10 = texture.frameBuffer[floor_v * textureWidth + next_u];
-        uint32_t color01 = texture.frameBuffer[next_v * textureWidth + floor_u];
-        uint32_t color11 = texture.frameBuffer[next_v * textureWidth + next_u];
+        uint32_t color00 = texture.pixels[floor_v * textureWidth + floor_u];
+        uint32_t color10 = texture.pixels[floor_v * textureWidth + next_u];
+        uint32_t color01 = texture.pixels[next_v * textureWidth + floor_u];
+        uint32_t color11 = texture.pixels[next_v * textureWidth + next_u];
         uint32_t color0 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color00), zgl_mul_scalar_color(ratio_u, color10));
         uint32_t color1 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color01), zgl_mul_scalar_color(ratio_u, color11));
         return zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_v, color0), zgl_mul_scalar_color(ratio_v, color1));
     } else {
-        return texture.frameBuffer[floor_v * textureWidth + floor_u];
+        return texture.pixels[floor_v * textureWidth + floor_u];
     }
 }
 
@@ -934,13 +937,13 @@ static inline zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction,
         .viewMatrix = viewMatrix,
         .projectionMatrix = projectionMatrix,
         .viewProjMatrix = viewProjMatrix,
-        .fustrumPlanes = {leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane},
+        .frustumPlanes = {leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane},
         .movementSpeed = movementSpeed,
         .turningSpeed = turningSpeed
     };
 }
 
-static inline int zgl__tri_in_fustrum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v3) {
+static inline int zgl__tri_in_frustum(zgl_vec4_t v1, zgl_vec4_t v2, zgl_vec4_t v3) {
     // Using NDC coordinates
     if (v1.x < -1 && v2.x < -1 && v3.x < -1) return 0;
     if (v1.x >  1 && v2.x >  1 && v3.x >  1) return 0;
@@ -961,27 +964,28 @@ static inline int zgl__edge_cross(int ax, int ay, int bx, int by, int px, int py
   return abx * apy - aby * apx;
 }
 
-static inline void zgl_clear_depth_buffer(zgl_canvas_t canvas) {
-    for (int i = 0; i < canvas.width * canvas.height; i++) {
-        canvas.depthBuffer[i] = FLT_MAX;
+static inline void zgl_clear_depth_buffer(zgl_framebuffer_t fb) {
+    if (fb.depth == NULL) return;
+    for (int i = 0; i < fb.color.width * fb.color.height; i++) {
+        fb.depth[i] = FLT_MAX;
     }
 }
 
-static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_canvas_t canvas) {
-    if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
-        int position = j * canvas.width + i;
-        canvas.frameBuffer[position] = color;
-        canvas.depthBuffer[position] = z;
+static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_framebuffer_t fb) {
+    if ((i >= 0) && (i < fb.color.width) && (j >= 0) && (j < fb.color.height)) {
+        int position = j * fb.color.width + i;
+        fb.color.pixels[position] = color;
+        if (fb.depth) fb.depth[position] = z;
     }
 }
 
-static inline void zgl_render_fill(uint32_t color, zgl_canvas_t canvas) {
-    for (int i = 0; i < canvas.width * canvas.height; i++) {
-        canvas.frameBuffer[i] = color;
+static inline void zgl_render_fill(uint32_t color, zgl_framebuffer_t fb) {
+    for (int i = 0; i < fb.color.width * fb.color.height; i++) {
+        fb.color.pixels[i] = color;
     }
 }
 
-static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas) {
+static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_framebuffer_t fb) {
     int delta_x = (x1 - x0);
     int delta_y = (y1 - y0);
     int longest_side_length = (abs(delta_x) >= abs(delta_y)) ? abs(delta_x) : abs(delta_y);
@@ -990,13 +994,13 @@ static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t colo
     float current_x = x0;
     float current_y = y0;
     for (int i = 0; i <= longest_side_length; i++) {
-        zgl_render_pixel(round(current_x), round(current_y), 0.0, color, canvas);
+        zgl_render_pixel(round(current_x), round(current_y), 0.0, color, fb);
         current_x += x_inc;
         current_y += y_inc;
     }
 }
 
-static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_canvas_t canvas) {
+static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_framebuffer_t fb) {
     int x1 = x - r;
     int x2 = x + r;
     int y1 = y - r;
@@ -1006,7 +1010,7 @@ static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_ca
             int dx = i - x;
             int dy = j - y;
             if (dx * dx + dy * dy <= r * r) {
-                zgl_render_pixel(i, j, 0.0, color, canvas);
+                zgl_render_pixel(i, j, 0.0, color, fb);
             }
         }
     }
@@ -1022,11 +1026,11 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                                            int area,
                                            zgl_shader_context_t vertexShaderOutput[3],
                                            zgl_fragment_shader_t fragmentShader, void* uniformData,
-                                           zgl_canvas_t canvas) {
+                                           zgl_framebuffer_t fb) {
     int x_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(x0, x1), x2), 0);
-    int x_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(x0, x1), x2), canvas.width - 1);
+    int x_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(x0, x1), x2), fb.color.width - 1);
     int y_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(y0, y1), y2), 0);
-    int y_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(y0, y1), y2), canvas.height - 1);
+    int y_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(y0, y1), y2), fb.color.height - 1);
 
     int delta_w0_col = (y1 - y2);
     int delta_w1_col = (y2 - y0);
@@ -1066,7 +1070,7 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                 float z = alpha * z0 + beta * z1 + gamma * z2;
 
                 // Depth test
-                if (z < canvas.depthBuffer[y * canvas.width + x]) {
+                if (!fb.depth || z < fb.depth[y * fb.color.width + x]) {
                     // Compute fragment input attributes from the outputs of the vertex shader
                     zgl_shader_context_t fragmentShaderInput = {0};
 
@@ -1097,7 +1101,7 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                     }
 
                     uint32_t color = fragmentShader(&fragmentShaderInput, uniformData);
-                    zgl_render_pixel(x, y, z, color, canvas); // TODO: Avoid scissor test in zgl_render_pixel
+                    zgl_render_pixel(x, y, z, color, fb); // TODO: Avoid scissor test in zgl_render_pixel
                 }
             }
 
@@ -1115,18 +1119,18 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
     }
 }
 
-static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_canvas_t canvas,
+static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_framebuffer_t fb,
                                        zgl_vertex_shader_t vertexShader, zgl_fragment_shader_t fragmentShader, uint16_t renderOptions) {
     zgl_mesh_t* mesh = object->mesh;
 
-    // Don't draw if the object is fully outside the camera fustrum
-    if (renderOptions & ZGL_FUSTRUM_CULLING) {
+    // Don't draw if the object is fully outside the camera frustum
+    if (renderOptions & ZGL_FRUSTUM_CULLING) {
         for (int p = 0; p < 6; p++) {
-            zgl_vec4_t plane = camera.fustrumPlanes[p];
+            zgl_vec4_t plane = camera.frustumPlanes[p];
             int isInside = 1;
             zgl_vec4_t center = zgl_mul_mat_v4(object->transform, (zgl_vec4_t) {mesh->center.x, mesh->center.y, mesh->center.z, 1});
             if (zgl_dot_v4(plane, center) < -(object->scale * mesh->boundsRadius)) {
-                ZGL_DEBUG_PRINT("DEBUG: Culled object using fustrum culling {plane %d}\n", p);
+                ZGL_DEBUG_PRINT("DEBUG: Culled object using frustum culling {plane %d}\n", p);
                 return;
             }
         }
@@ -1190,8 +1194,8 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
             vertexShaderOutput[v].position.w = 1.0f;
 
             // Viewport transform (NDC -> screen space)
-            xs[v] = (vertexShaderOutput[v].position.x + 1.0f) * canvas.width / 2.0f;
-            ys[v] = (1.0f - vertexShaderOutput[v].position.y) * canvas.height / 2.0f;
+            xs[v] = (vertexShaderOutput[v].position.x + 1.0f) * fb.color.width / 2.0f;
+            ys[v] = (1.0f - vertexShaderOutput[v].position.y) * fb.color.height / 2.0f;
             zs[v] = vertexShaderOutput[v].position.z; // For z-buffer
             invws[v] = invw; // Store 1/w to avoid divisions later when performing perspective correct interpolation
         }
@@ -1204,10 +1208,10 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
             continue;
         }
 
-        if ((renderOptions & ZGL_FUSTRUM_CULLING) && !zgl__tri_in_fustrum(vertexShaderOutput[0].position,
+        if ((renderOptions & ZGL_FRUSTUM_CULLING) && !zgl__tri_in_frustum(vertexShaderOutput[0].position,
                                                                           vertexShaderOutput[1].position,
                                                                           vertexShaderOutput[2].position)) {
-            ZGL_DEBUG_PRINT("DEBUG: Culled triangle using fustrum culling\n");
+            ZGL_DEBUG_PRINT("DEBUG: Culled triangle using frustum culling\n");
             continue;
         }
 
@@ -1216,14 +1220,14 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
                                 ys[0], ys[1], ys[2],
                                 zs[0], zs[1], zs[2],
                                 invws[0], invws[1], invws[2],
-                                area, vertexShaderOutput, fragmentShader, uniformData, canvas);
+                                area, vertexShaderOutput, fragmentShader, uniformData, fb);
     }
 }
 
 static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
                                        int x1, int y1, uint32_t color1,
                                        int x2, int y2, uint32_t color2,
-                                       zgl_canvas_t canvas) {
+                                       zgl_framebuffer_t fb) {
     int area = zgl__edge_cross(x0, y0, x1, y1, x2, y2);
     float r, g, b;
 
@@ -1253,7 +1257,7 @@ static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
 
     zgl_shader_context_t shaderContexts[3] = {shaderContext0, shaderContext1, shaderContext2};
     zgl__rasterize_triangle(x0, x1, x2, y0, y1, y2, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
-                            area, shaderContexts, zgl_colored_fragment_shader, NULL, canvas);
+                            area, shaderContexts, zgl_colored_fragment_shader, NULL, fb);
 }
 
 /* Shaders */
@@ -1266,7 +1270,7 @@ static inline zgl_shader_context_t zgl_basic_vertex_shader(void* inputVertex, vo
     zgl_shader_context_t result = {0};
     zgl_basic_uniform_t* basicUniformData = (zgl_basic_uniform_t*) uniformData;
     zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
-    result.position = zgl_mul_mat_v4(basicUniformData->modelviewprojection, inputVertex4);
+    result.position = zgl_mul_mat_v4(basicUniformData->modelViewProjection, inputVertex4);
     return result;
 }
 
@@ -1282,7 +1286,7 @@ static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, 
     zgl_shader_context_t result = {0};
     zgl_colored_uniform_t* basicUniformData = (zgl_colored_uniform_t*) uniformData;
     zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
-    result.position = zgl_mul_mat_v4(basicUniformData->modelviewprojection, inputVertex4);
+    result.position = zgl_mul_mat_v4(basicUniformData->modelViewProjection, inputVertex4);
     result.numAttributes = 9;
     zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].ambientColor, &result.attributes[0], &result.attributes[1], &result.attributes[2]);
     zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].diffuseColor, &result.attributes[3], &result.attributes[4], &result.attributes[5]);
@@ -1336,7 +1340,7 @@ static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* inp
     zgl_unlit_uniform_t* uniform = (zgl_unlit_uniform_t*) uniformData;
     int materialIndex = input->flatAttributes[13];
 
-    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
         float u = input->attributes[0];
@@ -1344,7 +1348,7 @@ static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* inp
         ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
     }
 
-    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
     uint32_t diffuseColor = zgl_color_from_floats(input->flatAttributes[6], input->flatAttributes[7], input->flatAttributes[8]);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
         float u = input->attributes[0];
@@ -1352,7 +1356,7 @@ static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* inp
         diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
     }
 
-    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
     uint32_t specularColor = zgl_color_from_floats(input->flatAttributes[9], input->flatAttributes[10], input->flatAttributes[11]);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
         float u = input->attributes[0];
@@ -1414,7 +1418,7 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
     zgl_flat_uniform_t* uniform = (zgl_flat_uniform_t*) uniformData;
     int materialIndex = input->flatAttributes[19];
 
-    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
         float u = input->attributes[0];
@@ -1424,7 +1428,7 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
     zgl_vec3_t ambientLight = {input->flatAttributes[13], input->flatAttributes[14], input->flatAttributes[15]};
     ambientColor = zgl_mul_vec3_color(ambientLight, ambientColor);
 
-    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
     uint32_t diffuseColor = zgl_color_from_floats(input->flatAttributes[6], input->flatAttributes[7], input->flatAttributes[8]);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
         float u = input->attributes[0];
@@ -1434,7 +1438,7 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
     zgl_vec3_t diffuseLight = {input->flatAttributes[16], input->flatAttributes[17], input->flatAttributes[18]};
     diffuseColor = zgl_mul_vec3_color(diffuseLight, diffuseColor);
 
-    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
     uint32_t specularColor = zgl_color_from_floats(input->flatAttributes[9], input->flatAttributes[10], input->flatAttributes[11]);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
         float u = input->attributes[0];
@@ -1451,10 +1455,10 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
 /* Gouraud shading */
 // Compute the lighting at each vertex and interpolate the values at each fragment
 
-static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, void* uniformData) {
+static inline zgl_shader_context_t zgl_gouraud_vertex_shader(void* inputVertex, void* uniformData) {
     zgl_vertex_input_t* inputVertexData = (zgl_vertex_input_t*) inputVertex;
     zgl_shader_context_t result = {0};
-    zgl_gourard_uniform_t* defaultUniformData = (zgl_gourard_uniform_t*) uniformData;
+    zgl_gouraud_uniform_t* defaultUniformData = (zgl_gouraud_uniform_t*) uniformData;
     zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
     result.position = zgl_mul_mat_v4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
@@ -1494,11 +1498,11 @@ static inline zgl_shader_context_t zgl_gourard_vertex_shader(void* inputVertex, 
 }
 
 
-static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
-    zgl_gourard_uniform_t* uniform = (zgl_gourard_uniform_t*) uniformData;
+static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
+    zgl_gouraud_uniform_t* uniform = (zgl_gouraud_uniform_t*) uniformData;
     int materialIndex = input->flatAttributes[0];
 
-    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->attributes[5], input->attributes[6], input->attributes[7]);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
         float u = input->attributes[3];
@@ -1508,7 +1512,7 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
     zgl_vec3_t ambientLight = {input->attributes[15], input->attributes[16], input->attributes[17]};
     ambientColor = zgl_mul_vec3_color(ambientLight, ambientColor);
 
-    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
     uint32_t diffuseColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
         float u = input->attributes[3];
@@ -1518,7 +1522,7 @@ static inline uint32_t zgl_gourard_fragment_shader(const zgl_shader_context_t* i
     zgl_vec3_t diffuseLight = {input->attributes[18], input->attributes[19], input->attributes[20]};
     diffuseColor = zgl_mul_vec3_color(diffuseLight, diffuseColor);
 
-    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
     uint32_t specularColor = zgl_color_from_floats(input->attributes[11], input->attributes[12], input->attributes[13]);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
         float u = input->attributes[3];
@@ -1578,21 +1582,21 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     float u = input->attributes[6];
     float v = input->attributes[7];
 
-    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {    
         ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
     }
     ambientColor = zgl_mul_vec3_color(lightingResult.ambient, ambientColor);
     
-    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
     uint32_t diffuseColor = zgl_color_from_floats(input->attributes[11], input->attributes[12], input->attributes[13]);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {    
         diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
     }
     diffuseColor = zgl_mul_vec3_color(lightingResult.diffuse, diffuseColor);
 
-    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
     uint32_t specularColor = zgl_color_from_floats(input->attributes[14], input->attributes[15], input->attributes[16]);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
         specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(u, v, specularTexture, uniform->bilinearFiltering));
@@ -1602,5 +1606,5 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     return zgl_add_colors(specularColor, zgl_add_colors(ambientColor, diffuseColor));
 }
 
-#endif // ZEROGL_IMPLEMENTATION_INCLUDED
-#endif // ZEROGL_IMPLEMENTATION
+#endif // ZGL_IMPLEMENTATION_INCLUDED
+#endif // ZGL_IMPLEMENTATION

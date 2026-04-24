@@ -30,7 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define ZEROGL_IMPLEMENTATION
+#define ZGL_IMPLEMENTATION
 #include "zerogl.h"
 #include "objloader.h"
 
@@ -65,7 +65,7 @@ typedef struct game_state_t {
     SDL_Window*   window;
     SDL_Renderer* renderer;
     SDL_Texture*  texture;
-    zgl_canvas_t  canvas;
+    zgl_framebuffer_t canvas;
     uint32_t      backgroundColor;
     uint16_t      renderOptions;
     int           drawLights;
@@ -125,7 +125,7 @@ game_state_t* init() {
     vertices[1] = (zgl_vec3_t) {1, 0, 0};
     vertices[2] = (zgl_vec3_t) {0, 1, 0};
     triangles[0] = (zgl_triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
-    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_canvas_t) {NULL, 0, 0, 0, NULL}};
+    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_texture_t) {NULL, 0, 0}};
     meshes[0] = (zgl_mesh_t) {
         .name = "debug",
         .numVertices = 3,
@@ -143,13 +143,13 @@ game_state_t* init() {
     meshes[5] = *loadObjFile("assets/woodcube/woodcube.obj", false);
     meshes[6] = *loadObjFile("assets/sphere.obj", false);
 
-    objects[0] = zgl_object(&meshes[0], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    objects[1] = zgl_object(&meshes[1], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[2] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[3] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[4] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[5] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[6] = zgl_object(&meshes[6], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
+    objects[0] = zgl_object(&meshes[0], (zgl_vec3_t) {0, 0, 0}, 1.0 , ZGL_IDENTITY_M4);
+    objects[1] = zgl_object(&meshes[1], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[2] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[3] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[4] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[5] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[6] = zgl_object(&meshes[6], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
 
     // Allocate object render toggles
     int* objectsRenderToggle = (int*) calloc(numObjects, sizeof(int));
@@ -179,7 +179,7 @@ game_state_t* init() {
     directionalLights[0] = (zgl_dir_light_t) {{0.0, 0.0, 0.0}, {0.0, -1.0, 1.0}};
     pointLights[0] = (zgl_point_light_t) {{0.9, 0.9, 0.9}, {-0.5, 1.5, -2.0}};
 
-    pointLightObjects[0] = zgl_object(&meshes[1], pointLights[0].position, 0.05, IDENTITY_M4x4);
+    pointLightObjects[0] = zgl_object(&meshes[1], pointLights[0].position, 0.05, ZGL_IDENTITY_M4);
 
     ZGL_DEBUG_PRINT("INFO: Initializing game state\n");
     uint32_t *frameBuffer = (uint32_t*) malloc(WIDTH * HEIGHT * sizeof(uint32_t));
@@ -190,12 +190,9 @@ game_state_t* init() {
         exit(-1);
     }
 
-    zgl_canvas_t canvas = {
-        .width = WIDTH,
-        .height = HEIGHT,
-        .hasDepthBuffer = 1,
-        .frameBuffer = frameBuffer,
-        .depthBuffer = depthBuffer
+    zgl_framebuffer_t canvas = {
+        .color = { .pixels = frameBuffer, .width = WIDTH, .height = HEIGHT },
+        .depth = depthBuffer,
     };
 
     game->running = 1;
@@ -214,7 +211,7 @@ game_state_t* init() {
     game->draw3DObjects = 1;
     game->bilinearFiltering = 0;
     game->shaderType = GOURAUD_SHADER;
-    game->renderOptions = ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING | ZGL_BACKFACE_CULLING | ZGL_FUSTRUM_CULLING;
+    game->renderOptions = ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING | ZGL_BACKFACE_CULLING | ZGL_FRUSTUM_CULLING;
     game->numMeshes = numMeshes;
     game->meshes = meshes;
     game->numObjects = numObjects;
@@ -426,7 +423,7 @@ void updateDebugUI(game_state_t *game) {
                             nk_property_float(ctx, "y", -10.0f, &game->lightSources.pointLights[i].position.y, 10.0f, 0.1f, 0.1f);
                             nk_layout_row_dynamic(ctx, row_size, 1);
                             nk_property_float(ctx, "z", -10.0f, &game->lightSources.pointLights[i].position.z, 10.0f, 0.1f, 0.1f);
-                            game->pointLightObjects[i] = zgl_object(&game->meshes[0], game->lightSources.pointLights[i].position, 0.05, IDENTITY_M4x4);
+                            game->pointLightObjects[i] = zgl_object(&game->meshes[0], game->lightSources.pointLights[i].position, 0.05, ZGL_IDENTITY_M4);
                             nk_group_end(ctx);
                         }
                     }
@@ -511,9 +508,9 @@ void updateDebugUI(game_state_t *game) {
                 game->renderOptions = isBackfaceCulling ? game->renderOptions | ZGL_BACKFACE_CULLING : game->renderOptions & ~ZGL_BACKFACE_CULLING;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
-                nk_bool isFustrumCulling = game->renderOptions & ZGL_FUSTRUM_CULLING;
-                nk_checkbox_label(ctx, "Fustrum culling", &isFustrumCulling);
-                game->renderOptions = isFustrumCulling ? game->renderOptions | ZGL_FUSTRUM_CULLING : game->renderOptions & ~ZGL_FUSTRUM_CULLING;
+                nk_bool isFrustumCulling = game->renderOptions & ZGL_FRUSTUM_CULLING;
+                nk_checkbox_label(ctx, "Frustum culling", &isFrustumCulling);
+                game->renderOptions = isFrustumCulling ? game->renderOptions | ZGL_FRUSTUM_CULLING : game->renderOptions & ~ZGL_FRUSTUM_CULLING;
 
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_bool isBilinearFiltering = game->bilinearFiltering;
@@ -681,12 +678,12 @@ void drawObjects(game_state_t* game) {
         switch (game->shaderType) {
             case BASIC_SHADER:
                 zgl_basic_uniform_t basicUniformData = {
-                    .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                    .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
                 };
                 zgl_render_object3D(&object, &basicUniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
             case COLORED_SHADER:
                 zgl_colored_uniform_t uniformData = {
-                    .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                    .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
                     .materials = object.mesh->materials
                 };
                 zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_colored_vertex_shader, zgl_colored_fragment_shader, game->renderOptions);
@@ -713,7 +710,7 @@ void drawObjects(game_state_t* game) {
                 zgl_render_object3D(&object, &flatUniformData, game->camera, game->canvas, zgl_flat_vertex_shader, zgl_flat_fragment_shader, game->renderOptions);
                 break;
             case GOURAUD_SHADER:
-                zgl_gourard_uniform_t gourardUniformData = {
+                zgl_gouraud_uniform_t gouraudUniformData = {
                     .modelMatrix = object.transform,
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
@@ -721,7 +718,7 @@ void drawObjects(game_state_t* game) {
                     .bilinearFiltering = game->bilinearFiltering,
                     .materials = object.mesh->materials
                 };
-                zgl_render_object3D(&object, &gourardUniformData, game->camera, game->canvas, zgl_gourard_vertex_shader, zgl_gourard_fragment_shader, game->renderOptions);
+                zgl_render_object3D(&object, &gouraudUniformData, game->camera, game->canvas, zgl_gouraud_vertex_shader, zgl_gouraud_fragment_shader, game->renderOptions);
                 break;
             case PHONG_SHADER:
                 zgl_phong_uniform_t phongUniformData = {
@@ -742,7 +739,7 @@ void drawLights(game_state_t* game) {
     // Use basic shader to draw lights
     for (int i = 0; i < game->lightSources.numPointLights; i++) {
         zgl_basic_uniform_t uniformData = {
-            .modelviewprojection = zgl_mul_mat(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
+            .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
         };
         zgl_render_object3D(&game->pointLightObjects[i], &uniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
     }
@@ -750,7 +747,7 @@ void drawLights(game_state_t* game) {
 
 void render(game_state_t* game) {
     ZGL_DEBUG_PRINT("INFO: Rendering scene\n");
-    zgl_canvas_t canvas = game->canvas;
+    zgl_framebuffer_t canvas = game->canvas;
 
     zgl_clear_depth_buffer(canvas);
 
@@ -770,7 +767,7 @@ void render(game_state_t* game) {
     }
 
     ZGL_DEBUG_PRINT("INFO: Update backbuffer\n");
-    if (!SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH)) {
+    if (!SDL_UpdateTexture(game->texture, NULL, game->canvas.color.pixels, PITCH)) {
         fprintf(stderr, "ERROR: Texture couldn't be updated: %s\n", SDL_GetError());
         exit(-1);
     }
@@ -791,8 +788,8 @@ void renderDebugUI(game_state_t* game) {
 #endif // DEBUGUI
 
 void destroy(game_state_t* game) {
-    free(game->canvas.frameBuffer);
-    free(game->canvas.depthBuffer);
+    free(game->canvas.color.pixels);
+    free(game->canvas.depth);
 
     // Free all triangles, vertices and materials from meshes
     for (int i = 0; i < game->numMeshes; i++) {
