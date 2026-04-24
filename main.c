@@ -65,7 +65,7 @@ typedef struct game_state_t {
     SDL_Window*   window;
     SDL_Renderer* renderer;
     SDL_Texture*  texture;
-    zgl_canvas_t  canvas;
+    zgl_framebuffer_t canvas;
     uint32_t      backgroundColor;
     uint16_t      renderOptions;
     int           drawLights;
@@ -125,7 +125,7 @@ game_state_t* init() {
     vertices[1] = (zgl_vec3_t) {1, 0, 0};
     vertices[2] = (zgl_vec3_t) {0, 1, 0};
     triangles[0] = (zgl_triangle_t) {0, 2, 1, 0, 0, 0, 0, 0, 0, 0};
-    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_canvas_t) {NULL, 0, 0, 0, NULL}};
+    materials[0] = (zgl_material_t) {"RedMaterial", ZGL_COLOR_RED, ZGL_COLOR_RED, ZGL_COLOR_RED, 0.0f, (zgl_texture_t) {NULL, 0, 0}};
     meshes[0] = (zgl_mesh_t) {
         .name = "debug",
         .numVertices = 3,
@@ -190,12 +190,9 @@ game_state_t* init() {
         exit(-1);
     }
 
-    zgl_canvas_t canvas = {
-        .width = WIDTH,
-        .height = HEIGHT,
-        .hasDepthBuffer = 1,
-        .frameBuffer = frameBuffer,
-        .depthBuffer = depthBuffer
+    zgl_framebuffer_t canvas = {
+        .color = { .pixels = frameBuffer, .width = WIDTH, .height = HEIGHT },
+        .depth = depthBuffer,
     };
 
     game->running = 1;
@@ -750,7 +747,7 @@ void drawLights(game_state_t* game) {
 
 void render(game_state_t* game) {
     ZGL_DEBUG_PRINT("INFO: Rendering scene\n");
-    zgl_canvas_t canvas = game->canvas;
+    zgl_framebuffer_t canvas = game->canvas;
 
     zgl_clear_depth_buffer(canvas);
 
@@ -770,7 +767,7 @@ void render(game_state_t* game) {
     }
 
     ZGL_DEBUG_PRINT("INFO: Update backbuffer\n");
-    if (!SDL_UpdateTexture(game->texture, NULL, game->canvas.frameBuffer, PITCH)) {
+    if (!SDL_UpdateTexture(game->texture, NULL, game->canvas.color.pixels, PITCH)) {
         fprintf(stderr, "ERROR: Texture couldn't be updated: %s\n", SDL_GetError());
         exit(-1);
     }
@@ -791,8 +788,8 @@ void renderDebugUI(game_state_t* game) {
 #endif // DEBUGUI
 
 void destroy(game_state_t* game) {
-    free(game->canvas.frameBuffer);
-    free(game->canvas.depthBuffer);
+    free(game->canvas.color.pixels);
+    free(game->canvas.depth);
 
     // Free all triangles, vertices and materials from meshes
     for (int i = 0; i < game->numMeshes; i++) {

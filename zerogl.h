@@ -117,12 +117,15 @@ static inline void zgl_color_to_floats(uint32_t color, float* r, float* g, float
 
 /* 3D Objects */
 typedef struct {
-    uint32_t* frameBuffer;
+    uint32_t* pixels;
     int       width;
     int       height;
-    int       hasDepthBuffer;
-    float*    depthBuffer;
-} zgl_canvas_t;
+} zgl_texture_t;
+
+typedef struct {
+    zgl_texture_t color;   // color attachment; also usable as a zgl_texture_t
+    float*        depth;   // optional; NULL means no depth buffer
+} zgl_framebuffer_t;
 
 typedef struct {
   int     v0, v1, v2;
@@ -137,9 +140,9 @@ typedef struct {
     uint32_t     diffuseColor;
     uint32_t     specularColor;
     float        specularExponent;
-    zgl_canvas_t ambientTexture;
-    zgl_canvas_t diffuseTexture;
-    zgl_canvas_t specularTexture;
+    zgl_texture_t ambientTexture;
+    zgl_texture_t diffuseTexture;
+    zgl_texture_t specularTexture;
 } zgl_material_t;
 
 typedef struct {
@@ -170,7 +173,7 @@ typedef struct {
 static inline zgl_object3D_t zgl_object(zgl_mesh_t *mesh, zgl_vec3_t translation, float scale, zgl_mat4x4_t rotation);
 static inline zgl_vec3_t zgl_mesh_center(zgl_vec3_t* vertices, int numVertices);
 static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices, zgl_vec3_t center);
-uint32_t zgl_sample_texture(float u, float v, zgl_canvas_t texture, int bilinearFiltering);
+uint32_t zgl_sample_texture(float u, float v, zgl_texture_t texture, int bilinearFiltering);
 
 /* Lighting */
 typedef struct {
@@ -323,16 +326,16 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
 #define ZGL_FRUSTUM_CULLING (1 << 3)
 #define ZGL_BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
 
-static inline void zgl_clear_depth_buffer(zgl_canvas_t canvas);
-static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_canvas_t canvas);
-static inline void zgl_render_fill(uint32_t color, zgl_canvas_t canvas);
-static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas);
-static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_canvas_t canvas);
+static inline void zgl_clear_depth_buffer(zgl_framebuffer_t fb);
+static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_framebuffer_t fb);
+static inline void zgl_render_fill(uint32_t color, zgl_framebuffer_t fb);
+static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_framebuffer_t fb);
+static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_framebuffer_t fb);
 static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
                                        int x1, int y1, uint32_t color1,
                                        int x2, int y2, uint32_t color2,
-                                       zgl_canvas_t canvas);
-static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_canvas_t canvas,
+                                       zgl_framebuffer_t fb);
+static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_framebuffer_t fb,
                                        zgl_vertex_shader_t vertexShader, zgl_fragment_shader_t fragmentShader, uint16_t renderOptions);
 
 #endif // ZGL_H
@@ -769,7 +772,7 @@ static inline float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices,
     return result;
 }
 
-uint32_t zgl_sample_texture(float u, float v, zgl_canvas_t texture, int bilinearFiltering) {
+uint32_t zgl_sample_texture(float u, float v, zgl_texture_t texture, int bilinearFiltering) {
     int textureWidth = texture.width;
     int textureHeight = texture.height;
     float tex_u = ZGL__MIN(fabs(u * textureWidth), textureWidth - 1);
@@ -782,15 +785,15 @@ uint32_t zgl_sample_texture(float u, float v, zgl_canvas_t texture, int bilinear
         float ratio_v = tex_v - floor_v;
         int next_u = ZGL__MIN(floor_u + 1, textureWidth - 1);
         int next_v = ZGL__MIN(floor_v + 1, textureHeight - 1);
-        uint32_t color00 = texture.frameBuffer[floor_v * textureWidth + floor_u];
-        uint32_t color10 = texture.frameBuffer[floor_v * textureWidth + next_u];
-        uint32_t color01 = texture.frameBuffer[next_v * textureWidth + floor_u];
-        uint32_t color11 = texture.frameBuffer[next_v * textureWidth + next_u];
+        uint32_t color00 = texture.pixels[floor_v * textureWidth + floor_u];
+        uint32_t color10 = texture.pixels[floor_v * textureWidth + next_u];
+        uint32_t color01 = texture.pixels[next_v * textureWidth + floor_u];
+        uint32_t color11 = texture.pixels[next_v * textureWidth + next_u];
         uint32_t color0 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color00), zgl_mul_scalar_color(ratio_u, color10));
         uint32_t color1 = zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_u, color01), zgl_mul_scalar_color(ratio_u, color11));
         return zgl_add_colors(zgl_mul_scalar_color(1.0f - ratio_v, color0), zgl_mul_scalar_color(ratio_v, color1));
     } else {
-        return texture.frameBuffer[floor_v * textureWidth + floor_u];
+        return texture.pixels[floor_v * textureWidth + floor_u];
     }
 }
 
@@ -961,27 +964,28 @@ static inline int zgl__edge_cross(int ax, int ay, int bx, int by, int px, int py
   return abx * apy - aby * apx;
 }
 
-static inline void zgl_clear_depth_buffer(zgl_canvas_t canvas) {
-    for (int i = 0; i < canvas.width * canvas.height; i++) {
-        canvas.depthBuffer[i] = FLT_MAX;
+static inline void zgl_clear_depth_buffer(zgl_framebuffer_t fb) {
+    if (fb.depth == NULL) return;
+    for (int i = 0; i < fb.color.width * fb.color.height; i++) {
+        fb.depth[i] = FLT_MAX;
     }
 }
 
-static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_canvas_t canvas) {
-    if ((i >= 0) && (i < canvas.width) && (j >= 0) && (j < canvas.height)) {
-        int position = j * canvas.width + i;
-        canvas.frameBuffer[position] = color;
-        canvas.depthBuffer[position] = z;
+static inline void zgl_render_pixel(int i, int j, float z, uint32_t color, zgl_framebuffer_t fb) {
+    if ((i >= 0) && (i < fb.color.width) && (j >= 0) && (j < fb.color.height)) {
+        int position = j * fb.color.width + i;
+        fb.color.pixels[position] = color;
+        if (fb.depth) fb.depth[position] = z;
     }
 }
 
-static inline void zgl_render_fill(uint32_t color, zgl_canvas_t canvas) {
-    for (int i = 0; i < canvas.width * canvas.height; i++) {
-        canvas.frameBuffer[i] = color;
+static inline void zgl_render_fill(uint32_t color, zgl_framebuffer_t fb) {
+    for (int i = 0; i < fb.color.width * fb.color.height; i++) {
+        fb.color.pixels[i] = color;
     }
 }
 
-static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_canvas_t canvas) {
+static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_framebuffer_t fb) {
     int delta_x = (x1 - x0);
     int delta_y = (y1 - y0);
     int longest_side_length = (abs(delta_x) >= abs(delta_y)) ? abs(delta_x) : abs(delta_y);
@@ -990,13 +994,13 @@ static inline void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t colo
     float current_x = x0;
     float current_y = y0;
     for (int i = 0; i <= longest_side_length; i++) {
-        zgl_render_pixel(round(current_x), round(current_y), 0.0, color, canvas);
+        zgl_render_pixel(round(current_x), round(current_y), 0.0, color, fb);
         current_x += x_inc;
         current_y += y_inc;
     }
 }
 
-static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_canvas_t canvas) {
+static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_framebuffer_t fb) {
     int x1 = x - r;
     int x2 = x + r;
     int y1 = y - r;
@@ -1006,7 +1010,7 @@ static inline void zgl_render_circle(int x, int y, int r, uint32_t color, zgl_ca
             int dx = i - x;
             int dy = j - y;
             if (dx * dx + dy * dy <= r * r) {
-                zgl_render_pixel(i, j, 0.0, color, canvas);
+                zgl_render_pixel(i, j, 0.0, color, fb);
             }
         }
     }
@@ -1022,11 +1026,11 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                                            int area,
                                            zgl_shader_context_t vertexShaderOutput[3],
                                            zgl_fragment_shader_t fragmentShader, void* uniformData,
-                                           zgl_canvas_t canvas) {
+                                           zgl_framebuffer_t fb) {
     int x_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(x0, x1), x2), 0);
-    int x_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(x0, x1), x2), canvas.width - 1);
+    int x_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(x0, x1), x2), fb.color.width - 1);
     int y_min = ZGL__MAX(ZGL__MIN(ZGL__MIN(y0, y1), y2), 0);
-    int y_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(y0, y1), y2), canvas.height - 1);
+    int y_max = ZGL__MIN(ZGL__MAX(ZGL__MAX(y0, y1), y2), fb.color.height - 1);
 
     int delta_w0_col = (y1 - y2);
     int delta_w1_col = (y2 - y0);
@@ -1066,7 +1070,7 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                 float z = alpha * z0 + beta * z1 + gamma * z2;
 
                 // Depth test
-                if (z < canvas.depthBuffer[y * canvas.width + x]) {
+                if (!fb.depth || z < fb.depth[y * fb.color.width + x]) {
                     // Compute fragment input attributes from the outputs of the vertex shader
                     zgl_shader_context_t fragmentShaderInput = {0};
 
@@ -1097,7 +1101,7 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
                     }
 
                     uint32_t color = fragmentShader(&fragmentShaderInput, uniformData);
-                    zgl_render_pixel(x, y, z, color, canvas); // TODO: Avoid scissor test in zgl_render_pixel
+                    zgl_render_pixel(x, y, z, color, fb); // TODO: Avoid scissor test in zgl_render_pixel
                 }
             }
 
@@ -1115,7 +1119,7 @@ static inline void zgl__rasterize_triangle(int x0, int x1, int x2,
     }
 }
 
-static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_canvas_t canvas,
+static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_framebuffer_t fb,
                                        zgl_vertex_shader_t vertexShader, zgl_fragment_shader_t fragmentShader, uint16_t renderOptions) {
     zgl_mesh_t* mesh = object->mesh;
 
@@ -1190,8 +1194,8 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
             vertexShaderOutput[v].position.w = 1.0f;
 
             // Viewport transform (NDC -> screen space)
-            xs[v] = (vertexShaderOutput[v].position.x + 1.0f) * canvas.width / 2.0f;
-            ys[v] = (1.0f - vertexShaderOutput[v].position.y) * canvas.height / 2.0f;
+            xs[v] = (vertexShaderOutput[v].position.x + 1.0f) * fb.color.width / 2.0f;
+            ys[v] = (1.0f - vertexShaderOutput[v].position.y) * fb.color.height / 2.0f;
             zs[v] = vertexShaderOutput[v].position.z; // For z-buffer
             invws[v] = invw; // Store 1/w to avoid divisions later when performing perspective correct interpolation
         }
@@ -1216,14 +1220,14 @@ static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData
                                 ys[0], ys[1], ys[2],
                                 zs[0], zs[1], zs[2],
                                 invws[0], invws[1], invws[2],
-                                area, vertexShaderOutput, fragmentShader, uniformData, canvas);
+                                area, vertexShaderOutput, fragmentShader, uniformData, fb);
     }
 }
 
 static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
                                        int x1, int y1, uint32_t color1,
                                        int x2, int y2, uint32_t color2,
-                                       zgl_canvas_t canvas) {
+                                       zgl_framebuffer_t fb) {
     int area = zgl__edge_cross(x0, y0, x1, y1, x2, y2);
     float r, g, b;
 
@@ -1253,7 +1257,7 @@ static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
 
     zgl_shader_context_t shaderContexts[3] = {shaderContext0, shaderContext1, shaderContext2};
     zgl__rasterize_triangle(x0, x1, x2, y0, y1, y2, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
-                            area, shaderContexts, zgl_colored_fragment_shader, NULL, canvas);
+                            area, shaderContexts, zgl_colored_fragment_shader, NULL, fb);
 }
 
 /* Shaders */
@@ -1336,7 +1340,7 @@ static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* inp
     zgl_unlit_uniform_t* uniform = (zgl_unlit_uniform_t*) uniformData;
     int materialIndex = input->flatAttributes[13];
 
-    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
         float u = input->attributes[0];
@@ -1344,7 +1348,7 @@ static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* inp
         ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
     }
 
-    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
     uint32_t diffuseColor = zgl_color_from_floats(input->flatAttributes[6], input->flatAttributes[7], input->flatAttributes[8]);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
         float u = input->attributes[0];
@@ -1352,7 +1356,7 @@ static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* inp
         diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
     }
 
-    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
     uint32_t specularColor = zgl_color_from_floats(input->flatAttributes[9], input->flatAttributes[10], input->flatAttributes[11]);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
         float u = input->attributes[0];
@@ -1414,7 +1418,7 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
     zgl_flat_uniform_t* uniform = (zgl_flat_uniform_t*) uniformData;
     int materialIndex = input->flatAttributes[19];
 
-    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
         float u = input->attributes[0];
@@ -1424,7 +1428,7 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
     zgl_vec3_t ambientLight = {input->flatAttributes[13], input->flatAttributes[14], input->flatAttributes[15]};
     ambientColor = zgl_mul_vec3_color(ambientLight, ambientColor);
 
-    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
     uint32_t diffuseColor = zgl_color_from_floats(input->flatAttributes[6], input->flatAttributes[7], input->flatAttributes[8]);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
         float u = input->attributes[0];
@@ -1434,7 +1438,7 @@ static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* inpu
     zgl_vec3_t diffuseLight = {input->flatAttributes[16], input->flatAttributes[17], input->flatAttributes[18]};
     diffuseColor = zgl_mul_vec3_color(diffuseLight, diffuseColor);
 
-    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
     uint32_t specularColor = zgl_color_from_floats(input->flatAttributes[9], input->flatAttributes[10], input->flatAttributes[11]);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
         float u = input->attributes[0];
@@ -1498,7 +1502,7 @@ static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* i
     zgl_gouraud_uniform_t* uniform = (zgl_gouraud_uniform_t*) uniformData;
     int materialIndex = input->flatAttributes[0];
 
-    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->attributes[5], input->attributes[6], input->attributes[7]);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
         float u = input->attributes[3];
@@ -1508,7 +1512,7 @@ static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* i
     zgl_vec3_t ambientLight = {input->attributes[15], input->attributes[16], input->attributes[17]};
     ambientColor = zgl_mul_vec3_color(ambientLight, ambientColor);
 
-    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
     uint32_t diffuseColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
         float u = input->attributes[3];
@@ -1518,7 +1522,7 @@ static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* i
     zgl_vec3_t diffuseLight = {input->attributes[18], input->attributes[19], input->attributes[20]};
     diffuseColor = zgl_mul_vec3_color(diffuseLight, diffuseColor);
 
-    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
     uint32_t specularColor = zgl_color_from_floats(input->attributes[11], input->attributes[12], input->attributes[13]);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
         float u = input->attributes[3];
@@ -1578,21 +1582,21 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     float u = input->attributes[6];
     float v = input->attributes[7];
 
-    zgl_canvas_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
+    zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {    
         ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
     }
     ambientColor = zgl_mul_vec3_color(lightingResult.ambient, ambientColor);
     
-    zgl_canvas_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
+    zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
     uint32_t diffuseColor = zgl_color_from_floats(input->attributes[11], input->attributes[12], input->attributes[13]);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {    
         diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
     }
     diffuseColor = zgl_mul_vec3_color(lightingResult.diffuse, diffuseColor);
 
-    zgl_canvas_t specularTexture = uniform->materials[materialIndex].specularTexture;
+    zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
     uint32_t specularColor = zgl_color_from_floats(input->attributes[14], input->attributes[15], input->attributes[16]);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
         specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(u, v, specularTexture, uniform->bilinearFiltering));

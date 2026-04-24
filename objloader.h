@@ -12,10 +12,9 @@
 
 #include "zerogl.h"
 
-static inline zgl_canvas_t loadTexture(char* filename) {
+static inline zgl_texture_t loadTexture(char* filename) {
     ZGL_DEBUG_PRINT("DEBUG: Loading texture %s\n", filename);
-    zgl_canvas_t texture = {0};
-    texture.frameBuffer = NULL;
+    zgl_texture_t texture = {0};
 
     int channels;
     unsigned char* data = stbi_load(filename, &texture.width, &texture.height, &channels, 3);
@@ -24,8 +23,8 @@ static inline zgl_canvas_t loadTexture(char* filename) {
         exit(-1);
     }
 
-    texture.frameBuffer = (uint32_t*) malloc(texture.width * texture.height * sizeof(uint32_t));
-    if (texture.frameBuffer == NULL) {
+    texture.pixels = (uint32_t*) malloc(texture.width * texture.height * sizeof(uint32_t));
+    if (texture.pixels == NULL) {
         fprintf(stderr, "ERROR: Texture memory allocation failed.\n");
         exit(-1);
     }
@@ -35,7 +34,7 @@ static inline zgl_canvas_t loadTexture(char* filename) {
         uint8_t r = data[bufferIndex];
         uint8_t g = data[bufferIndex + 1];
         uint8_t b = data[bufferIndex + 2];
-        texture.frameBuffer[i] = zgl_color(r, g, b);
+        texture.pixels[i] = zgl_color(r, g, b);
     }
 
     stbi_image_free(data);
@@ -88,8 +87,8 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
                     // Deep copy diffuse texture to ambient texture if no ambient texture is present
                     materials[*numMaterials - 1].ambientTexture.height = materials[*numMaterials - 1].diffuseTexture.height;
                     materials[*numMaterials - 1].ambientTexture.width = materials[*numMaterials - 1].diffuseTexture.width;
-                    materials[*numMaterials - 1].ambientTexture.frameBuffer = (uint32_t*) malloc(materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
-                    memcpy(materials[*numMaterials - 1].ambientTexture.frameBuffer, materials[*numMaterials - 1].diffuseTexture.frameBuffer, materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
+                    materials[*numMaterials - 1].ambientTexture.pixels = (uint32_t*) malloc(materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
+                    memcpy(materials[*numMaterials - 1].ambientTexture.pixels, materials[*numMaterials - 1].diffuseTexture.pixels, materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
                 }
             }
 
@@ -106,8 +105,8 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
             materials[*numMaterials - 1].diffuseColor = zgl_color(255, 255, 255);
             materials[*numMaterials - 1].specularColor = zgl_color(0, 0, 0);
             materials[*numMaterials - 1].specularExponent = 10.0f;
-            materials[*numMaterials - 1].diffuseTexture = (zgl_canvas_t) {NULL, 0, 0,};
-            materials[*numMaterials - 1].specularTexture = (zgl_canvas_t) {NULL, 0, 0,};
+            materials[*numMaterials - 1].diffuseTexture = (zgl_texture_t) {NULL, 0, 0,};
+            materials[*numMaterials - 1].specularTexture = (zgl_texture_t) {NULL, 0, 0,};
         }
 
         if (line[0] == 'K' && line[1] == 'a') {
@@ -168,8 +167,8 @@ static inline zgl_material_t* loadMtlFile(const char* filename, int* numMaterial
         // Deep copy diffuse texture to ambient texture if no ambient texture is present
         materials[*numMaterials - 1].ambientTexture.height = materials[*numMaterials - 1].diffuseTexture.height;
         materials[*numMaterials - 1].ambientTexture.width = materials[*numMaterials - 1].diffuseTexture.width;
-        materials[*numMaterials - 1].ambientTexture.frameBuffer = (uint32_t*) malloc(materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
-        memcpy(materials[*numMaterials - 1].ambientTexture.frameBuffer, materials[*numMaterials - 1].diffuseTexture.frameBuffer, materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
+        materials[*numMaterials - 1].ambientTexture.pixels = (uint32_t*) malloc(materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
+        memcpy(materials[*numMaterials - 1].ambientTexture.pixels, materials[*numMaterials - 1].diffuseTexture.pixels, materials[*numMaterials - 1].diffuseTexture.width * materials[*numMaterials - 1].diffuseTexture.height * sizeof(uint32_t));
     }
 
     fclose(fp);
