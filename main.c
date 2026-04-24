@@ -30,7 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define ZEROGL_IMPLEMENTATION
+#define ZGL_IMPLEMENTATION
 #include "zerogl.h"
 #include "objloader.h"
 
@@ -143,13 +143,13 @@ game_state_t* init() {
     meshes[5] = *loadObjFile("assets/woodcube/woodcube.obj", false);
     meshes[6] = *loadObjFile("assets/sphere.obj", false);
 
-    objects[0] = zgl_object(&meshes[0], (zgl_vec3_t) {0, 0, 0}, 1.0 , IDENTITY_M4x4);
-    objects[1] = zgl_object(&meshes[1], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[2] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[3] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[4] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[5] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
-    objects[6] = zgl_object(&meshes[6], (zgl_vec3_t) {0, 0, 0}, 1.0, IDENTITY_M4x4);
+    objects[0] = zgl_object(&meshes[0], (zgl_vec3_t) {0, 0, 0}, 1.0 , ZGL_IDENTITY_M4);
+    objects[1] = zgl_object(&meshes[1], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[2] = zgl_object(&meshes[2], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[3] = zgl_object(&meshes[3], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[4] = zgl_object(&meshes[4], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[5] = zgl_object(&meshes[5], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
+    objects[6] = zgl_object(&meshes[6], (zgl_vec3_t) {0, 0, 0}, 1.0, ZGL_IDENTITY_M4);
 
     // Allocate object render toggles
     int* objectsRenderToggle = (int*) calloc(numObjects, sizeof(int));
@@ -179,7 +179,7 @@ game_state_t* init() {
     directionalLights[0] = (zgl_dir_light_t) {{0.0, 0.0, 0.0}, {0.0, -1.0, 1.0}};
     pointLights[0] = (zgl_point_light_t) {{0.9, 0.9, 0.9}, {-0.5, 1.5, -2.0}};
 
-    pointLightObjects[0] = zgl_object(&meshes[1], pointLights[0].position, 0.05, IDENTITY_M4x4);
+    pointLightObjects[0] = zgl_object(&meshes[1], pointLights[0].position, 0.05, ZGL_IDENTITY_M4);
 
     ZGL_DEBUG_PRINT("INFO: Initializing game state\n");
     uint32_t *frameBuffer = (uint32_t*) malloc(WIDTH * HEIGHT * sizeof(uint32_t));
@@ -426,7 +426,7 @@ void updateDebugUI(game_state_t *game) {
                             nk_property_float(ctx, "y", -10.0f, &game->lightSources.pointLights[i].position.y, 10.0f, 0.1f, 0.1f);
                             nk_layout_row_dynamic(ctx, row_size, 1);
                             nk_property_float(ctx, "z", -10.0f, &game->lightSources.pointLights[i].position.z, 10.0f, 0.1f, 0.1f);
-                            game->pointLightObjects[i] = zgl_object(&game->meshes[0], game->lightSources.pointLights[i].position, 0.05, IDENTITY_M4x4);
+                            game->pointLightObjects[i] = zgl_object(&game->meshes[0], game->lightSources.pointLights[i].position, 0.05, ZGL_IDENTITY_M4);
                             nk_group_end(ctx);
                         }
                     }

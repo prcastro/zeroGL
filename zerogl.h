@@ -1,5 +1,5 @@
-#ifndef ZEROGL_H
-#define ZEROGL_H
+#ifndef ZGL_H
+#define ZGL_H
 
 #include <assert.h>
 #include <float.h>
@@ -29,7 +29,7 @@ typedef struct {
   float data[4][4];
 } zgl_mat4x4_t;
 
-static const zgl_mat4x4_t IDENTITY_M4x4 = {{
+static const zgl_mat4x4_t ZGL_IDENTITY_M4 = {{
     {1.0, 0.0, 0.0, 0.0},
     {0.0, 1.0, 0.0, 0.0},
     {0.0, 0.0, 1.0, 0.0},
@@ -70,36 +70,36 @@ static inline zgl_vec3_t zgl_rotate(zgl_vec3_t v, zgl_quaternion_t q);
 /* Colors */
 
 // Pixel formats
-#define ZEROGL_PIXELFORMAT_RGBA8888 0
-#define ZEROGL_PIXELFORMAT_ARGB8888 1
-#define ZEROGL_PIXELFORMAT_BGRA8888 2
-#define ZEROGL_PIXELFORMAT_ABGR8888 3
+#define ZGL_PIXELFORMAT_RGBA8888 0
+#define ZGL_PIXELFORMAT_ARGB8888 1
+#define ZGL_PIXELFORMAT_BGRA8888 2
+#define ZGL_PIXELFORMAT_ABGR8888 3
 
 // Configure pixel format
-#ifndef ZEROGL_PIXELFORMAT
-#define ZEROGL_PIXELFORMAT ZEROGL_PIXELFORMAT_RGBA8888
-#endif // ZEROGL_PIXELFORMAT
+#ifndef ZGL_PIXELFORMAT
+#define ZGL_PIXELFORMAT ZGL_PIXELFORMAT_RGBA8888
+#endif // ZGL_PIXELFORMAT
 
 // Default colors
-#if  ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_RGBA8888
+#if  ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_RGBA8888
 static const uint32_t ZGL_COLOR_WHITE  = 0xFFFFFFFF;
 static const uint32_t ZGL_COLOR_BLACK  = 0x000000FF;
 static const uint32_t ZGL_COLOR_RED    = 0xFF0000FF;
 static const uint32_t ZGL_COLOR_GREEN  = 0x00FF00FF;
 static const uint32_t ZGL_COLOR_BLUE   = 0x0000FFFF;
-#elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ARGB8888
+#elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ARGB8888
 static const uint32_t ZGL_COLOR_WHITE  = 0x00FFFFFF;
 static const uint32_t ZGL_COLOR_BLACK  = 0x00000000;
 static const uint32_t ZGL_COLOR_RED    = 0x00FF0000;
 static const uint32_t ZGL_COLOR_GREEN  = 0x0000FF00;
 static const uint32_t ZGL_COLOR_BLUE   = 0x000000FF;
-#elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_BGRA8888
+#elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_BGRA8888
 static const uint32_t ZGL_COLOR_WHITE  = 0xFFFFFF00;
 static const uint32_t ZGL_COLOR_BLACK  = 0x00000000;
 static const uint32_t ZGL_COLOR_RED    = 0x0000FF00;
 static const uint32_t ZGL_COLOR_GREEN  = 0x00FF0000;
 static const uint32_t ZGL_COLOR_BLUE   = 0xFF000000;
-#elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ABGR8888
+#elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ABGR8888
 static const uint32_t ZGL_COLOR_WHITE  = 0x00FFFFFF;
 static const uint32_t ZGL_COLOR_BLACK  = 0x00000000;
 static const uint32_t ZGL_COLOR_RED    = 0x000000FF;
@@ -335,13 +335,13 @@ static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
 static inline void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t camera, zgl_canvas_t canvas,
                                        zgl_vertex_shader_t vertexShader, zgl_fragment_shader_t fragmentShader, uint16_t renderOptions);
 
-#endif // ZEROGL_H
+#endif // ZGL_H
 
 
-// Include implementation if the client sets ZEROGL_IMPLEMENTATION, but not twice
-#ifdef ZEROGL_IMPLEMENTATION
-#ifndef ZEROGL_IMPLEMENTATION_INCLUDED
-#define ZEROGL_IMPLEMENTATION_INCLUDED
+// Include implementation if the client sets ZGL_IMPLEMENTATION, but not twice
+#ifdef ZGL_IMPLEMENTATION
+#ifndef ZGL_IMPLEMENTATION_INCLUDED
+#define ZGL_IMPLEMENTATION_INCLUDED
 
 /* Utils */
 #define ZGL__PI 3.14159265358979323846264338327950288
@@ -564,7 +564,7 @@ static inline zgl_mat4x4_t zgl_inverse(zgl_mat4x4_t matrix) {
     det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
 
     if (det == 0)
-        return IDENTITY_M4x4;
+        return ZGL_IDENTITY_M4;
 
     det = 1.0 / det;
 
@@ -666,31 +666,31 @@ static inline zgl_vec3_t zgl_rotate(zgl_vec3_t v, zgl_quaternion_t q) {
 /* Colors */
 
 static inline uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b) {
-    #if  ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_RGBA8888
+    #if  ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_RGBA8888
     return 0x000000FF | ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8);
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ARGB8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ARGB8888
     return 0xFF000000 | ((uint32_t)r << 16) | ((uint32_t)g << 8) |  (uint32_t)b;
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_BGRA8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_BGRA8888
     return 0x000000FF | ((uint32_t)b << 24) | ((uint32_t)g << 16) | ((uint32_t)r << 8);
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ABGR8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ABGR8888
     return 0xFF000000 | ((uint32_t)b << 16) | ((uint32_t)g << 8) |  (uint32_t)r;
     #endif
 }
 
 static inline void zgl_color_components(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b) {
-    #if  ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_RGBA8888
+    #if  ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_RGBA8888
     *r = (c & 0xFF000000) >> 24;
     *g = (c & 0x00FF0000) >> 16;
     *b = (c & 0x0000FF00) >> 8;
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ARGB8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ARGB8888
     *r = (c & 0x00FF0000) >> 16;
     *g = (c & 0x0000FF00) >> 8;
     *b = c & 0x000000FF;
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_BGRA8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_BGRA8888
     *r = (c & 0x0000FF00) >> 8;
     *g = (c & 0x00FF0000) >> 16;
     *b = (c & 0xFF000000) >> 24;
-    #elif ZEROGL_PIXELFORMAT == ZEROGL_PIXELFORMAT_ABGR8888
+    #elif ZGL_PIXELFORMAT == ZGL_PIXELFORMAT_ABGR8888
     *r = c & 0x000000FF;
     *g = (c & 0x0000FF00) >> 8;
     *b = (c & 0x00FF0000) >> 16;
@@ -1602,5 +1602,5 @@ static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* inp
     return zgl_add_colors(specularColor, zgl_add_colors(ambientColor, diffuseColor));
 }
 
-#endif // ZEROGL_IMPLEMENTATION_INCLUDED
-#endif // ZEROGL_IMPLEMENTATION
+#endif // ZGL_IMPLEMENTATION_INCLUDED
+#endif // ZGL_IMPLEMENTATION
