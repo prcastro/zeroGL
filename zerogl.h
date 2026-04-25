@@ -255,6 +255,15 @@ typedef struct {
 typedef zgl_shader_context_t zgl_vertex_shader_t(void* inputVertex, void* uniformData);
 typedef uint32_t zgl_fragment_shader_t(const zgl_shader_context_t* input, void* uniformData);
 
+// Named typed views over zgl_shader_context_t::attributes/flatAttributes.
+// Each built-in shader defines a struct of plain floats and casts the float[]
+// storage to it, so vertex/fragment pairs can no longer drift on a numeric
+// index. The cast is routed through void* (every supported compiler aliases
+// a struct-of-floats over a float[]).
+#define ZGL_VARYING_FLOATS(T)              (sizeof(T) / sizeof(float))
+#define ZGL_VARYING_AS(T, ctx_attrs)       ((T*)       (void*)       (ctx_attrs))
+#define ZGL_VARYING_CONST_AS(T, ctx_attrs) ((const T*) (const void*) (ctx_attrs))
+
 typedef struct {
     zgl_mat4x4_t modelViewProjection;
 } zgl_basic_uniform_t;
@@ -267,6 +276,18 @@ typedef struct {
     zgl_material_t* materials;
 } zgl_colored_uniform_t;
 
+typedef struct {
+    float ambient_r,  ambient_g,  ambient_b;
+    float diffuse_r,  diffuse_g,  diffuse_b;
+    float specular_r, specular_g, specular_b;
+} zgl_colored_varying_t;
+
+// Used by zgl_render_triangle, which calls zgl_colored_fragment_shader with
+// only the ambient colour slots populated.
+typedef struct {
+    float r, g, b;
+} zgl_render_triangle_varying_t;
+
 static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, void* uniformData);
 static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
 
@@ -277,6 +298,19 @@ typedef struct {
     int                 bilinearFiltering;
     zgl_material_t*     materials;
 } zgl_unlit_uniform_t;
+
+typedef struct {
+    float u, v;
+} zgl_unlit_varying_t;
+
+typedef struct {
+    float nx, ny, nz;
+    float ambient_r,  ambient_g,  ambient_b;
+    float diffuse_r,  diffuse_g,  diffuse_b;
+    float specular_r, specular_g, specular_b;
+    float specular_exponent;
+    float material_index;
+} zgl_unlit_per_tri_t;
 
 static inline zgl_shader_context_t zgl_unlit_vertex_shader(void* inputVertex, void* uniformData);
 static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
@@ -290,6 +324,22 @@ typedef struct {
     zgl_material_t*     materials;
 } zgl_flat_uniform_t;
 
+typedef struct {
+    float u, v;
+} zgl_flat_varying_t;
+
+typedef struct {
+    float nx, ny, nz;
+    float ambient_r,    ambient_g,    ambient_b;
+    float diffuse_r,    diffuse_g,    diffuse_b;
+    float specular_r,   specular_g,   specular_b;
+    float specular_exponent;
+    float light_amb_r,  light_amb_g,  light_amb_b;
+    float light_diff_r, light_diff_g, light_diff_b;
+    float light_spec_r, light_spec_g, light_spec_b;
+    float material_index;
+} zgl_flat_per_tri_t;
+
 static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, void* uniformData);
 static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
 
@@ -301,6 +351,22 @@ typedef struct {
     int                 bilinearFiltering;
     zgl_material_t*     materials;
 } zgl_gouraud_uniform_t;
+
+typedef struct {
+    float nx, ny, nz;
+    float u, v;
+    float ambient_r,    ambient_g,    ambient_b;
+    float diffuse_r,    diffuse_g,    diffuse_b;
+    float specular_r,   specular_g,   specular_b;
+    float specular_exponent;
+    float light_amb_r,  light_amb_g,  light_amb_b;
+    float light_diff_r, light_diff_g, light_diff_b;
+    float light_spec_r, light_spec_g, light_spec_b;
+} zgl_gouraud_varying_t;
+
+typedef struct {
+    float material_index;
+} zgl_gouraud_per_tri_t;
 
 static inline zgl_shader_context_t zgl_gouraud_vertex_shader(void* inputVertex, void* uniformData);
 static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
@@ -314,8 +380,33 @@ typedef struct {
     zgl_material_t*     materials;
 } zgl_phong_uniform_t;
 
+typedef struct {
+    float nx, ny, nz;
+    float wx, wy, wz;
+    float u, v;
+    float ambient_r,  ambient_g,  ambient_b;
+    float diffuse_r,  diffuse_g,  diffuse_b;
+    float specular_r, specular_g, specular_b;
+    float specular_exponent;
+} zgl_phong_varying_t;
+
+typedef struct {
+    float material_index;
+} zgl_phong_per_tri_t;
+
 static inline zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, void* uniformData);
 static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* input, void* uniformData);
+
+_Static_assert(ZGL_VARYING_FLOATS(zgl_colored_varying_t)         <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_colored_varying_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_render_triangle_varying_t) <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_render_triangle_varying_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_unlit_varying_t)           <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_unlit_varying_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_unlit_per_tri_t)           <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_unlit_per_tri_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_flat_varying_t)            <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_flat_varying_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_flat_per_tri_t)            <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_flat_per_tri_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_gouraud_varying_t)         <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_gouraud_varying_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_gouraud_per_tri_t)         <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_gouraud_per_tri_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_phong_varying_t)           <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_phong_varying_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
+_Static_assert(ZGL_VARYING_FLOATS(zgl_phong_per_tri_t)           <= ZGL_MAX_VERTEX_SHADER_ATTRIBUTES, "zgl_phong_per_tri_t exceeds ZGL_MAX_VERTEX_SHADER_ATTRIBUTES");
 
 /* Rendering */
 
@@ -1229,31 +1320,24 @@ static inline void zgl_render_triangle(int x0, int y0, uint32_t color0,
                                        int x2, int y2, uint32_t color2,
                                        zgl_framebuffer_t fb) {
     int area = zgl__edge_cross(x0, y0, x1, y1, x2, y2);
-    float r, g, b;
 
     zgl_shader_context_t shaderContext0 = {0};
     shaderContext0.position = (zgl_vec4_t) {x0, y0, 0, 1};
-    shaderContext0.numAttributes = 3;
-    zgl_color_to_floats(color0, &r, &g, &b);
-    shaderContext0.attributes[0] = r;
-    shaderContext0.attributes[1] = g;
-    shaderContext0.attributes[2] = b;
+    shaderContext0.numAttributes = ZGL_VARYING_FLOATS(zgl_render_triangle_varying_t);
+    zgl_render_triangle_varying_t* v0 = ZGL_VARYING_AS(zgl_render_triangle_varying_t, shaderContext0.attributes);
+    zgl_color_to_floats(color0, &v0->r, &v0->g, &v0->b);
 
     zgl_shader_context_t shaderContext1 = {0};
     shaderContext1.position = (zgl_vec4_t) {x1, y1, 0, 1};
-    shaderContext1.numAttributes = 3;
-    zgl_color_to_floats(color1, &r, &g, &b);
-    shaderContext1.attributes[0] = r;
-    shaderContext1.attributes[1] = g;
-    shaderContext1.attributes[2] = b;
+    shaderContext1.numAttributes = ZGL_VARYING_FLOATS(zgl_render_triangle_varying_t);
+    zgl_render_triangle_varying_t* v1 = ZGL_VARYING_AS(zgl_render_triangle_varying_t, shaderContext1.attributes);
+    zgl_color_to_floats(color1, &v1->r, &v1->g, &v1->b);
 
     zgl_shader_context_t shaderContext2 = {0};
     shaderContext2.position = (zgl_vec4_t) {x2, y2, 0, 1};
-    shaderContext2.numAttributes = 3;
-    zgl_color_to_floats(color2, &r, &g, &b);
-    shaderContext2.attributes[0] = r;
-    shaderContext2.attributes[1] = g;
-    shaderContext2.attributes[2] = b;
+    shaderContext2.numAttributes = ZGL_VARYING_FLOATS(zgl_render_triangle_varying_t);
+    zgl_render_triangle_varying_t* v2 = ZGL_VARYING_AS(zgl_render_triangle_varying_t, shaderContext2.attributes);
+    zgl_color_to_floats(color2, &v2->r, &v2->g, &v2->b);
 
     zgl_shader_context_t shaderContexts[3] = {shaderContext0, shaderContext1, shaderContext2};
     zgl__rasterize_triangle(x0, x1, x2, y0, y1, y2, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
@@ -1287,18 +1371,22 @@ static inline zgl_shader_context_t zgl_colored_vertex_shader(void* inputVertex, 
     zgl_colored_uniform_t* basicUniformData = (zgl_colored_uniform_t*) uniformData;
     zgl_vec4_t inputVertex4 = {inputVertexData->position.x, inputVertexData->position.y, inputVertexData->position.z, 1.0f};
     result.position = zgl_mul_mat_v4(basicUniformData->modelViewProjection, inputVertex4);
-    result.numAttributes = 9;
-    zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].ambientColor, &result.attributes[0], &result.attributes[1], &result.attributes[2]);
-    zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].diffuseColor, &result.attributes[3], &result.attributes[4], &result.attributes[5]);
-    zgl_color_to_floats(basicUniformData->materials[inputVertexData->materialIndex].specularColor, &result.attributes[6], &result.attributes[7], &result.attributes[8]);
+    result.numAttributes = ZGL_VARYING_FLOATS(zgl_colored_varying_t);
+
+    zgl_colored_varying_t* v = ZGL_VARYING_AS(zgl_colored_varying_t, result.attributes);
+    zgl_material_t mat = basicUniformData->materials[inputVertexData->materialIndex];
+    zgl_color_to_floats(mat.ambientColor,  &v->ambient_r,  &v->ambient_g,  &v->ambient_b);
+    zgl_color_to_floats(mat.diffuseColor,  &v->diffuse_r,  &v->diffuse_g,  &v->diffuse_b);
+    zgl_color_to_floats(mat.specularColor, &v->specular_r, &v->specular_g, &v->specular_b);
 
     return result;
 }
 
 static inline uint32_t zgl_colored_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
-    uint32_t ambientColor = zgl_color_from_floats(input->attributes[0], input->attributes[1], input->attributes[2]);
-    uint32_t diffuseColor = zgl_color_from_floats(input->attributes[3], input->attributes[4], input->attributes[5]);
-    uint32_t specularColor = zgl_color_from_floats(input->attributes[6], input->attributes[7], input->attributes[8]);
+    const zgl_colored_varying_t* v = ZGL_VARYING_CONST_AS(zgl_colored_varying_t, input->attributes);
+    uint32_t ambientColor  = zgl_color_from_floats(v->ambient_r,  v->ambient_g,  v->ambient_b);
+    uint32_t diffuseColor  = zgl_color_from_floats(v->diffuse_r,  v->diffuse_g,  v->diffuse_b);
+    uint32_t specularColor = zgl_color_from_floats(v->specular_r, v->specular_g, v->specular_b);
 
     return zgl_mul_colors(ambientColor, zgl_mul_colors(diffuseColor, specularColor));
 }
@@ -1314,54 +1402,50 @@ static inline zgl_shader_context_t zgl_unlit_vertex_shader(void* inputVertex, vo
     zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
     result.position = zgl_mul_mat_v4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
 
+    result.numAttributes     = ZGL_VARYING_FLOATS(zgl_unlit_varying_t);
+    result.numFlatAttributes = ZGL_VARYING_FLOATS(zgl_unlit_per_tri_t);
 
-    result.numAttributes = 2;
-    result.attributes[0] = inputVertexData->textureCoord.x;   // u
-    result.attributes[1] = inputVertexData->textureCoord.y;   // v
+    zgl_unlit_varying_t* v = ZGL_VARYING_AS(zgl_unlit_varying_t, result.attributes);
+    zgl_unlit_per_tri_t* f = ZGL_VARYING_AS(zgl_unlit_per_tri_t, result.flatAttributes);
 
-    // Set other vertex attributes
-    result.numFlatAttributes = 14;
+    v->u = inputVertexData->textureCoord.x;
+    v->v = inputVertexData->textureCoord.y;
 
     zgl_vec3_t worldSpaceNormal = zgl_mul_mat_v3(defaultUniformData->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
-    float invMagNormal = 1.0f / zgl_magnitude(worldSpaceNormal);
-    result.flatAttributes[0] = worldSpaceNormal.x;
-    result.flatAttributes[1] = worldSpaceNormal.y;
-    result.flatAttributes[2] = worldSpaceNormal.z;
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].ambientColor, &result.flatAttributes[3], &result.flatAttributes[4], &result.flatAttributes[5]);
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].diffuseColor, &result.flatAttributes[6], &result.flatAttributes[7], &result.flatAttributes[8]);
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].specularColor, &result.flatAttributes[9], &result.flatAttributes[10], &result.flatAttributes[11]);
-    result.flatAttributes[12] = defaultUniformData->materials[inputVertexData->materialIndex].specularExponent;
-
-    result.flatAttributes[13] = inputVertexData->materialIndex;
+    f->nx = worldSpaceNormal.x;
+    f->ny = worldSpaceNormal.y;
+    f->nz = worldSpaceNormal.z;
+    zgl_material_t mat = defaultUniformData->materials[inputVertexData->materialIndex];
+    zgl_color_to_floats(mat.ambientColor,  &f->ambient_r,  &f->ambient_g,  &f->ambient_b);
+    zgl_color_to_floats(mat.diffuseColor,  &f->diffuse_r,  &f->diffuse_g,  &f->diffuse_b);
+    zgl_color_to_floats(mat.specularColor, &f->specular_r, &f->specular_g, &f->specular_b);
+    f->specular_exponent = mat.specularExponent;
+    f->material_index    = (float) inputVertexData->materialIndex;
     return result;
 }
 
 static inline uint32_t zgl_unlit_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
     zgl_unlit_uniform_t* uniform = (zgl_unlit_uniform_t*) uniformData;
-    int materialIndex = input->flatAttributes[13];
+    const zgl_unlit_varying_t* v = ZGL_VARYING_CONST_AS(zgl_unlit_varying_t, input->attributes);
+    const zgl_unlit_per_tri_t* f = ZGL_VARYING_CONST_AS(zgl_unlit_per_tri_t, input->flatAttributes);
+    int materialIndex = (int) f->material_index;
 
     zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
-    uint32_t ambientColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
+    uint32_t ambientColor = zgl_color_from_floats(f->ambient_r, f->ambient_g, f->ambient_b);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
-        float u = input->attributes[0];
-        float v = input->attributes[1];
-        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
+        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(v->u, v->v, ambientTexture, uniform->bilinearFiltering));
     }
 
     zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
-    uint32_t diffuseColor = zgl_color_from_floats(input->flatAttributes[6], input->flatAttributes[7], input->flatAttributes[8]);
+    uint32_t diffuseColor = zgl_color_from_floats(f->diffuse_r, f->diffuse_g, f->diffuse_b);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
-        float u = input->attributes[0];
-        float v = input->attributes[1];
-        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
+        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(v->u, v->v, diffuseTexture, uniform->bilinearFiltering));
     }
 
     zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
-    uint32_t specularColor = zgl_color_from_floats(input->flatAttributes[9], input->flatAttributes[10], input->flatAttributes[11]);
+    uint32_t specularColor = zgl_color_from_floats(f->specular_r, f->specular_g, f->specular_b);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
-        float u = input->attributes[0];
-        float v = input->attributes[1];
-        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(u, v, specularTexture, uniform->bilinearFiltering));
+        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(v->u, v->v, specularTexture, uniform->bilinearFiltering));
     }
 
     return zgl_mul_colors(ambientColor, zgl_mul_colors(diffuseColor, specularColor));
@@ -1379,74 +1463,65 @@ static inline zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, voi
     zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
     result.position = zgl_mul_mat_v4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
 
-    result.numAttributes = 2;
-    result.attributes[0] = inputVertexData->textureCoord.x;   // u
-    result.attributes[1] = inputVertexData->textureCoord.y;   // v
+    result.numAttributes     = ZGL_VARYING_FLOATS(zgl_flat_varying_t);
+    result.numFlatAttributes = ZGL_VARYING_FLOATS(zgl_flat_per_tri_t);
 
-    // Set other vertex attributes
-    result.numFlatAttributes = 23;
+    zgl_flat_varying_t* v = ZGL_VARYING_AS(zgl_flat_varying_t, result.attributes);
+    zgl_flat_per_tri_t* f = ZGL_VARYING_AS(zgl_flat_per_tri_t, result.flatAttributes);
+
+    v->u = inputVertexData->textureCoord.x;
+    v->v = inputVertexData->textureCoord.y;
 
     zgl_vec3_t worldSpaceNormal = zgl_mul_mat_v3(defaultUniformData->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
     float invMagNormal = 1.0f / zgl_magnitude(worldSpaceNormal);
-    result.flatAttributes[0] = worldSpaceNormal.x;
-    result.flatAttributes[1] = worldSpaceNormal.y;
-    result.flatAttributes[2] = worldSpaceNormal.z;
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].ambientColor, &result.flatAttributes[3], &result.flatAttributes[4], &result.flatAttributes[5]);
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].diffuseColor, &result.flatAttributes[6], &result.flatAttributes[7], &result.flatAttributes[8]);
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].specularColor, &result.flatAttributes[9], &result.flatAttributes[10], &result.flatAttributes[11]);
-    result.flatAttributes[12] = defaultUniformData->materials[inputVertexData->materialIndex].specularExponent;
+    f->nx = worldSpaceNormal.x;
+    f->ny = worldSpaceNormal.y;
+    f->nz = worldSpaceNormal.z;
+
+    zgl_material_t mat = defaultUniformData->materials[inputVertexData->materialIndex];
+    zgl_color_to_floats(mat.ambientColor,  &f->ambient_r,  &f->ambient_g,  &f->ambient_b);
+    zgl_color_to_floats(mat.diffuseColor,  &f->diffuse_r,  &f->diffuse_g,  &f->diffuse_b);
+    zgl_color_to_floats(mat.specularColor, &f->specular_r, &f->specular_g, &f->specular_b);
+    f->specular_exponent = mat.specularExponent;
 
     zgl_lighting_result_t lightResult = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z},
                                                      worldSpaceNormal, invMagNormal,
-                                                     defaultUniformData->materials[inputVertexData->materialIndex].specularExponent,
+                                                     mat.specularExponent,
                                                      defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
-    result.flatAttributes[13] = lightResult.ambient.x;
-    result.flatAttributes[14] = lightResult.ambient.y;
-    result.flatAttributes[15] = lightResult.ambient.z;
-    result.flatAttributes[16] = lightResult.diffuse.x;
-    result.flatAttributes[17] = lightResult.diffuse.y;
-    result.flatAttributes[18] = lightResult.diffuse.z;
-    result.flatAttributes[19] = lightResult.specular.x;
-    result.flatAttributes[20] = lightResult.specular.y;
-    result.flatAttributes[21] = lightResult.specular.z;
+    f->light_amb_r  = lightResult.ambient.x;  f->light_amb_g  = lightResult.ambient.y;  f->light_amb_b  = lightResult.ambient.z;
+    f->light_diff_r = lightResult.diffuse.x;  f->light_diff_g = lightResult.diffuse.y;  f->light_diff_b = lightResult.diffuse.z;
+    f->light_spec_r = lightResult.specular.x; f->light_spec_g = lightResult.specular.y; f->light_spec_b = lightResult.specular.z;
 
-    result.flatAttributes[22] = inputVertexData->materialIndex;
+    f->material_index = (float) inputVertexData->materialIndex;
     return result;
 }
 
 static inline uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
     zgl_flat_uniform_t* uniform = (zgl_flat_uniform_t*) uniformData;
-    int materialIndex = input->flatAttributes[19];
+    const zgl_flat_varying_t* v = ZGL_VARYING_CONST_AS(zgl_flat_varying_t, input->attributes);
+    const zgl_flat_per_tri_t* f = ZGL_VARYING_CONST_AS(zgl_flat_per_tri_t, input->flatAttributes);
+    int materialIndex = (int) f->material_index;
 
     zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
-    uint32_t ambientColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);
+    uint32_t ambientColor = zgl_color_from_floats(f->ambient_r, f->ambient_g, f->ambient_b);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
-        float u = input->attributes[0];
-        float v = input->attributes[1];
-        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
+        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(v->u, v->v, ambientTexture, uniform->bilinearFiltering));
     }
-    zgl_vec3_t ambientLight = {input->flatAttributes[13], input->flatAttributes[14], input->flatAttributes[15]};
-    ambientColor = zgl_mul_vec3_color(ambientLight, ambientColor);
+    ambientColor = zgl_mul_vec3_color((zgl_vec3_t){f->light_amb_r, f->light_amb_g, f->light_amb_b}, ambientColor);
 
     zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
-    uint32_t diffuseColor = zgl_color_from_floats(input->flatAttributes[6], input->flatAttributes[7], input->flatAttributes[8]);
+    uint32_t diffuseColor = zgl_color_from_floats(f->diffuse_r, f->diffuse_g, f->diffuse_b);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
-        float u = input->attributes[0];
-        float v = input->attributes[1];
-        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
+        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(v->u, v->v, diffuseTexture, uniform->bilinearFiltering));
     }
-    zgl_vec3_t diffuseLight = {input->flatAttributes[16], input->flatAttributes[17], input->flatAttributes[18]};
-    diffuseColor = zgl_mul_vec3_color(diffuseLight, diffuseColor);
+    diffuseColor = zgl_mul_vec3_color((zgl_vec3_t){f->light_diff_r, f->light_diff_g, f->light_diff_b}, diffuseColor);
 
     zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
-    uint32_t specularColor = zgl_color_from_floats(input->flatAttributes[9], input->flatAttributes[10], input->flatAttributes[11]);
+    uint32_t specularColor = zgl_color_from_floats(f->specular_r, f->specular_g, f->specular_b);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
-        float u = input->attributes[0];
-        float v = input->attributes[1];
-        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(u, v, specularTexture, uniform->bilinearFiltering));
+        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(v->u, v->v, specularTexture, uniform->bilinearFiltering));
     }
-    zgl_vec3_t specularLight = {input->flatAttributes[19], input->flatAttributes[20], input->flatAttributes[21]};
-    specularColor = zgl_mul_vec3_color(specularLight, specularColor);
+    specularColor = zgl_mul_vec3_color((zgl_vec3_t){f->light_spec_r, f->light_spec_g, f->light_spec_b}, specularColor);
 
     return zgl_add_colors(ambientColor, zgl_add_colors(diffuseColor, specularColor));
 }
@@ -1463,74 +1538,65 @@ static inline zgl_shader_context_t zgl_gouraud_vertex_shader(void* inputVertex, 
     zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(defaultUniformData->modelMatrix, inputVertex4); // Local to world space
     result.position = zgl_mul_mat_v4(defaultUniformData->viewProjectionMatrix, worldSpaceVertex); // World to clip space
 
-    // Set other vertex attributes
-    result.numAttributes = 24;
+    result.numAttributes     = ZGL_VARYING_FLOATS(zgl_gouraud_varying_t);
+    result.numFlatAttributes = ZGL_VARYING_FLOATS(zgl_gouraud_per_tri_t);
+
+    zgl_gouraud_varying_t* v = ZGL_VARYING_AS(zgl_gouraud_varying_t, result.attributes);
+    zgl_gouraud_per_tri_t* f = ZGL_VARYING_AS(zgl_gouraud_per_tri_t, result.flatAttributes);
 
     zgl_vec3_t worldSpaceNormal = zgl_mul_mat_v3(defaultUniformData->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
     float invMagNormal = 1.0f / zgl_magnitude(worldSpaceNormal);
-    result.attributes[0] = worldSpaceNormal.x;
-    result.attributes[1] = worldSpaceNormal.y;
-    result.attributes[2] = worldSpaceNormal.z;
-    result.attributes[3] = inputVertexData->textureCoord.x;   // u
-    result.attributes[4] = inputVertexData->textureCoord.y;   // v
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].ambientColor, &result.attributes[5], &result.attributes[6], &result.attributes[7]);
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].diffuseColor, &result.attributes[8], &result.attributes[9], &result.attributes[10]);
-    zgl_color_to_floats(defaultUniformData->materials[inputVertexData->materialIndex].specularColor, &result.attributes[11], &result.attributes[12], &result.attributes[13]);
-    result.attributes[14] = defaultUniformData->materials[inputVertexData->materialIndex].specularExponent;
+    v->nx = worldSpaceNormal.x;
+    v->ny = worldSpaceNormal.y;
+    v->nz = worldSpaceNormal.z;
+    v->u  = inputVertexData->textureCoord.x;
+    v->v  = inputVertexData->textureCoord.y;
+
+    zgl_material_t mat = defaultUniformData->materials[inputVertexData->materialIndex];
+    zgl_color_to_floats(mat.ambientColor,  &v->ambient_r,  &v->ambient_g,  &v->ambient_b);
+    zgl_color_to_floats(mat.diffuseColor,  &v->diffuse_r,  &v->diffuse_g,  &v->diffuse_b);
+    zgl_color_to_floats(mat.specularColor, &v->specular_r, &v->specular_g, &v->specular_b);
+    v->specular_exponent = mat.specularExponent;
 
     zgl_lighting_result_t lightResult = zgl_lighting((zgl_vec3_t) {worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z},
                                                      worldSpaceNormal, invMagNormal,
-                                                     defaultUniformData->materials[inputVertexData->materialIndex].specularExponent,
+                                                     mat.specularExponent,
                                                      defaultUniformData->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
-    result.attributes[15] = lightResult.ambient.x;
-    result.attributes[16] = lightResult.ambient.y;
-    result.attributes[17] = lightResult.ambient.z;
-    result.attributes[18] = lightResult.diffuse.x;
-    result.attributes[19] = lightResult.diffuse.y;
-    result.attributes[20] = lightResult.diffuse.z;
-    result.attributes[21] = lightResult.specular.x;
-    result.attributes[22] = lightResult.specular.y;
-    result.attributes[23] = lightResult.specular.z;
+    v->light_amb_r  = lightResult.ambient.x;  v->light_amb_g  = lightResult.ambient.y;  v->light_amb_b  = lightResult.ambient.z;
+    v->light_diff_r = lightResult.diffuse.x;  v->light_diff_g = lightResult.diffuse.y;  v->light_diff_b = lightResult.diffuse.z;
+    v->light_spec_r = lightResult.specular.x; v->light_spec_g = lightResult.specular.y; v->light_spec_b = lightResult.specular.z;
 
-    result.numFlatAttributes = 1;
-    result.flatAttributes[0] = inputVertexData->materialIndex;
+    f->material_index = (float) inputVertexData->materialIndex;
     return result;
 }
 
 
 static inline uint32_t zgl_gouraud_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
     zgl_gouraud_uniform_t* uniform = (zgl_gouraud_uniform_t*) uniformData;
-    int materialIndex = input->flatAttributes[0];
+    const zgl_gouraud_varying_t* v = ZGL_VARYING_CONST_AS(zgl_gouraud_varying_t, input->attributes);
+    const zgl_gouraud_per_tri_t* f = ZGL_VARYING_CONST_AS(zgl_gouraud_per_tri_t, input->flatAttributes);
+    int materialIndex = (int) f->material_index;
 
     zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
-    uint32_t ambientColor = zgl_color_from_floats(input->attributes[5], input->attributes[6], input->attributes[7]);
+    uint32_t ambientColor = zgl_color_from_floats(v->ambient_r, v->ambient_g, v->ambient_b);
     if (ambientTexture.width != 0 && ambientTexture.height != 0) {
-        float u = input->attributes[3];
-        float v = input->attributes[4];
-        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
+        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(v->u, v->v, ambientTexture, uniform->bilinearFiltering));
     }
-    zgl_vec3_t ambientLight = {input->attributes[15], input->attributes[16], input->attributes[17]};
-    ambientColor = zgl_mul_vec3_color(ambientLight, ambientColor);
+    ambientColor = zgl_mul_vec3_color((zgl_vec3_t){v->light_amb_r, v->light_amb_g, v->light_amb_b}, ambientColor);
 
     zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
-    uint32_t diffuseColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
+    uint32_t diffuseColor = zgl_color_from_floats(v->diffuse_r, v->diffuse_g, v->diffuse_b);
     if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
-        float u = input->attributes[3];
-        float v = input->attributes[4];
-        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
+        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(v->u, v->v, diffuseTexture, uniform->bilinearFiltering));
     }
-    zgl_vec3_t diffuseLight = {input->attributes[18], input->attributes[19], input->attributes[20]};
-    diffuseColor = zgl_mul_vec3_color(diffuseLight, diffuseColor);
+    diffuseColor = zgl_mul_vec3_color((zgl_vec3_t){v->light_diff_r, v->light_diff_g, v->light_diff_b}, diffuseColor);
 
     zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
-    uint32_t specularColor = zgl_color_from_floats(input->attributes[11], input->attributes[12], input->attributes[13]);
+    uint32_t specularColor = zgl_color_from_floats(v->specular_r, v->specular_g, v->specular_b);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
-        float u = input->attributes[3];
-        float v = input->attributes[4];
-        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(u, v, specularTexture, uniform->bilinearFiltering));
+        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(v->u, v->v, specularTexture, uniform->bilinearFiltering));
     }
-    zgl_vec3_t specularLight = {input->attributes[21], input->attributes[22], input->attributes[23]};
-    specularColor = zgl_mul_vec3_color(specularLight, specularColor);
+    specularColor = zgl_mul_vec3_color((zgl_vec3_t){v->light_spec_r, v->light_spec_g, v->light_spec_b}, specularColor);
 
     return zgl_add_colors(specularColor, zgl_add_colors(ambientColor, diffuseColor));
 }
@@ -1547,59 +1613,57 @@ static inline zgl_shader_context_t zgl_phong_vertex_shader(void* inputVertex, vo
     zgl_vec4_t worldSpaceVertex = zgl_mul_mat_v4(uniform->modelMatrix, inputVertex4); // Local to world space
     result.position = zgl_mul_mat_v4(uniform->viewProjectionMatrix, worldSpaceVertex); // World to clip space
 
-    // Set other vertex attributes
-    result.numAttributes = 18;
+    result.numAttributes     = ZGL_VARYING_FLOATS(zgl_phong_varying_t);
+    result.numFlatAttributes = ZGL_VARYING_FLOATS(zgl_phong_per_tri_t);
+
+    zgl_phong_varying_t* v = ZGL_VARYING_AS(zgl_phong_varying_t, result.attributes);
+    zgl_phong_per_tri_t* f = ZGL_VARYING_AS(zgl_phong_per_tri_t, result.flatAttributes);
+
     zgl_vec3_t worldSpaceNormal = zgl_mul_mat_v3(uniform->modelInvRotationMatrixTransposed, inputVertexData->normal); // Local to world space
-    result.attributes[0] = worldSpaceNormal.x;
-    result.attributes[1] = worldSpaceNormal.y;
-    result.attributes[2] = worldSpaceNormal.z;
-    result.attributes[3] = worldSpaceVertex.x;
-    result.attributes[4] = worldSpaceVertex.y;
-    result.attributes[5] = worldSpaceVertex.z;
-    result.attributes[6] = inputVertexData->textureCoord.x;    // u
-    result.attributes[7] = inputVertexData->textureCoord.y;    // v
+    v->nx = worldSpaceNormal.x; v->ny = worldSpaceNormal.y; v->nz = worldSpaceNormal.z;
+    v->wx = worldSpaceVertex.x; v->wy = worldSpaceVertex.y; v->wz = worldSpaceVertex.z;
+    v->u  = inputVertexData->textureCoord.x;
+    v->v  = inputVertexData->textureCoord.y;
 
-    zgl_color_to_floats(uniform->materials[inputVertexData->materialIndex].ambientColor, &result.attributes[8], &result.attributes[9], &result.attributes[10]);
-    zgl_color_to_floats(uniform->materials[inputVertexData->materialIndex].diffuseColor, &result.attributes[11], &result.attributes[12], &result.attributes[13]);
-    zgl_color_to_floats(uniform->materials[inputVertexData->materialIndex].specularColor, &result.attributes[14], &result.attributes[15], &result.attributes[16]);
-    result.attributes[17] = uniform->materials[inputVertexData->materialIndex].specularExponent;
+    zgl_material_t mat = uniform->materials[inputVertexData->materialIndex];
+    zgl_color_to_floats(mat.ambientColor,  &v->ambient_r,  &v->ambient_g,  &v->ambient_b);
+    zgl_color_to_floats(mat.diffuseColor,  &v->diffuse_r,  &v->diffuse_g,  &v->diffuse_b);
+    zgl_color_to_floats(mat.specularColor, &v->specular_r, &v->specular_g, &v->specular_b);
+    v->specular_exponent = mat.specularExponent;
 
-    result.numFlatAttributes = 1;
-    result.flatAttributes[0] = inputVertexData->materialIndex;
+    f->material_index = (float) inputVertexData->materialIndex;
     return result;
 }
 
 static inline uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
     zgl_phong_uniform_t* uniform = (zgl_phong_uniform_t*) uniformData;
+    const zgl_phong_varying_t* v = ZGL_VARYING_CONST_AS(zgl_phong_varying_t, input->attributes);
+    const zgl_phong_per_tri_t* f = ZGL_VARYING_CONST_AS(zgl_phong_per_tri_t, input->flatAttributes);
 
-    zgl_vec3_t normal = {input->attributes[0], input->attributes[1], input->attributes[2]};
-    zgl_vec3_t position = {input->attributes[3], input->attributes[4], input->attributes[5]};
-    float specularExponent = input->attributes[17];
+    zgl_vec3_t normal   = {v->nx, v->ny, v->nz};
+    zgl_vec3_t position = {v->wx, v->wy, v->wz};
     float invMagNormal = 1.0f / zgl_magnitude(normal);
-    zgl_lighting_result_t lightingResult = zgl_lighting(position, normal, invMagNormal, specularExponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
-    int materialIndex = input->flatAttributes[0];
-    
-    float u = input->attributes[6];
-    float v = input->attributes[7];
+    zgl_lighting_result_t lightingResult = zgl_lighting(position, normal, invMagNormal, v->specular_exponent, uniform->lightSources, ZGL_DIFFUSE_LIGHTING | ZGL_SPECULAR_LIGHTING);
+    int materialIndex = (int) f->material_index;
 
     zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
-    uint32_t ambientColor = zgl_color_from_floats(input->attributes[8], input->attributes[9], input->attributes[10]);
-    if (ambientTexture.width != 0 && ambientTexture.height != 0) {    
-        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(u, v, ambientTexture, uniform->bilinearFiltering));
+    uint32_t ambientColor = zgl_color_from_floats(v->ambient_r, v->ambient_g, v->ambient_b);
+    if (ambientTexture.width != 0 && ambientTexture.height != 0) {
+        ambientColor = zgl_mul_colors(ambientColor, zgl_sample_texture(v->u, v->v, ambientTexture, uniform->bilinearFiltering));
     }
     ambientColor = zgl_mul_vec3_color(lightingResult.ambient, ambientColor);
-    
+
     zgl_texture_t diffuseTexture = uniform->materials[materialIndex].diffuseTexture;
-    uint32_t diffuseColor = zgl_color_from_floats(input->attributes[11], input->attributes[12], input->attributes[13]);
-    if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {    
-        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(u, v, diffuseTexture, uniform->bilinearFiltering));
+    uint32_t diffuseColor = zgl_color_from_floats(v->diffuse_r, v->diffuse_g, v->diffuse_b);
+    if (diffuseTexture.width != 0 && diffuseTexture.height != 0) {
+        diffuseColor = zgl_mul_colors(diffuseColor, zgl_sample_texture(v->u, v->v, diffuseTexture, uniform->bilinearFiltering));
     }
     diffuseColor = zgl_mul_vec3_color(lightingResult.diffuse, diffuseColor);
 
     zgl_texture_t specularTexture = uniform->materials[materialIndex].specularTexture;
-    uint32_t specularColor = zgl_color_from_floats(input->attributes[14], input->attributes[15], input->attributes[16]);
+    uint32_t specularColor = zgl_color_from_floats(v->specular_r, v->specular_g, v->specular_b);
     if (specularTexture.width != 0 && specularTexture.height != 0) {
-        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(u, v, specularTexture, uniform->bilinearFiltering));
+        specularColor = zgl_mul_colors(specularColor, zgl_sample_texture(v->u, v->v, specularTexture, uniform->bilinearFiltering));
     }
     specularColor = zgl_mul_vec3_color(lightingResult.specular, specularColor);
 
