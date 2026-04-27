@@ -146,7 +146,6 @@ float        zgl_magnitude(zgl_vec3_t v);
 zgl_vec3_t   zgl_sub(zgl_vec3_t a, zgl_vec3_t b);
 zgl_vec4_t   zgl_sub_v4(zgl_vec4_t a, zgl_vec4_t b);
 zgl_vec3_t   zgl_add(zgl_vec3_t a, zgl_vec3_t b);
-zgl_vec3_t   zgl_add_three_vec3(zgl_vec3_t a, zgl_vec3_t b, zgl_vec3_t c);
 zgl_vec4_t   zgl_add_v4(zgl_vec4_t a, zgl_vec4_t b);
 zgl_vec3_t   zgl_normalize(zgl_vec3_t v);
 zgl_vec3_t   zgl_mul_scalar(float k, zgl_vec3_t v);
@@ -190,10 +189,11 @@ ZGL_PIXELFORMAT_ABGR8888
         <p>You can manipulate colors by using the following functions:</p>
         <pre><code>
 uint32_t zgl_color(uint8_t r, uint8_t g, uint8_t b);
-void     zgl_color_components(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b);
+void     zgl_color_components(uint32_t c, uint8_t* r, uint8_t* g, uint8_t* b, uint8_t* a);
 uint32_t zgl_mul_scalar_color(double x, uint32_t color);
 uint32_t zgl_mul_vec3_color(zgl_vec3_t v, uint32_t color);
 uint32_t zgl_add_colors(uint32_t c0, uint32_t c1);
+uint32_t zgl_mul_colors(uint32_t c0, uint32_t c1);
 uint32_t zgl_color_from_floats(float r, float g, float b);
 void     zgl_color_to_floats(uint32_t color, float* r, float* g, float* b);
         </code></pre>
@@ -215,7 +215,7 @@ zgl_lighting_result_t zgl_lighting(zgl_vec3_t position, zgl_vec3_t normal, float
           <p>You can define a camera using <code>zgl_camera_t</code> type. Create one using:</p>
           <pre><code>
 zgl_camera_t zgl_camera(zgl_vec3_t position, zgl_vec3_t direction, zgl_vec3_t up,
-                        float fov, float aspectRatio, float near, float far,
+                        float fov, float aspectRatio, float nearPlane, float farPlane,
                         float movementSpeed, float turningSpeed)
           </code></pre>
         </div>
@@ -249,7 +249,7 @@ zgl_framebuffer_t fb = {
 void zgl_clear_depth_buffer(zgl_framebuffer_t fb)
 void zgl_render_pixel(int x, int y, float z, uint32_t color, zgl_framebuffer_t fb)
 void zgl_render_fill(uint32_t color, zgl_framebuffer_t fb)
-void zgl_render_line(int x0, int x1, int y0, int y1, uint32_t color, zgl_framebuffer_t fb)
+void zgl_render_line(int x0, int y0, int x1, int y1, uint32_t color, zgl_framebuffer_t fb)
 void zgl_render_circle(int x, int y, int radius, uint32_t color, zgl_framebuffer_t fb)
 void zgl_render_triangle(int x0, int y0, uint32_t color0,
                          int x1, int y1, uint32_t color1,

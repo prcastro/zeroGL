@@ -257,8 +257,8 @@ static inline zgl_mesh_t* loadObjFile(const char* filename, bool flipTexturesVer
             for (int i = 0; i < num_materials; i++) {
                 if (strcmp(material_name, materials[i].name) == 0) {
                     ZGL_DEBUG_PRINT("DEBUG: Using material %s\n", materials[i].name);
-                    uint8_t r, g, b;
-                    zgl_color_components(materials[i].diffuseColor, &r, &g, &b);
+                    uint8_t r, g, b, a;
+                    zgl_color_components(materials[i].diffuseColor, &r, &g, &b, &a);
                     ZGL_DEBUG_PRINT("DEBUG: Color %d %d %d\n", r, g, b);
                     currentMaterial = i;
                 }

@@ -524,8 +524,8 @@ void updateDebugUI(game_state_t *game) {
                 nk_layout_row_dynamic(ctx, row_size, 1);
                 nk_label(ctx, "Color", NK_TEXT_LEFT);
                 nk_layout_row_dynamic(ctx, row_size * 10, 1);
-                uint8_t r, g, b;
-                zgl_color_components(game->backgroundColor, &r, &g, &b);
+                uint8_t r, g, b, a;
+                zgl_color_components(game->backgroundColor, &r, &g, &b, &a);
                 struct nk_colorf nkBackgroundColor = nk_color_cf(nk_rgb(r, g, b));
                 nk_color_pick(ctx, &nkBackgroundColor, NK_RGBA);
                 game->backgroundColor = zgl_color_from_floats(nkBackgroundColor.r, nkBackgroundColor.g, nkBackgroundColor.b);
