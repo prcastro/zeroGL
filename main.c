@@ -678,19 +678,19 @@ void drawObjects(game_state_t* game) {
         switch (game->shaderType) {
             case BASIC_SHADER:
                 zgl_basic_uniform_t basicUniformData = {
-                    .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                    .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, zgl_object_transform(&object)),
                 };
                 zgl_render_object3D(&object, &basicUniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
             case COLORED_SHADER:
                 zgl_colored_uniform_t uniformData = {
-                    .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, object.transform),
+                    .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, zgl_object_transform(&object)),
                     .materials = object.mesh->materials
                 };
                 zgl_render_object3D(&object, &uniformData, game->camera, game->canvas, zgl_colored_vertex_shader, zgl_colored_fragment_shader, game->renderOptions);
                 break;
             case UNLIT_SHADER:
                 zgl_unlit_uniform_t unlitUniformData = {
-                    .modelMatrix = object.transform,
+                    .modelMatrix = zgl_object_transform(&object),
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
                     .bilinearFiltering = game->bilinearFiltering,
@@ -700,7 +700,7 @@ void drawObjects(game_state_t* game) {
                 break;
             case FLAT_SHADER:
                 zgl_flat_uniform_t flatUniformData = {
-                    .modelMatrix = object.transform,
+                    .modelMatrix = zgl_object_transform(&object),
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
                     .lightSources = game->lightSources,
@@ -711,7 +711,7 @@ void drawObjects(game_state_t* game) {
                 break;
             case GOURAUD_SHADER:
                 zgl_gouraud_uniform_t gouraudUniformData = {
-                    .modelMatrix = object.transform,
+                    .modelMatrix = zgl_object_transform(&object),
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
                     .lightSources = game->lightSources,
@@ -722,7 +722,7 @@ void drawObjects(game_state_t* game) {
                 break;
             case PHONG_SHADER:
                 zgl_phong_uniform_t phongUniformData = {
-                    .modelMatrix = object.transform,
+                    .modelMatrix = zgl_object_transform(&object),
                     .modelInvRotationMatrixTransposed = zgl_transpose(zgl_inverse(object.rotation)),
                     .viewProjectionMatrix = game->camera.viewProjMatrix,
                     .lightSources = game->lightSources,
@@ -739,7 +739,7 @@ void drawLights(game_state_t* game) {
     // Use basic shader to draw lights
     for (int i = 0; i < game->lightSources.numPointLights; i++) {
         zgl_basic_uniform_t uniformData = {
-            .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, game->pointLightObjects[i].transform),
+            .modelViewProjection = zgl_mul_mat(game->camera.viewProjMatrix, zgl_object_transform(&game->pointLightObjects[i])),
         };
         zgl_render_object3D(&game->pointLightObjects[i], &uniformData, game->camera, game->canvas, zgl_basic_vertex_shader, zgl_basic_fragment_shader, game->renderOptions);
     }
