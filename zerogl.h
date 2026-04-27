@@ -149,7 +149,6 @@ typedef struct {
     zgl_vec3_t*     textureCoords;
     int             numNormals;
     zgl_vec3_t*     normals;
-    float*          invMagnitudeNormals;
     int             numTriangles;
     zgl_triangle_t* triangles;
     int             numMaterials;
@@ -163,10 +162,10 @@ typedef struct {
     zgl_vec3_t   translation;
     float        scale;
     zgl_mat4x4_t rotation;
-    zgl_mat4x4_t transform;
 } zgl_object3D_t;
 
 zgl_object3D_t zgl_object(zgl_mesh_t *mesh, zgl_vec3_t translation, float scale, zgl_mat4x4_t rotation);
+zgl_mat4x4_t zgl_object_transform(const zgl_object3D_t* obj);
 zgl_vec3_t zgl_mesh_center(zgl_vec3_t* vertices, int numVertices);
 float zgl_mesh_bound_radius(zgl_vec3_t* vertices, int numVertices, zgl_vec3_t center);
 uint32_t zgl_sample_texture(float u, float v, zgl_texture_t texture, int bilinearFiltering);
@@ -320,7 +319,7 @@ uint32_t zgl_phong_fragment_shader(const zgl_shader_context_t* input, void* unif
 #define ZGL_SPECULAR_LIGHTING (1 << 1)
 #define ZGL_BACKFACE_CULLING (1 << 2)
 #define ZGL_FRUSTUM_CULLING (1 << 3)
-#define ZGL_BILINEAR_FILTERING (1 << 4) // TODO: Implement bilinear filtering
+#define ZGL_BILINEAR_FILTERING (1 << 4)
 
 void zgl_clear_depth_buffer(zgl_framebuffer_t fb);
 void zgl_render_pixel(int x, int y, float z, uint32_t color, zgl_framebuffer_t fb);
@@ -748,10 +747,13 @@ void zgl_color_to_floats(uint32_t color, float* r, float* g, float* b) {
 /* 3D Objects */
 
 zgl_object3D_t zgl_object(zgl_mesh_t *mesh, zgl_vec3_t translation, float scale, zgl_mat4x4_t rotation) {
-    zgl_mat4x4_t translationMatrix = zgl_translation_mat(translation);
-    zgl_mat4x4_t scaleMatrix = zgl_scale_mat(scale);
-    zgl_mat4x4_t transform = zgl_mul_mat(translationMatrix, zgl_mul_mat(rotation, scaleMatrix));
-    return (zgl_object3D_t) {mesh, translation, scale, rotation, transform};
+    return (zgl_object3D_t) {mesh, translation, scale, rotation};
+}
+
+zgl_mat4x4_t zgl_object_transform(const zgl_object3D_t* obj) {
+    zgl_mat4x4_t translationMatrix = zgl_translation_mat(obj->translation);
+    zgl_mat4x4_t scaleMatrix = zgl_scale_mat(obj->scale);
+    return zgl_mul_mat(translationMatrix, zgl_mul_mat(obj->rotation, scaleMatrix));
 }
 
 zgl_vec3_t zgl_mesh_center(zgl_vec3_t* vertices, int numVertices) {
@@ -1126,10 +1128,10 @@ void zgl_render_object3D(zgl_object3D_t* object, void *uniformData, zgl_camera_t
 
     // Don't draw if the object is fully outside the camera frustum
     if (renderOptions & ZGL_FRUSTUM_CULLING) {
+        zgl_mat4x4_t modelMatrix = zgl_object_transform(object);
+        zgl_vec4_t center = zgl_mul_mat_v4(modelMatrix, (zgl_vec4_t) {mesh->center.x, mesh->center.y, mesh->center.z, 1});
         for (int p = 0; p < 6; p++) {
             zgl_vec4_t plane = camera.frustumPlanes[p];
-            int isInside = 1;
-            zgl_vec4_t center = zgl_mul_mat_v4(object->transform, (zgl_vec4_t) {mesh->center.x, mesh->center.y, mesh->center.z, 1});
             if (zgl_dot_v4(plane, center) < -(object->scale * mesh->boundsRadius)) {
                 ZGL_DEBUG_PRINT("DEBUG: Culled object using frustum culling {plane %d}\n", p);
                 return;
@@ -1417,7 +1419,7 @@ zgl_shader_context_t zgl_flat_vertex_shader(void* inputVertex, void* uniformData
 
 uint32_t zgl_flat_fragment_shader(const zgl_shader_context_t* input, void* uniformData) {
     zgl_flat_uniform_t* uniform = (zgl_flat_uniform_t*) uniformData;
-    int materialIndex = input->flatAttributes[19];
+    int materialIndex = input->flatAttributes[22];
 
     zgl_texture_t ambientTexture = uniform->materials[materialIndex].ambientTexture;
     uint32_t ambientColor = zgl_color_from_floats(input->flatAttributes[3], input->flatAttributes[4], input->flatAttributes[5]);

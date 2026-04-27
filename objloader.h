@@ -355,23 +355,12 @@ static inline zgl_mesh_t* loadObjFile(const char* filename, bool flipTexturesVer
         exit(-1);
     }
 
-    float* invMagnitudeNormals = (float*) malloc(num_normals * sizeof(float));
-    if (invMagnitudeNormals == NULL) {
-        fprintf(stderr, "ERROR: Normal magnitudes couldn't be allocated.\n");
-        exit(-1);
-    }
-
-    for (int i = 0; i < num_normals; i++) {
-        invMagnitudeNormals[i] = 1.0f / zgl_magnitude(normals[i]);
-    }
-
     mesh->numVertices = num_vertices;
     mesh->vertices = vertices;
     mesh->numTextureCoords = num_textureCoords;
     mesh->textureCoords = textureCoords;
     mesh->numNormals = num_normals;
     mesh->normals = normals;
-    mesh->invMagnitudeNormals = invMagnitudeNormals;
     mesh->numTriangles = num_triangles;
     mesh->triangles = triangles;
     mesh->numMaterials = num_materials;
